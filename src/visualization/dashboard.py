@@ -452,7 +452,7 @@ class DashboardApp:
                 
                 # Get current connection value
                 value = self.get_connection_value(source_layer, source_cell, target_layer, target_cell)
-                    
+                
                 # Create slider component
                 slider = self.create_slider_for_cell(
                     source_layer, source_cell, target_layer, target_cell, value
@@ -467,18 +467,16 @@ class DashboardApp:
                     "slider_id": clicked_id
                 }
                 
-                # Return the slider container configuration
+                # Return the slider container with display block but no position
                 return {
                     'display': 'block',
-                    'position': 'absolute',
-                    'top': '0px',  # Will be set by JS
-                    'left': '0px', # Will be set by JS
                     'backgroundColor': 'rgba(50, 50, 50, 0.9)',
                     'padding': '10px',
                     'border': '1px solid #444',
                     'borderRadius': '5px',
                     'zIndex': '1000',
-                    'width': '200px'
+                    'width': '200px',
+                    'position': 'absolute'
                 }, slider, connection_data
             except Exception as e:
                 print(f"Error handling cell click: {e}")
@@ -519,25 +517,48 @@ class DashboardApp:
         self.app.clientside_callback(
             """
             function(n_clicks) {
+                // Function to position the slider relative to a cell
+                function positionSlider(cell) {
+                    const rect = cell.getBoundingClientRect();
+                    const sliderContainer = document.getElementById('slider-container');
+                    if (!sliderContainer) return;
+                    
+                    // Position the slider immediately
+                    sliderContainer.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+                    sliderContainer.style.left = (rect.left + window.scrollX - 75) + 'px';
+                    
+                    // Highlight the active cell
+                    document.querySelectorAll('.connection-cell').forEach(c => c.style.outline = 'none');
+                    cell.style.outline = '2px solid white';
+                }
+                
                 // Set up event handlers for connection cells
                 const cells = document.querySelectorAll('.connection-cell');
                 cells.forEach(cell => {
-                    cell.addEventListener('click', function(e) {
-                        // Get the clicked cell's position
-                        const rect = this.getBoundingClientRect();
-                        
-                        // Position the slider below the cell
-                        const sliderContainer = document.getElementById('slider-container');
-                        if (!sliderContainer) return;
-                        
-                        sliderContainer.style.top = (rect.bottom + window.scrollY + 5) + 'px';
-                        sliderContainer.style.left = (rect.left + window.scrollX - 75) + 'px';
-                        
-                        // Highlight the active cell
-                        cells.forEach(c => c.style.outline = 'none');
-                        this.style.outline = '2px solid white';
-                    });
+                    // Remove any existing click listeners to prevent duplicates
+                    cell.removeEventListener('click', cell._clickHandler);
+                    
+                    // Create and store new click handler
+                    cell._clickHandler = function(e) {
+                        positionSlider(this);
+                    };
+                    
+                    // Add the click handler
+                    cell.addEventListener('click', cell._clickHandler);
                 });
+                
+                // Handle the initial click if this callback was triggered by a cell click
+                const ctx = window.dash_clientside.callback_context;
+                if (ctx && ctx.triggered && ctx.triggered.length > 0) {
+                    const triggerId = ctx.triggered[0].prop_id;
+                    if (triggerId.includes('connection-cell')) {
+                        const cellId = JSON.parse(triggerId.split('.')[0]).id;
+                        const clickedCell = document.querySelector(`[id*="${cellId}"]`);
+                        if (clickedCell) {
+                            positionSlider(clickedCell);  // Position immediately without setTimeout
+                        }
+                    }
+                }
                 
                 // Hide slider when clicking outside the matrix or slider
                 document.addEventListener('click', function(e) {
@@ -554,7 +575,8 @@ class DashboardApp:
             }
             """,
             Output('connection-matrix-container', 'n_clicks'),
-            [Input('connection-matrix-container', 'id')],
+            [Input('connection-matrix-container', 'id'),
+             Input({'type': 'connection-cell', 'id': ALL}, 'n_clicks')],
         )
         
         # Update visualization based on simulation state
