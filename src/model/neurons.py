@@ -149,8 +149,8 @@ class CorticalCircuit:
         Returns:
             Dictionary containing all population activities
         """
-        thalamus_flat = self.thalamus.flatten()
         grid_shape = (self.grid_size, self.grid_size)
+        thalamus_flat = self.thalamus.flatten()
         
         # Precompute thalamic inputs once outside the integration loop
         thalamic_inputs = {}
@@ -198,5 +198,5 @@ class CorticalCircuit:
                 # Update this layer
                 self.layers[target_layer].update(layer_inputs)
         
-        # Return activities from all layers
+        # Return current activities
         return self.get_layer_activities() 

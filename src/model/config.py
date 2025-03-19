@@ -14,12 +14,12 @@ INTEGRATION_STEPS = 5  # Number of steps per update cycle - INCREASE for faster 
 VISUALIZATION_STEPS = 3  # Number of simulation steps per visualization update - DECREASE for more frequent visual updates
 
 # Thalamic input parameters
-THALAMIC_INTRINSIC_FREQ = 5.0  # Base frequency for intrinsic oscillations (Hz) - INCREASE for faster oscillations
-THALAMIC_INTRINSIC_SIGMA = 3.0  # Spatial spread of intrinsic activity (grid units) - DECREASE for more rapid spatial changes
+THALAMIC_INTRINSIC_FREQ = 10.0  # Base frequency for intrinsic oscillations (Hz) - INCREASE for faster oscillations
+THALAMIC_INTRINSIC_SIGMA = 4.0  # Spatial spread of intrinsic activity (grid units) - DECREASE for more rapid spatial changes
 THALAMIC_SENSORY_SIGMA = 1.5  # Spatial spread of sensory inputs (grid units)
 THALAMIC_SENSORY_DURATION = 20.0  # Duration of sensory bursts (ms) - DECREASE for faster transitions
 THALAMIC_SENSORY_INTERVAL = 50.0  # Mean interval between sensory bursts (ms) - DECREASE for more frequent activity changes
-THALAMIC_SCALING = 2.0  # Overall scaling factor for thalamic input - INCREASE for more dramatic visual changes
+THALAMIC_SCALING = 1.0  # Overall scaling factor for thalamic input - INCREASE for more dramatic visual changes
 
 # Neural network parameters
 NEURAL_TAU = 10.0  # Membrane time constant (ms) - DECREASE for faster neural dynamics and visual changes
@@ -156,7 +156,7 @@ LAYER_CONNECTIONS = [
 ]
 
 # Visualization settings
-UPDATE_INTERVAL = 50  # Time between visualization updates (ms) - DECREASE for more frequent visual updates
+UPDATE_INTERVAL = 60  # Time between visualization updates (ms) - DECREASE for more frequent visual updates
 COLORMAPS = {
     'E': [[0, 'black'], [1, 'blue']],
     'SST': [[0, 'black'], [1, 'orange']],

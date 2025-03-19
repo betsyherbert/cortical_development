@@ -178,14 +178,16 @@ class ThalamicInput:
         # Add sensory bursts
         for _ in range(n_steps):
             self._maybe_add_sensory_burst()
-            
+        
         # Generate final output
         intrinsic = self.generate_intrinsic()
         sensory = self.generate_sensory()
         
         # Combine intrinsic and sensory components
         combined = (1 - alpha) * intrinsic + alpha * sensory
-        return combined * THALAMIC_SCALING
+        result = combined * THALAMIC_SCALING
+        
+        return result
     
     def reset(self) -> None:
         """Reset the generator to initial state."""

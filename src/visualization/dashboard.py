@@ -43,11 +43,29 @@ class DashboardApp:
             suppress_callback_exceptions=True
         )
         
+        # Pre-create all figures for better performance
+        self.figures = {}
+        self._initialize_figures()
+        
         # Set up the layout
         self.setup_layout()
         
         # Set up callbacks
         self.setup_callbacks()
+    
+    def _initialize_figures(self):
+        """Pre-create all heatmap figures for better performance."""
+        # Initialize with zeros
+        empty_data = np.zeros((self.simulation.grid_size, self.simulation.grid_size))
+        
+        # Create figures for all cell types in all layers
+        for layer in LAYERS:
+            for cell_type in CELL_TYPES:
+                fig_id = f'graph-{layer}-{cell_type}'
+                self.figures[fig_id] = self.create_heatmap(empty_data, cell_type)
+        
+        # Create thalamus figure
+        self.figures['graph-thalamus'] = self.create_heatmap(empty_data, 'thalamus')
     
     def setup_layout(self):
         """Set up the dashboard layout."""
@@ -92,7 +110,7 @@ class DashboardApp:
                                     html.Div(
                                         dcc.Graph(
                                             id='graph-thalamus',
-                                            figure=self.create_heatmap(np.zeros((self.simulation.grid_size, self.simulation.grid_size)), 'thalamus'),
+                                            figure=self.figures['graph-thalamus'],
                                             config={'displayModeBar': False}
                                         ),
                                         style={"display": "inline-block"}
@@ -199,7 +217,7 @@ class DashboardApp:
                         html.Div(
                             dcc.Graph(
                                 id=f'graph-{layer}-{cell_type}',
-                                figure=self.create_heatmap(np.zeros((self.simulation.grid_size, self.simulation.grid_size)), cell_type),
+                                figure=self.figures[f'graph-{layer}-{cell_type}'],
                                 config={'displayModeBar': False}
                             ),
                             style={"display": "inline-block"}
@@ -529,23 +547,21 @@ class DashboardApp:
                     # Run simulation update
                     activities = self.simulation.update(alpha)
                     
-                    # Create figures for all cell types in all layers
+                    # Update figures efficiently by only changing the z data
                     figures = []
                     for layer in LAYERS:
                         for cell_type in CELL_TYPES:
-                            data = activities[layer][cell_type]
-                            figures.append(self.create_heatmap(data, cell_type))
+                            fig_id = f'graph-{layer}-{cell_type}'
+                            # Update only the z data without recreating the figure
+                            self.figures[fig_id].data[0].z = activities[layer][cell_type]
+                            figures.append(self.figures[fig_id])
                     
-                    # Add thalamus figure
-                    figures.append(self.create_heatmap(
-                        activities['thalamus'], 'thalamus'
-                    ))
+                    # Update thalamus figure
+                    self.figures['graph-thalamus'].data[0].z = activities['thalamus']
+                    figures.append(self.figures['graph-thalamus'])
                     
                     return figures
                 except Exception as e:
-                    print(f"Error updating simulation: {e}")
-                    import traceback
-                    traceback.print_exc()
                     # On error, don't update
                     return [dash.no_update] * (len(LAYERS) * len(CELL_TYPES) + 1)
             
@@ -607,7 +623,6 @@ class DashboardApp:
             debug: Whether to run in debug mode
             port: Port to run the server on
         """
-        # Run with silenced route logging to reduce terminal output
         self.app.run_server(
             debug=debug, 
             port=port, 

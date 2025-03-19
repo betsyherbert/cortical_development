@@ -248,36 +248,39 @@ class LayerConnectivity:
             source: Source population type ('E', 'SST', 'PV', 'thalamus')
             target: Target population type ('E', 'SST', 'PV')
             rates: Firing rates of source population
-            source_layer: Source layer ('L23', 'L4', 'L5', or 'thalamus')
-            target_layer: Target layer ('L23', 'L4', 'L5')
+            source_layer: Layer of source population ('L23', 'L4', 'L5', 'thalamus', 'any')
+            target_layer: Layer of target population ('L23', 'L4', 'L5', 'any')
             
         Returns:
-            Input currents to target population
+            Input current from source to target population
         """
-        # Create connection key tuple
+        # Try to find a layer-specific connection first
         conn_key = (source_layer, source, target_layer, target)
         
-        # Direct lookup with the exact layer-specific key
+        # If layer-specific connection exists, use it
         if conn_key in self.W:
-            return self.W[conn_key] @ rates
+            weight_matrix = self.W[conn_key]
+            input_current = weight_matrix @ rates
         
-        # Prepare fallback keys in order of specificity
-        fallback_keys = [
-            (source_layer, source, 'any', target),
-            ('any', source, target_layer, target),
-            ('any', source, 'any', target)
-        ]
-        
-        if source == 'thalamus':
-            fallback_keys = [('thalamus', None, 'any', target)]
+        # Otherwise try traditional connections for backward compatibility
+        else:
+            any_layer_key = ('any', source, 'any', target)
+            if any_layer_key in self.W:
+                weight_matrix = self.W[any_layer_key]
+                input_current = weight_matrix @ rates
             
-        # Try each fallback key
-        for key in fallback_keys:
-            if key in self.W:
-                return self.W[key] @ rates
-                
-        # If no connection exists, return zeros
-        return np.zeros_like(rates)
+            # For thalamic inputs with backward compatibility
+            elif source == 'thalamus':
+                any_layer_key = ('thalamus', None, 'any', target)
+                if any_layer_key in self.W:
+                    weight_matrix = self.W[any_layer_key]
+                    input_current = weight_matrix @ rates
+                else:
+                    input_current = np.zeros_like(rates)
+            else:
+                input_current = np.zeros_like(rates)
+        
+        return input_current
     
     def get_connection_strength(self, source_layer: str, source_cell: str, 
                               target_layer: str, target_cell: str) -> float:
