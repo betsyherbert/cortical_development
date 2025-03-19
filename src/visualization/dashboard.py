@@ -2,12 +2,13 @@
 
 import dash
 from dash import html, dcc
-from dash.dependencies import Input, Output, State
+from dash.dependencies import Input, Output, State, ALL, MATCH
 import plotly.graph_objects as go
 import numpy as np
 import dash_bootstrap_components as dbc
 from typing import Dict, List, Tuple
 import time
+import json
 
 from model.config import (
     COLORMAPS, UPDATE_INTERVAL, CELL_TYPES, LAYERS, LAYER_NAMES, 
@@ -39,7 +40,6 @@ class DashboardApp:
         self.app = dash.Dash(
             __name__, 
             external_stylesheets=[dbc.themes.DARKLY],
-            # Prevent validation errors when dynamically generating callbacks
             suppress_callback_exceptions=True
         )
         
@@ -47,10 +47,8 @@ class DashboardApp:
         self.figures = {}
         self._initialize_figures()
         
-        # Set up the layout
+        # Set up the layout and callbacks
         self.setup_layout()
-        
-        # Set up callbacks
         self.setup_callbacks()
     
     def _initialize_figures(self):
@@ -80,6 +78,9 @@ class DashboardApp:
         self.app.layout = dbc.Container([
             # Interval component for updates
             interval,
+            
+            # Store component for currently selected cell
+            dcc.Store(id='selected-cell', data=None),
             
             # Main content: visualization and controls
             dbc.Row([
@@ -133,33 +134,31 @@ class DashboardApp:
                 dbc.Col([
                     html.H4("Control Panel", className="text-center mb-2"),
                     
-                    # Connection strength controls in tabs
+                    # Connection Strength Matrix
                     html.Div([
                         html.H5("Connection Strengths", className="mb-2"),
                         
-                        # Tab navigation for connection types
-                        dbc.Tabs([
-                            # Within-layer connections
-                            dbc.Tab(
-                                self.create_within_layer_controls(),
-                                label="Within-Layer", 
-                                tab_id="tab-within-layer"
-                            ),
-                            
-                            # Cross-layer connections
-                            dbc.Tab(
-                                self.create_cross_layer_controls(),
-                                label="Cross-Layer", 
-                                tab_id="tab-cross-layer"
-                            ),
-                            
-                            # Thalamic connections
-                            dbc.Tab(
-                                self.create_thalamic_controls(),
-                                label="Thalamic", 
-                                tab_id="tab-thalamic"
-                            )
-                        ], id="conn-tabs", active_tab="tab-within-layer")
+                        # Connection Matrix Container
+                        html.Div(
+                            self.create_connection_matrix(),
+                            id="connection-matrix-container",
+                            style={"position": "relative"}
+                        ),
+                        
+                        # Hover Activated Slider Container (initially hidden)
+                        html.Div(
+                            id="slider-container",
+                            style={
+                                "position": "absolute", 
+                                "display": "none",
+                                "backgroundColor": "rgba(50, 50, 50, 0.9)",
+                                "padding": "10px",
+                                "border": "1px solid #444",
+                                "borderRadius": "5px",
+                                "zIndex": "1000",
+                                "width": "200px"
+                            }
+                        )
                     ], className="mb-3"),
                     
                     # Thalamic input controls
@@ -190,15 +189,7 @@ class DashboardApp:
         ], fluid=True, className="py-2")
     
     def create_layer_row(self, layer: str) -> dbc.Row:
-        """
-        Create a row for a single cortical layer with cell types as columns.
-        
-        Args:
-            layer: Layer identifier (e.g., 'L23', 'L4', 'L5')
-            
-        Returns:
-            A Bootstrap row component containing the layer visualization
-        """
+        """Create a row for a single cortical layer with cell types as columns."""
         # Define the cell type order (SST, E, PV)
         ordered_cell_types = ['SST', 'E', 'PV']
         
@@ -234,20 +225,10 @@ class DashboardApp:
         )
 
     def create_heatmap(self, data: np.ndarray, cell_type: str) -> go.Figure:
-        """
-        Create a heatmap figure for the given neural activity data.
-        
-        Args:
-            data: 2D array of activity values
-            cell_type: Cell type for determining colormap
-            
-        Returns:
-            Plotly figure object
-        """
+        """Create a heatmap figure for the given neural activity data."""
         colorscale = COLORMAPS.get(cell_type, [[0, 'black'], [1, 'gray']])
         
         # Set appropriate range for each cell type
-        # Using lower zmax values to make activity more visible
         if cell_type == 'thalamus':
             zmax = THALAMIC_SCALING
         elif cell_type == 'E':
@@ -261,7 +242,6 @@ class DashboardApp:
                 colorscale=colorscale,
                 showscale=False,
                 hoverinfo='none',  # Disable hover info for performance
-                # Fix color range to prevent flashing
                 zmin=0,
                 zmax=zmax
             )],
@@ -269,14 +249,13 @@ class DashboardApp:
                 margin=dict(l=0, r=0, t=0, b=0),
                 height=180,  # Reduced height
                 width=180,  # Reduced width
-                # Optimize for performance by disabling interactions
                 dragmode=False,
                 xaxis=dict(
                     showgrid=False,
                     showticklabels=False,
                     zeroline=False,
                     scaleanchor="y",  # Force square aspect ratio
-                    scaleratio=1      # Force square aspect ratio
+                    scaleratio=1
                 ),
                 yaxis=dict(
                     showgrid=False,
@@ -286,231 +265,299 @@ class DashboardApp:
             )
         )
     
-    def create_within_layer_controls(self) -> html.Div:
-        """
-        Create controls for within-layer connection parameters.
-        
-        Returns:
-            Dash component with within-layer connection controls
-        """
-        # Filter for within-layer connections
-        within_layer_controls = []
-        
-        # Create one accordion item per layer with sliders inside
-        accordion_items = []
-        
-        for layer in LAYERS:
-            # Create sliders for this layer's connections
-            sliders = []
-            
-            for source_cell in CELL_TYPES:
-                for target_cell in CELL_TYPES:
-                    # Skip connections that don't exist (e.g., SST->SST)
-                    if source_cell == 'SST' and target_cell == 'SST':
-                        continue
-                    
-                    # Create connection key
-                    conn_key = f'{layer}_{source_cell}_to_{layer}_{target_cell}'
-                    
-                    # Get default value if it exists
-                    if conn_key in LAYER_CONNECTIVITY_PARAMS:
-                        default_value = LAYER_CONNECTIVITY_PARAMS[conn_key]['amplitude']
-                    else:
-                        # Skip connections that aren't defined
-                        continue
-                    
-                    # Set slider range based on excitatory/inhibitory type
-                    is_excitatory = source_cell == 'E'
-                    slider_min = 0 if is_excitatory else -0.5
-                    slider_max = 0.5 if is_excitatory else 0
-                    
-                    # Create slider component
-                    sliders.append(html.Div([
-                        dbc.Label(f"{source_cell} → {target_cell}", className="mb-0"),
-                        dcc.Slider(
-                            id=f'slider-{layer}-{source_cell}-{layer}-{target_cell}',
-                            min=slider_min, max=slider_max, step=0.01,
-                            value=default_value,
-                            marks={
-                                slider_min: f"{slider_min:.1f}",
-                                slider_min/2 + slider_max/2: f"{(slider_min/2 + slider_max/2):.1f}",
-                                slider_max: f"{slider_max:.1f}"
-                            }
-                        )
-                    ], className="mb-2"))
-            
-            # Create accordion item for this layer
-            accordion_items.append(
-                dbc.AccordionItem(
-                    sliders,
-                    title=f"{LAYER_NAMES[layer]} Connections",
-                    item_id=f"layer-{layer}"
-                )
-            )
-        
-        # Return the accordion with all layers
-        return html.Div([
-            dbc.Accordion(
-                accordion_items,
-                start_collapsed=True,
-                always_open=True
-            )
-        ])
+    def get_connection_key(self, source_layer, source_cell, target_layer, target_cell):
+        """Generate a connection key based on source and target information."""
+        if source_layer == 'Th':
+            return f'thalamus_to_{target_layer}_{target_cell}'
+        else:
+            return f'{source_layer}_{source_cell}_to_{target_layer}_{target_cell}'
+    
+    def get_connection_value(self, source_layer, source_cell, target_layer, target_cell):
+        """Get the current connection strength value."""
+        conn_key = self.get_connection_key(source_layer, source_cell, target_layer, target_cell)
+        if conn_key in LAYER_CONNECTIVITY_PARAMS:
+            return LAYER_CONNECTIVITY_PARAMS[conn_key]['amplitude']
+        return 0.0
 
-    def create_cross_layer_controls(self) -> html.Div:
-        """
-        Create controls for cross-layer connection parameters.
+    def create_connection_matrix(self) -> html.Div:
+        """Create a matrix visualization of all layer and cell type connections."""
+        # Define the labels/indices for the matrix
+        all_populations = [(layer, cell_type) for layer in LAYERS for cell_type in CELL_TYPES]
+        all_populations.append(('Th', None))  # Add thalamus
         
-        Returns:
-            Dash component with cross-layer connection controls
-        """
-        # Create one accordion item per pair of layers
-        accordion_items = []
+        # Create the matrix table header (To...)
+        header_cells = [html.Th("From", className="text-center")] + [
+            html.Th([
+                html.Div([
+                    html.Div(LAYER_NAMES[layer] if layer != 'Th' else "Thalamus", className="fw-bold"),
+                    html.Div(cell_type or "")
+                ], className="text-center")
+            ]) 
+            for layer, cell_type in all_populations if layer != 'Th' or cell_type is None
+        ]
         
-        for source_layer in LAYERS:
-            for target_layer in LAYERS:
-                # Skip within-layer connections as they're in a different tab
-                if source_layer == target_layer:
+        header_row = html.Tr(header_cells)
+        
+        # Generate matrix rows
+        rows = []
+        for source in all_populations:
+            source_layer, source_cell = source
+            display_layer = "Thalamus" if source_layer == 'Th' else LAYER_NAMES[source_layer]
+            
+            # Create row header (From...)
+            row_header = html.Th([
+                html.Div([
+                    html.Div(display_layer, className="fw-bold"),
+                    html.Div(source_cell or "")
+                ], className="text-end")
+            ])
+            
+            # Create data cells
+            cells = []
+            for target in all_populations:
+                target_layer, target_cell = target
+                
+                # Skip certain connection types
+                if (source_layer == 'Th' and target_layer == 'Th') or \
+                   (target_layer == 'Th') or \
+                   (source_cell == 'SST' and target_cell == 'SST'):
+                    cells.append(html.Td(
+                        "",
+                        className="text-center",
+                        style={"backgroundColor": "#1a1a1a"}
+                    ))
                     continue
                 
-                # Create sliders for connections between these layers
-                sliders = []
+                # Get connection strength
+                value = self.get_connection_value(source_layer, source_cell, target_layer, target_cell)
                 
-                # Only excitatory neurons project between layers
-                source_cell = 'E'
-                for target_cell in CELL_TYPES:
-                    # Create connection key
-                    conn_key = f'{source_layer}_{source_cell}_to_{target_layer}_{target_cell}'
-                    
-                    # Get default value if it exists
-                    if conn_key in LAYER_CONNECTIVITY_PARAMS:
-                        default_value = LAYER_CONNECTIVITY_PARAMS[conn_key]['amplitude']
-                    else:
-                        # Skip connections that aren't defined
-                        continue
-                    
-                    # Create slider component
-                    sliders.append(html.Div([
-                        dbc.Label(f"{source_cell} → {target_cell}", className="mb-0"),
-                        dcc.Slider(
-                            id=f'slider-{source_layer}-{source_cell}-{target_layer}-{target_cell}',
-                            min=0, max=0.3, step=0.01,
-                            value=default_value,
-                            marks={0: "0", 0.15: "0.15", 0.3: "0.3"}
-                        )
-                    ], className="mb-2"))
-                
-                # Only add accordion item if there are sliders
-                if sliders:
-                    accordion_items.append(
-                        dbc.AccordionItem(
-                            sliders,
-                            title=f"{LAYER_NAMES[source_layer]} → {LAYER_NAMES[target_layer]}",
-                            item_id=f"layers-{source_layer}-{target_layer}"
-                        )
-                    )
-        
-        # Return the accordion with all layer pairs
-        return html.Div([
-            dbc.Accordion(
-                accordion_items,
-                start_collapsed=True,
-                always_open=True
-            )
-        ])
-
-    def create_thalamic_controls(self) -> html.Div:
-        """
-        Create controls for thalamic connection parameters.
-        
-        Returns:
-            Dash component with thalamic connection controls
-        """
-        # Create one accordion item per target layer
-        accordion_items = []
-        
-        for target_layer in LAYERS:
-            # Create sliders for thalamic connections to this layer
-            sliders = []
-            
-            for target_cell in CELL_TYPES:
-                # Create connection key
-                conn_key = f'thalamus_to_{target_layer}_{target_cell}'
-                
-                # Get default value if it exists
-                if conn_key in LAYER_CONNECTIVITY_PARAMS:
-                    default_value = LAYER_CONNECTIVITY_PARAMS[conn_key]['amplitude']
+                # Create cell with background color based on strength
+                if value > 0:
+                    intensity = min(value / 1.0, 1.0) * 0.7
+                    bg_color = f"rgba(0, 120, 215, {intensity})"
+                    hover_color = f"rgba(0, 150, 255, {intensity + 0.2})"
+                elif value < 0:
+                    intensity = min(abs(value) / 1.0, 1.0) * 0.7
+                    bg_color = f"rgba(215, 0, 0, {intensity})"
+                    hover_color = f"rgba(255, 0, 0, {intensity + 0.2})"
                 else:
-                    # Skip connections that aren't defined
-                    continue
+                    bg_color = "rgba(80, 80, 80, 0.1)"
+                    hover_color = "rgba(100, 100, 100, 0.3)"
                 
-                # Create slider component
-                sliders.append(html.Div([
-                    dbc.Label(f"Thalamus → {target_cell}", className="mb-0"),
-                    dcc.Slider(
-                        id=f'slider-thalamus-None-{target_layer}-{target_cell}',
-                        min=0, max=0.3, step=0.01,
-                        value=default_value,
-                        marks={0: "0", 0.15: "0.15", 0.3: "0.3"}
-                    )
-                ], className="mb-2"))
+                # Create cell with unique ID for callbacks
+                cell_id = f"{source_layer}-{source_cell or 'None'}-{target_layer}-{target_cell}"
+                cells.append(html.Td(
+                    f"{value:.1f}",
+                    id={'type': 'connection-cell', 'id': cell_id},
+                    className="connection-cell text-center",
+                    style={
+                        "backgroundColor": bg_color,
+                        "cursor": "pointer",
+                        "transition": "background-color 0.2s"
+                    },
+                    **{
+                        'data-highlight-color': hover_color
+                    }
+                ))
             
-            # Create accordion item for this layer
-            accordion_items.append(
-                dbc.AccordionItem(
-                    sliders,
-                    title=f"Thalamus → {LAYER_NAMES[target_layer]}",
-                    item_id=f"thal-{target_layer}"
-                )
-            )
+            # Add row to table
+            rows.append(html.Tr([row_header] + cells))
         
-        # Return the accordion with all layers
+        # Create table
         return html.Div([
-            dbc.Accordion(
-                accordion_items,
-                start_collapsed=True,
-                always_open=True
+            html.Table(
+                [header_row] + rows,
+                className="table table-bordered connection-matrix",
+                style={"tableLayout": "fixed", "fontSize": "0.8rem"}
             )
         ])
-    
-    def collect_layer_connection_ids(self) -> List[str]:
-        """
-        Collect all slider IDs for layer-specific connections.
+
+    def create_slider_for_cell(self, source_layer, source_cell, target_layer, target_cell, value):
+        """Create a slider component for a connection cell."""
+        # Set slider range based on excitatory/inhibitory type
+        is_excitatory = source_cell == 'E' or source_layer == 'Th'
+        slider_min = 0 if is_excitatory else -5.0
+        slider_max = 5.0
         
-        Returns:
-            List of slider IDs for all layer-specific connections
-        """
-        slider_ids = []
+        # Create unique ID for slider
+        slider_id = f"{source_layer}-{source_cell or 'None'}-{target_layer}-{target_cell}"
         
-        # Within-layer connections
-        for layer in LAYERS:
-            for source_cell in CELL_TYPES:
-                for target_cell in CELL_TYPES:
-                    # Skip connections that don't exist (e.g., SST->SST)
-                    if source_cell == 'SST' and target_cell == 'SST':
-                        continue
-                    
-                    slider_ids.append(f'slider-{layer}-{source_cell}-{layer}-{target_cell}')
-        
-        # Cross-layer connections (E cells only)
-        for source_layer in LAYERS:
-            for target_layer in LAYERS:
-                if source_layer != target_layer:  # Skip within-layer
-                    for target_cell in CELL_TYPES:
-                        slider_ids.append(f'slider-{source_layer}-E-{target_layer}-{target_cell}')
-        
-        # Thalamic connections
-        for target_layer in LAYERS:
-            for target_cell in CELL_TYPES:
-                slider_ids.append(f'slider-thalamus-None-{target_layer}-{target_cell}')
-        
-        return slider_ids
-    
+        return html.Div([
+            html.Div(
+                f"{source_layer}" + (f"-{source_cell}" if source_cell else "") + 
+                f" → {target_layer}-{target_cell}: {value:.1f}", 
+                style={"marginBottom": "5px", "textAlign": "center"}
+            ),
+            dcc.Slider(
+                id={'type': 'matrix-slider', 'id': slider_id},
+                min=slider_min, max=slider_max, step=0.1,
+                value=value,
+                marks={
+                    slider_min: f"{slider_min:.1f}",
+                    0: "0",
+                    slider_max/2: f"{slider_max/2:.1f}",
+                    slider_max: f"{slider_max:.1f}"
+                }
+            ),
+            html.Div(
+                id={'type': 'slider-value', 'id': slider_id}, 
+                style={"marginTop": "5px", "textAlign": "center"}
+            )
+        ])
+
     def setup_callbacks(self):
         """Set up the dashboard callbacks for interactivity."""
-        # Collect all slider IDs for layer-specific connections
-        slider_ids = self.collect_layer_connection_ids()
+        # Initialize slider container (hidden)
+        @self.app.callback(
+            [Output('slider-container', 'style'),
+             Output('slider-container', 'children'),
+             Output('selected-cell', 'data')],
+            [Input('connection-matrix-container', 'children')],
+            [State('selected-cell', 'data')]
+        )
+        def initialize_slider_container(_, current_data):
+            return {'display': 'none'}, [], None
+            
+        # Handle cell clicks to show the slider
+        @self.app.callback(
+            [Output('slider-container', 'style', allow_duplicate=True),
+             Output('slider-container', 'children', allow_duplicate=True),
+             Output('selected-cell', 'data', allow_duplicate=True)],
+            [Input({'type': 'connection-cell', 'id': ALL}, 'n_clicks')],
+            [State('selected-cell', 'data')],
+            prevent_initial_call=True
+        )
+        def handle_cell_click(clicks, current_data):
+            try:
+                # Get the context that triggered the callback
+                ctx = dash.callback_context
+                if not ctx.triggered:
+                    return {'display': 'none'}, [], None
+                
+                # Get the ID of the clicked cell
+                triggered_prop_id = ctx.triggered[0]['prop_id']
+                cell_data = json.loads(triggered_prop_id.split('.')[0])
+                clicked_id = cell_data['id']
+                
+                # Extract connection info from the ID
+                parts = clicked_id.split('-')
+                if len(parts) < 4:
+                    print(f"Invalid cell ID format: {clicked_id}")
+                    return {'display': 'none'}, [], None
+                
+                source_layer = parts[0]
+                source_cell = parts[1] if parts[1] != "None" else None
+                target_layer = parts[2]
+                target_cell = parts[3]
+                
+                # Get current connection value
+                value = self.get_connection_value(source_layer, source_cell, target_layer, target_cell)
+                    
+                # Create slider component
+                slider = self.create_slider_for_cell(
+                    source_layer, source_cell, target_layer, target_cell, value
+                )
+                
+                # Create connection data for state
+                connection_data = {
+                    "source_layer": source_layer,
+                    "source_cell": source_cell,
+                    "target_layer": target_layer,
+                    "target_cell": target_cell,
+                    "slider_id": clicked_id
+                }
+                
+                # Return the slider container configuration
+                return {
+                    'display': 'block',
+                    'position': 'absolute',
+                    'top': '0px',  # Will be set by JS
+                    'left': '0px', # Will be set by JS
+                    'backgroundColor': 'rgba(50, 50, 50, 0.9)',
+                    'padding': '10px',
+                    'border': '1px solid #444',
+                    'borderRadius': '5px',
+                    'zIndex': '1000',
+                    'width': '200px'
+                }, slider, connection_data
+            except Exception as e:
+                print(f"Error handling cell click: {e}")
+                return {'display': 'none'}, [], None
         
+        # Update connection strength when slider changes
+        @self.app.callback(
+            Output({'type': 'slider-value', 'id': MATCH}, 'children'),
+            Input({'type': 'matrix-slider', 'id': MATCH}, 'value'),
+            State('selected-cell', 'data')
+        )
+        def update_connection_value(value, connection_data):
+            if not connection_data:
+                return ""
+            
+            try:
+                # Update connection in simulation
+                source_layer = connection_data['source_layer'] 
+                source_cell = connection_data['source_cell']
+                target_layer = connection_data['target_layer']
+                target_cell = connection_data['target_cell']
+                
+                # Handle thalamus special case
+                if source_layer == 'Th':
+                    source_layer = 'thalamus'
+                
+                # Update simulation connection strength
+                self.simulation.connectivity.set_connection_strength(
+                    source_layer, source_cell, target_layer, target_cell, value
+                )
+                
+                return f"Value: {value:.1f}"
+            except Exception as e:
+                print(f"Error updating connection value: {e}")
+                return f"Error: {str(e)}"
+        
+        # JavaScript to handle slider positioning and cell interactions
+        self.app.clientside_callback(
+            """
+            function(n_clicks) {
+                // Set up event handlers for connection cells
+                const cells = document.querySelectorAll('.connection-cell');
+                cells.forEach(cell => {
+                    cell.addEventListener('click', function(e) {
+                        // Get the clicked cell's position
+                        const rect = this.getBoundingClientRect();
+                        
+                        // Position the slider below the cell
+                        const sliderContainer = document.getElementById('slider-container');
+                        if (!sliderContainer) return;
+                        
+                        sliderContainer.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+                        sliderContainer.style.left = (rect.left + window.scrollX - 75) + 'px';
+                        
+                        // Highlight the active cell
+                        cells.forEach(c => c.style.outline = 'none');
+                        this.style.outline = '2px solid white';
+                    });
+                });
+                
+                // Hide slider when clicking outside the matrix or slider
+                document.addEventListener('click', function(e) {
+                    if (!e.target.closest('.connection-cell') && 
+                        !e.target.closest('#slider-container')) {
+                        const sliderContainer = document.getElementById('slider-container');
+                        if (sliderContainer) sliderContainer.style.display = 'none';
+                        
+                        cells.forEach(c => c.style.outline = 'none');
+                    }
+                });
+                
+                return window.dash_clientside.no_update;
+            }
+            """,
+            Output('connection-matrix-container', 'n_clicks'),
+            [Input('connection-matrix-container', 'id')],
+        )
+        
+        # Update visualization based on simulation state
         @self.app.callback(
             # Outputs: all graph figures
             [Output(f'graph-{layer}-{cell_type}', 'figure')
@@ -518,32 +565,19 @@ class DashboardApp:
              for cell_type in CELL_TYPES] +
             [Output('graph-thalamus', 'figure')],
             
-            # Inputs: interval trigger and all sliders
-            [Input('interval-component', 'n_intervals')] +
-            [Input(slider_id, 'value') for slider_id in slider_ids] +
-            [Input('alpha-slider', 'value')],
+            # Inputs: interval trigger and alpha slider
+            [Input('interval-component', 'n_intervals'),
+             Input('alpha-slider', 'value')],
             
             # States: pause button state
             [State('pause-button', 'n_clicks')]
         )
-        def update_graphs(n_intervals, *args):
-            # Extract parameters from args
-            connection_params = args[:-2]  # All but last two args
-            alpha = args[-2] if args[-2] is not None else 0.7  # Second to last arg, default to 0.7
-            pause_clicks = args[-1]  # Last arg
-            
+        def update_graphs(n_intervals, alpha, pause_clicks):
             # Check if simulation is paused
             is_paused = pause_clicks and pause_clicks % 2 == 1
             
             if not is_paused:
                 try:
-                    # Update connection weights only if they've changed
-                    ctx = dash.callback_context
-                    if ctx.triggered:
-                        prop_id = ctx.triggered[0]['prop_id']
-                        if 'slider' in prop_id:
-                            self.update_connections(slider_ids, connection_params)
-                    
                     # Run simulation update
                     activities = self.simulation.update(alpha)
                     
@@ -552,7 +586,6 @@ class DashboardApp:
                     for layer in LAYERS:
                         for cell_type in CELL_TYPES:
                             fig_id = f'graph-{layer}-{cell_type}'
-                            # Update only the z data without recreating the figure
                             self.figures[fig_id].data[0].z = activities[layer][cell_type]
                             figures.append(self.figures[fig_id])
                     
@@ -562,67 +595,32 @@ class DashboardApp:
                     
                     return figures
                 except Exception as e:
-                    # On error, don't update
+                    print(f"Error updating graphs: {e}")
                     return [dash.no_update] * (len(LAYERS) * len(CELL_TYPES) + 1)
             
             # If paused, don't update
             return [dash.no_update] * (len(LAYERS) * len(CELL_TYPES) + 1)
         
+        # Toggle simulation pause state
         @self.app.callback(
             Output('interval-component', 'disabled'),
             [Input('pause-button', 'n_clicks')]
         )
         def toggle_simulation(n_clicks):
-            """Toggle the simulation between running and paused states."""
-            if n_clicks is None:
-                return False
-            return n_clicks % 2 == 1
+            return n_clicks is not None and n_clicks % 2 == 1
         
+        # Reset simulation
         @self.app.callback(
             Output('interval-component', 'n_intervals'),
             [Input('reset-button', 'n_clicks')]
         )
         def reset_simulation(n_clicks):
-            """Reset the simulation to its initial state."""
             if n_clicks is not None:
                 self.simulation.reset()
             return 0
     
-    def update_connections(self, slider_ids: List[str], params: Tuple[float, ...]):
-        """
-        Update connection weights based on slider values.
-        
-        Args:
-            slider_ids: List of slider IDs
-            params: Tuple of connection strength values from sliders
-        """
-        # Map slider IDs to their values
-        slider_values = dict(zip(slider_ids, params))
-        
-        # Update layer-specific connection strengths
-        for slider_id, value in slider_values.items():
-            # Parse the slider ID to get connection information
-            # Format: slider-{source_layer}-{source_cell}-{target_layer}-{target_cell}
-            parts = slider_id.split('-')
-            if len(parts) >= 5:
-                source_layer = parts[1]
-                source_cell = parts[2]
-                target_layer = parts[3]
-                target_cell = parts[4]
-                
-                # Update connection strength in the simulation
-                self.simulation.connectivity.set_connection_strength(
-                    source_layer, source_cell, target_layer, target_cell, value
-                )
-    
     def run(self, debug: bool = True, port: int = 8050):
-        """
-        Run the dashboard application.
-        
-        Args:
-            debug: Whether to run in debug mode
-            port: Port to run the server on
-        """
+        """Run the dashboard application."""
         self.app.run_server(
             debug=debug, 
             port=port, 

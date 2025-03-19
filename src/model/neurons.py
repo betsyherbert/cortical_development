@@ -150,18 +150,6 @@ class CorticalCircuit:
             Dictionary containing all population activities
         """
         grid_shape = (self.grid_size, self.grid_size)
-        thalamus_flat = self.thalamus.flatten()
-        
-        # Precompute thalamic inputs once outside the integration loop
-        thalamic_inputs = {}
-        for target_layer in LAYERS:
-            thalamic_inputs[target_layer] = {}
-            for target_cell in CELL_TYPES:
-                thal_input = self.connectivity.compute_input(
-                    'thalamus', target_cell, thalamus_flat,
-                    source_layer='thalamus', target_layer=target_layer
-                )
-                thalamic_inputs[target_layer][target_cell] = thal_input.reshape(grid_shape)
         
         # Run multiple steps for smoother dynamics
         for _ in range(n_steps):
@@ -170,29 +158,28 @@ class CorticalCircuit:
                 # Initialize inputs for this layer
                 layer_inputs = {cell_type: np.zeros(grid_shape) for cell_type in CELL_TYPES}
                 
-                # Add pre-computed thalamic inputs to this layer
+                # Add thalamic inputs
                 for target_cell in CELL_TYPES:
-                    layer_inputs[target_cell] += thalamic_inputs[target_layer][target_cell]
+                    conn_key = f'thalamus_to_{target_layer}_{target_cell}'
+                    if conn_key in self.connectivity.layer_params:
+                        layer_inputs[target_cell] += (
+                            self.connectivity.layer_params[conn_key]['amplitude'] * self.thalamus
+                        )
                 
-                # Add inputs from all layers to this layer
+                # Add inputs from all layers
                 for source_layer in LAYERS:
                     for source_cell in CELL_TYPES:
-                        # Get the flattened rates from source layer
                         source_rates = self.layers[source_layer].r[source_cell].flatten()
                         
-                        # Compute input to each cell type in target layer
                         for target_cell in CELL_TYPES:
-                            # Skip SST->SST which doesn't exist in the base model
+                            # Skip SST->SST which doesn't exist
                             if source_cell == 'SST' and target_cell == 'SST':
                                 continue
                                 
-                            # Compute input
                             input_curr = self.connectivity.compute_input(
                                 source_cell, target_cell, source_rates,
                                 source_layer=source_layer, target_layer=target_layer
                             )
-                            
-                            # Add to the target layer inputs
                             layer_inputs[target_cell] += input_curr.reshape(grid_shape)
                 
                 # Update this layer

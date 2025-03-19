@@ -23,7 +23,7 @@ THALAMIC_SCALING = 1.0  # Overall scaling factor for thalamic input - INCREASE f
 
 # Neural network parameters
 NEURAL_TAU = 10.0  # Membrane time constant (ms) - DECREASE for faster neural dynamics and visual changes
-NOISE_AMPLITUDE = 0.01  # Standard deviation of neural noise - INCREASE for more rapid random activity changes
+NOISE_AMPLITUDE = 0.00  # Standard deviation of neural noise - INCREASE for more rapid random activity changes
 
 # Network structure
 CELL_TYPES = ['E', 'SST', 'PV']  # Available cell types
