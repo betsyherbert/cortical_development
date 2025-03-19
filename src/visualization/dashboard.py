@@ -128,21 +128,21 @@ class DashboardApp:
                         ], style={"height": "180px"}),
                         className="mt-5"  # Match vertical spacing with other layers
                     )
-                ], width=8),
+                ], width=6),  # Adjust visualization column width
                 
                 # Right column: control panel
                 dbc.Col([
-                    html.H4("Control Panel", className="text-center mb-2"),
-                    
                     # Connection Strength Matrix
                     html.Div([
-                        html.H5("Connection Strengths", className="mb-2"),
+                        html.H5("Connection Strengths", 
+                               className="mb-4 text-center",
+                               style={"textAlign": "center", "width": "100%"}),  # Ensure true centering
                         
                         # Connection Matrix Container
                         html.Div(
                             self.create_connection_matrix(),
                             id="connection-matrix-container",
-                            style={"position": "relative"}
+                            style={"position": "relative", "display": "flex", "justifyContent": "center"}
                         ),
                         
                         # Hover Activated Slider Container (initially hidden)
@@ -184,9 +184,9 @@ class DashboardApp:
                             color="primary"
                         )
                     ])
-                ], width=4, className="ps-4")
-            ], className="g-2"),
-        ], fluid=True, className="py-2")
+                ], width=5, className="ps-4")  # Adjust control panel column width
+            ], className="g-4 px-4"),  # Add horizontal padding to row
+        ], fluid=True, className="py-3 px-0")  # Added more padding to container
     
     def create_layer_row(self, layer: str) -> dbc.Row:
         """Create a row for a single cortical layer with cell types as columns."""
@@ -281,96 +281,248 @@ class DashboardApp:
 
     def create_connection_matrix(self) -> html.Div:
         """Create a matrix visualization of all layer and cell type connections."""
+        # Define consistent cell dimensions
+        CELL_SIZE = 50  # Size for data cells in pixels
+        HEADER_HEIGHT = 40  # Height for headers in pixels
+        HEADER_WIDTH = 40  # Width for all header columns
+        
         # Define the labels/indices for the matrix
         all_populations = [(layer, cell_type) for layer in LAYERS for cell_type in CELL_TYPES]
         all_populations.append(('Th', None))  # Add thalamus
         
-        # Create the matrix table header (To...)
-        header_cells = [html.Th("From", className="text-center")] + [
-            html.Th([
-                html.Div([
-                    html.Div(LAYER_NAMES[layer] if layer != 'Th' else "Thalamus", className="fw-bold"),
-                    html.Div(cell_type or "")
-                ], className="text-center")
-            ]) 
-            for layer, cell_type in all_populations if layer != 'Th' or cell_type is None
+        # Create the main header row with layer spans (removed "To" text)
+        main_header_cells = [
+            # Empty cell for top-left corner (matches header width)
+            html.Th("", colSpan=2, style={
+                "border": "none", 
+                "width": f"{HEADER_WIDTH}px", 
+                "height": f"{HEADER_HEIGHT}px",
+                "minWidth": f"{HEADER_WIDTH}px",
+                "maxWidth": f"{HEADER_WIDTH}px"
+            })
         ]
         
-        header_row = html.Tr(header_cells)
+        # Add layer headers that span 3 columns each (for E, SST, PV)
+        for layer in LAYERS:
+            # Different background colors based on layer
+            bg_color = "rgba(180, 180, 180, 0.3)" if layer == "L4" else "rgba(180, 180, 180, 0.15)"
+            
+            main_header_cells.append(
+                html.Th(
+                    LAYER_NAMES[layer], 
+                    className="text-center fw-bold",
+                    colSpan=3,  # Span all cell types
+                    style={
+                        "backgroundColor": bg_color, 
+                        "color": "white",  # White text for layer headers
+                        "padding": "10px 5px",
+                        "fontSize": "0.9rem",  # Consistent font size
+                        "height": f"{HEADER_HEIGHT}px",  # Consistent height
+                        "minHeight": f"{HEADER_HEIGHT}px",
+                        "maxHeight": f"{HEADER_HEIGHT}px"
+                    }
+                )
+            )
+        
+        main_header_row = html.Tr(main_header_cells)
+        
+        # Create the cell type sub-header row
+        sub_header_cells = [
+            # Empty cell to align with the layer column (matches header width)
+            html.Th("", style={
+                "border": "none", 
+                "width": f"{HEADER_WIDTH}px", 
+                "height": f"{HEADER_HEIGHT}px",
+                "minWidth": f"{HEADER_WIDTH}px",
+                "maxWidth": f"{HEADER_WIDTH}px"
+            }),
+            # Empty cell to align with the cell type column (matches cell type header width)
+            html.Th("", style={
+                "border": "none", 
+                "width": f"{HEADER_WIDTH}px", 
+                "height": f"{HEADER_HEIGHT}px",
+                "minWidth": f"{HEADER_WIDTH}px",
+                "maxWidth": f"{HEADER_WIDTH}px"
+            })
+        ]
+        
+        # Add all cell types under their respective layers
+        for layer in LAYERS:
+            for cell_type in CELL_TYPES:
+                # Set background colors based on cell type (darker colors)
+                bg_color = "#103a5b" if cell_type == "E" else \
+                          "#752f00" if cell_type == "SST" else \
+                          "#661111"  # PV
+                
+                sub_header_cells.append(
+                    html.Th(
+                        cell_type,
+                        className="text-center",
+                        style={
+                            "backgroundColor": bg_color, 
+                            "color": "white",
+                            "padding": "8px 5px",
+                            "width": f"{HEADER_WIDTH}px",
+                            "height": f"{HEADER_HEIGHT}px",  # Consistent height
+                            "minWidth": f"{HEADER_WIDTH}px",
+                            "maxWidth": f"{HEADER_WIDTH}px",
+                            "minHeight": f"{HEADER_HEIGHT}px",
+                            "maxHeight": f"{HEADER_HEIGHT}px",
+                            "fontSize": "0.9rem"  # Consistent font size
+                        }
+                    )
+                )
+        
+        sub_header_row = html.Tr(sub_header_cells)
         
         # Generate matrix rows
         rows = []
+        current_layer = None
         for source in all_populations:
             source_layer, source_cell = source
-            display_layer = "Thalamus" if source_layer == 'Th' else LAYER_NAMES[source_layer]
             
-            # Create row header (From...)
-            row_header = html.Th([
-                html.Div([
-                    html.Div(display_layer, className="fw-bold"),
-                    html.Div(source_cell or "")
-                ], className="text-end")
-            ])
+            # Check if we're starting a new layer group
+            is_new_layer = current_layer != source_layer
+            if is_new_layer:
+                current_layer = source_layer
+            
+            # Create row header with layer spanning if first cell in layer
+            if is_new_layer:
+                layer_name = "Thalamus" if source_layer == 'Th' else LAYER_NAMES[source_layer]
+                layer_cells_count = 1 if source_layer == 'Th' else len(CELL_TYPES)
+                
+                # Different background colors based on layer
+                bg_color = "rgba(180, 180, 180, 0.3)" if source_layer == "L4" else \
+                          "rgba(180, 180, 180, 0.15)" if source_layer != "Th" else \
+                          "transparent"  # Transparent for Thalamus
+                
+                row_header = html.Th(
+                    layer_name,
+                    className="fw-bold",
+                    rowSpan=layer_cells_count,
+                    style={
+                        "backgroundColor": bg_color, 
+                        "color": "white",  # White text for all layer headers
+                        "textAlign": "center",
+                        "verticalAlign": "middle",
+                        "padding": "10px 5px",
+                        "width": f"{HEADER_WIDTH}px",
+                        "minWidth": f"{HEADER_WIDTH}px",
+                        "maxWidth": f"{HEADER_WIDTH}px",
+                        "height": "100%",
+                        "fontSize": "0.9rem"  # Consistent font size
+                    }
+                )
+            else:
+                # No placeholder needed anymore due to structure change
+                row_header = None
+            
+            # Create the cell type header for this row
+            cell_type_bg = "#103a5b" if source_cell == "E" else \
+                         "#752f00" if source_cell == "SST" else \
+                         "#661111" if source_cell == "PV" else \
+                         "transparent"  # Transparent for Thalamus
+            
+            cell_type_header = html.Th(
+                source_cell or "",
+                className="text-center",
+                style={
+                    "backgroundColor": cell_type_bg,
+                    "color": "white",
+                    "width": f"{HEADER_WIDTH}px",
+                    "height": f"{CELL_SIZE}px",  # Make cells more square
+                    "minWidth": f"{HEADER_WIDTH}px",
+                    "maxWidth": f"{HEADER_WIDTH}px",
+                    "minHeight": f"{CELL_SIZE}px", 
+                    "maxHeight": f"{CELL_SIZE}px",
+                    "padding": "5px",
+                    "fontSize": "0.9rem"  # Consistent font size
+                }
+            )
             
             # Create data cells
             cells = []
-            for target in all_populations:
-                target_layer, target_cell = target
-                
-                # Skip certain connection types
-                if (source_layer == 'Th' and target_layer == 'Th') or \
-                   (target_layer == 'Th') or \
-                   (source_cell == 'SST' and target_cell == 'SST'):
+            for target_layer in LAYERS:
+                for target_cell in CELL_TYPES:
+                    # Skip certain connection types
+                    if (source_layer == 'Th' and target_layer == 'Th') or \
+                       (source_cell == 'SST' and target_cell == 'SST'):
+                        cells.append(html.Td(
+                            "",
+                            className="text-center",
+                            style={
+                                "backgroundColor": "#1a1a1a",
+                                "width": f"{CELL_SIZE}px",
+                                "height": f"{CELL_SIZE}px",  # Make cells more square
+                                "minWidth": f"{CELL_SIZE}px",
+                                "maxWidth": f"{CELL_SIZE}px",
+                                "minHeight": f"{CELL_SIZE}px",
+                                "maxHeight": f"{CELL_SIZE}px"
+                            }
+                        ))
+                        continue
+                    
+                    # Get connection strength
+                    value = self.get_connection_value(source_layer, source_cell, target_layer, target_cell)
+                    
+                    # Create cell with background color based on strength
+                    if value > 0:
+                        intensity = min(value / 1.0, 1.0) * 0.7
+                        bg_color = f"rgba(0, 120, 215, {intensity})"
+                        hover_color = f"rgba(0, 150, 255, {intensity + 0.2})"
+                    elif value < 0:
+                        intensity = min(abs(value) / 1.0, 1.0) * 0.7
+                        bg_color = f"rgba(215, 0, 0, {intensity})"
+                        hover_color = f"rgba(255, 0, 0, {intensity + 0.2})"
+                    else:
+                        bg_color = "rgba(80, 80, 80, 0.1)"
+                        hover_color = "rgba(100, 100, 100, 0.3)"
+                    
+                    # Create cell with unique ID for callbacks
+                    cell_id = f"{source_layer}-{source_cell or 'None'}-{target_layer}-{target_cell}"
                     cells.append(html.Td(
-                        "",
-                        className="text-center",
-                        style={"backgroundColor": "#1a1a1a"}
+                        f"{value:.1f}",
+                        id={'type': 'connection-cell', 'id': cell_id},
+                        className="connection-cell text-center",
+                        style={
+                            "backgroundColor": bg_color,
+                            "cursor": "pointer",
+                            "transition": "background-color 0.2s",
+                            "width": f"{CELL_SIZE}px",
+                            "height": f"{CELL_SIZE}px",
+                            "minWidth": f"{CELL_SIZE}px",
+                            "maxWidth": f"{CELL_SIZE}px",
+                            "minHeight": f"{CELL_SIZE}px",
+                            "maxHeight": f"{CELL_SIZE}px",
+                            "padding": "5px",
+                            "fontSize": "0.8rem"  # Consistent font size for values
+                        },
+                        **{
+                            'data-highlight-color': hover_color
+                        }
                     ))
-                    continue
-                
-                # Get connection strength
-                value = self.get_connection_value(source_layer, source_cell, target_layer, target_cell)
-                
-                # Create cell with background color based on strength
-                if value > 0:
-                    intensity = min(value / 1.0, 1.0) * 0.7
-                    bg_color = f"rgba(0, 120, 215, {intensity})"
-                    hover_color = f"rgba(0, 150, 255, {intensity + 0.2})"
-                elif value < 0:
-                    intensity = min(abs(value) / 1.0, 1.0) * 0.7
-                    bg_color = f"rgba(215, 0, 0, {intensity})"
-                    hover_color = f"rgba(255, 0, 0, {intensity + 0.2})"
-                else:
-                    bg_color = "rgba(80, 80, 80, 0.1)"
-                    hover_color = "rgba(100, 100, 100, 0.3)"
-                
-                # Create cell with unique ID for callbacks
-                cell_id = f"{source_layer}-{source_cell or 'None'}-{target_layer}-{target_cell}"
-                cells.append(html.Td(
-                    f"{value:.1f}",
-                    id={'type': 'connection-cell', 'id': cell_id},
-                    className="connection-cell text-center",
-                    style={
-                        "backgroundColor": bg_color,
-                        "cursor": "pointer",
-                        "transition": "background-color 0.2s"
-                    },
-                    **{
-                        'data-highlight-color': hover_color
-                    }
-                ))
             
-            # Add row to table
-            rows.append(html.Tr([row_header] + cells))
+            # Create row with header (if needed) and cells
+            if row_header:
+                rows.append(html.Tr([row_header, cell_type_header] + cells))
+            else:
+                rows.append(html.Tr([cell_type_header] + cells))
         
         # Create table
         return html.Div([
             html.Table(
-                [header_row] + rows,
+                [main_header_row, sub_header_row] + rows,
                 className="table table-bordered connection-matrix",
-                style={"tableLayout": "fixed", "fontSize": "0.8rem"}
+                style={
+                    "tableLayout": "fixed", 
+                    "fontSize": "0.8rem",
+                    "borderCollapse": "collapse",
+                    "width": "auto",
+                    "margin": "0 auto",
+                    "borderSpacing": "0"
+                }
             )
-        ])
+        ])  # Removed the horizontal scrolling
 
     def create_slider_for_cell(self, source_layer, source_cell, target_layer, target_cell, value):
         """Create a slider component for a connection cell."""
@@ -385,7 +537,7 @@ class DashboardApp:
         return html.Div([
             html.Div(
                 f"{source_layer}" + (f"-{source_cell}" if source_cell else "") + 
-                f" → {target_layer}-{target_cell}: {value:.1f}", 
+                f" → {target_layer}-{target_cell}", 
                 style={"marginBottom": "5px", "textAlign": "center"}
             ),
             dcc.Slider(
