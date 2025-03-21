@@ -82,6 +82,13 @@ class DashboardApp:
             # Store component for currently selected cell
             dcc.Store(id='selected-cell', data=None),
             
+            # Hidden button for resetting slider state
+            html.Button(
+                id='reset-slider-state-btn',
+                style={'display': 'none'},
+                n_clicks=0
+            ),
+            
             # Main content: visualization and controls
             dbc.Row([
                 # Left column: activity visualization
@@ -568,7 +575,8 @@ class DashboardApp:
             [State('selected-cell', 'data')]
         )
         def initialize_slider_container(_, current_data):
-            return {'display': 'none'}, [], None
+            """Initialize the slider container as hidden when the dashboard loads."""
+            return {'display': 'none', 'position': 'absolute'}, [], None
             
         # Handle cell clicks to show the slider
         @self.app.callback(
@@ -580,11 +588,12 @@ class DashboardApp:
             prevent_initial_call=True
         )
         def handle_cell_click(clicks, current_data):
+            """Show the connection strength slider when a matrix cell is clicked."""
             try:
                 # Get the context that triggered the callback
                 ctx = dash.callback_context
                 if not ctx.triggered:
-                    return {'display': 'none'}, [], None
+                    return {'display': 'none', 'position': 'absolute'}, [], None
                 
                 # Get the ID of the clicked cell
                 triggered_prop_id = ctx.triggered[0]['prop_id']
@@ -595,7 +604,7 @@ class DashboardApp:
                 parts = clicked_id.split('-')
                 if len(parts) < 4:
                     print(f"Invalid cell ID format: {clicked_id}")
-                    return {'display': 'none'}, [], None
+                    return {'display': 'none', 'position': 'absolute'}, [], None
                 
                 source_layer = parts[0]
                 source_cell = parts[1] if parts[1] != "None" else None
@@ -619,7 +628,7 @@ class DashboardApp:
                     "slider_id": clicked_id
                 }
                 
-                # Return the slider container with display block but no position
+                # Return with initial position - exact positioning will be handled by clientside JS
                 return {
                     'display': 'block',
                     'backgroundColor': 'rgba(50, 50, 50, 0.9)',
@@ -628,11 +637,13 @@ class DashboardApp:
                     'borderRadius': '5px',
                     'zIndex': '1000',
                     'width': '200px',
-                    'position': 'absolute'
+                    'position': 'absolute',
+                    'top': '0px',
+                    'left': '0px'
                 }, slider, connection_data
             except Exception as e:
                 print(f"Error handling cell click: {e}")
-                return {'display': 'none'}, [], None
+                return {'display': 'none', 'position': 'absolute'}, [], None
         
         # Update connection strength when slider changes
         @self.app.callback(
@@ -641,6 +652,7 @@ class DashboardApp:
             State('selected-cell', 'data')
         )
         def update_connection_value(value, connection_data):
+            """Update the connection strength value display and simulation when slider changes."""
             if not connection_data:
                 return ""
             
@@ -665,70 +677,118 @@ class DashboardApp:
                 print(f"Error updating connection value: {e}")
                 return f"Error: {str(e)}"
         
-        # JavaScript to handle slider positioning and cell interactions
+        # Update connection cell in matrix when slider changes
+        @self.app.callback(
+            [Output({'type': 'connection-cell', 'id': MATCH}, 'children'),
+             Output({'type': 'connection-cell', 'id': MATCH}, 'style'),
+             Output({'type': 'connection-cell', 'id': MATCH}, 'data-highlight-color')],
+            Input({'type': 'matrix-slider', 'id': MATCH}, 'value'),
+            [State({'type': 'connection-cell', 'id': MATCH}, 'style'),
+             State({'type': 'connection-cell', 'id': MATCH}, 'id')]
+        )
+        def update_matrix_cell(value, current_style, cell_id):
+            """Update the matrix cell appearance and value when the slider changes."""
+            if value is None:
+                # No change if value is None
+                return dash.no_update, dash.no_update, dash.no_update
+            
+            try:
+                # Determine color based on connection value
+                if value > 0:
+                    intensity = min(value / 1.0, 1.0) * 0.7
+                    bg_color = f"rgba(0, 120, 215, {intensity})"
+                    hover_color = f"rgba(0, 150, 255, {intensity + 0.2})"
+                elif value < 0:
+                    intensity = min(abs(value) / 1.0, 1.0) * 0.7
+                    bg_color = f"rgba(215, 0, 0, {intensity})"
+                    hover_color = f"rgba(255, 0, 0, {intensity + 0.2})"
+                else:
+                    bg_color = "rgba(80, 80, 80, 0.1)"
+                    hover_color = "rgba(100, 100, 100, 0.3)"
+                
+                # Update style with new background color
+                updated_style = {**current_style, "backgroundColor": bg_color}
+                
+                # Return updated text, style, and hover color
+                return f"{value:.1f}", updated_style, hover_color
+            except Exception as e:
+                print(f"Error updating matrix cell: {e}")
+                return dash.no_update, dash.no_update, dash.no_update
+        
+        # Reset the slider when clicking the reset button
+        @self.app.callback(
+            [Output('slider-container', 'style', allow_duplicate=True),
+             Output('slider-container', 'children', allow_duplicate=True),
+             Output('selected-cell', 'data', allow_duplicate=True)],
+            Input('reset-slider-state-btn', 'n_clicks'),
+            prevent_initial_call=True
+        )
+        def reset_slider_state(n_clicks):
+            """Reset the slider state when clicking outside the slider or matrix."""
+            return {'display': 'none', 'position': 'absolute'}, [], None
+        
+        # JavaScript to position the slider near the clicked cell
         self.app.clientside_callback(
             """
-            function(n_clicks) {
-                // Function to position the slider relative to a cell
-                function positionSlider(cell) {
+            function(styles, children, data) {
+                // Skip if no data or slider is hidden
+                if (!data || styles.display === 'none') {
+                    return window.dash_clientside.no_update;
+                }
+
+                // Find the cell that was clicked
+                const cellId = data.slider_id;
+                const cell = document.querySelector(`[id*="${cellId}"]`);
+                
+                if (cell) {
                     const rect = cell.getBoundingClientRect();
                     const sliderContainer = document.getElementById('slider-container');
-                    if (!sliderContainer) return;
                     
-                    // Position the slider immediately
-                    sliderContainer.style.top = (rect.bottom + window.scrollY + 5) + 'px';
-                    sliderContainer.style.left = (rect.left + window.scrollX - 75) + 'px';
-                    
-                    // Highlight the active cell
-                    document.querySelectorAll('.connection-cell').forEach(c => c.style.outline = 'none');
-                    cell.style.outline = '2px solid white';
-                }
-                
-                // Set up event handlers for connection cells
-                const cells = document.querySelectorAll('.connection-cell');
-                cells.forEach(cell => {
-                    // Remove any existing click listeners to prevent duplicates
-                    cell.removeEventListener('click', cell._clickHandler);
-                    
-                    // Create and store new click handler
-                    cell._clickHandler = function(e) {
-                        positionSlider(this);
-                    };
-                    
-                    // Add the click handler
-                    cell.addEventListener('click', cell._clickHandler);
-                });
-                
-                // Handle the initial click if this callback was triggered by a cell click
-                const ctx = window.dash_clientside.callback_context;
-                if (ctx && ctx.triggered && ctx.triggered.length > 0) {
-                    const triggerId = ctx.triggered[0].prop_id;
-                    if (triggerId.includes('connection-cell')) {
-                        const cellId = JSON.parse(triggerId.split('.')[0]).id;
-                        const clickedCell = document.querySelector(`[id*="${cellId}"]`);
-                        if (clickedCell) {
-                            positionSlider(clickedCell);  // Position immediately without setTimeout
-                        }
-                    }
-                }
-                
-                // Hide slider when clicking outside the matrix or slider
-                document.addEventListener('click', function(e) {
-                    if (!e.target.closest('.connection-cell') && 
-                        !e.target.closest('#slider-container')) {
-                        const sliderContainer = document.getElementById('slider-container');
-                        if (sliderContainer) sliderContainer.style.display = 'none';
+                    if (sliderContainer) {
+                        // Position below the cell
+                        sliderContainer.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+                        sliderContainer.style.left = (rect.left + window.scrollX - 75) + 'px';
                         
-                        cells.forEach(c => c.style.outline = 'none');
+                        // Highlight the active cell
+                        document.querySelectorAll('.connection-cell').forEach(c => c.style.outline = 'none');
+                        cell.style.outline = '2px solid white';
+                        
+                        // Clean up any existing click handler
+                        if (window.outsideClickHandler) {
+                            document.removeEventListener('click', window.outsideClickHandler);
+                            window.outsideClickHandler = null;
+                        }
+                        
+                        // Create new document click handler for closing the slider
+                        window.outsideClickHandler = function(e) {
+                            if (!e.target.closest('.connection-cell') && 
+                                !e.target.closest('#slider-container')) {
+                                
+                                // Reset with the button
+                                const resetBtn = document.getElementById('reset-slider-state-btn');
+                                if (resetBtn) resetBtn.click();
+                                
+                                // Clear active cell highlighting
+                                document.querySelectorAll('.connection-cell').forEach(c => {
+                                    c.style.outline = 'none';
+                                });
+                            }
+                        };
+                        
+                        // Add handler with slight delay to avoid immediate trigger
+                        setTimeout(() => {
+                            document.addEventListener('click', window.outsideClickHandler);
+                        }, 50);
                     }
-                });
+                }
                 
                 return window.dash_clientside.no_update;
             }
             """,
-            Output('connection-matrix-container', 'n_clicks'),
-            [Input('connection-matrix-container', 'id'),
-             Input({'type': 'connection-cell', 'id': ALL}, 'n_clicks')],
+            Output('slider-container', 'id'),
+            [Input('slider-container', 'style'),
+             Input('slider-container', 'children'),
+             Input('selected-cell', 'data')],
         )
         
         # Update visualization based on simulation state
