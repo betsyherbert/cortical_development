@@ -327,19 +327,32 @@ class LayerConnectivity:
         else:
             conn_key = f'{source_layer}_{source_cell}_to_{target_layer}_{target_cell}'
         
-        # Check if this connection has parameters defined
-        if conn_key in self.layer_params:
-            # Update the parameter
-            self.layer_params[conn_key]['amplitude'] = amplitude
+        # Create connection parameter entry if it doesn't exist
+        if conn_key not in self.layer_params:
+            # Determine appropriate sigma based on cell type patterns
+            if source_cell == 'E' or source_layer == 'thalamus':
+                sigma = 2.0  # Default for excitatory connections
+            elif source_cell == 'SST':
+                sigma = 3.0  # Default for SST connections (wider)
+            elif source_cell == 'PV':
+                sigma = 1.5  # Default for PV connections (narrower)
+            else:
+                sigma = 2.0  # Default fallback
+                
+            # Add the new connection parameters
+            self.layer_params[conn_key] = {'amplitude': 0.0, 'sigma': sigma}
             
-            # Update the weight matrix
-            size = (self.grid_size, self.grid_size)
-            sigma = self.layer_params[conn_key]['sigma']
+        # Update the parameter
+        self.layer_params[conn_key]['amplitude'] = amplitude
             
-            # Create the connection tuple key
-            tuple_key = (source_layer, source_cell, target_layer, target_cell)
+        # Update the weight matrix
+        size = (self.grid_size, self.grid_size)
+        sigma = self.layer_params[conn_key]['sigma']
             
-            # Update the weight matrix
-            self.W[tuple_key] = self.profile.compute_weight_matrix(
-                amplitude, sigma, size, size
-            ) 
+        # Create the connection tuple key
+        tuple_key = (source_layer, source_cell, target_layer, target_cell)
+            
+        # Update the weight matrix
+        self.W[tuple_key] = self.profile.compute_weight_matrix(
+            amplitude, sigma, size, size
+        ) 

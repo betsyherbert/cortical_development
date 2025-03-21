@@ -3,7 +3,7 @@
 
 from model.neurons import CorticalCircuit
 from model.thalamus import ThalamicInput
-from model.config import GRID_SIZE, DT, INTEGRATION_STEPS
+from model.config import GRID_SIZE, DT, INTEGRATION_STEPS, THALAMIC_ALPHA
 import time
 
 def main():
@@ -20,7 +20,7 @@ def main():
         print(f"\nIteration {i+1}:")
         # Generate thalamic input
         thal_start = time.time()
-        simulation.thalamus = thalamic_input.update(alpha=0.7)
+        simulation.thalamus = thalamic_input.update(alpha=THALAMIC_ALPHA)
         thal_time = time.time() - thal_start
         print(f"Thalamic input generation: {thal_time*1000:.2f} ms")
         

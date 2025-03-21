@@ -3,7 +3,7 @@
 
 from model.neurons import CorticalCircuit
 from model.thalamus import ThalamicInput
-from model.config import GRID_SIZE, DT, CELL_TYPES, LAYERS, COLORMAPS
+from model.config import GRID_SIZE, DT, CELL_TYPES, LAYERS, COLORMAPS, THALAMIC_ALPHA
 import plotly.graph_objects as go
 import numpy as np
 import time
@@ -46,7 +46,7 @@ def main():
     # Create simulation components
     simulation = CorticalCircuit(GRID_SIZE)
     thalamic_input = ThalamicInput(GRID_SIZE, DT)
-    simulation.thalamus = thalamic_input.update(alpha=0.7)
+    simulation.thalamus = thalamic_input.update(alpha=THALAMIC_ALPHA)
     
     # Run simulation once to get activities
     activities = simulation.update()
@@ -80,7 +80,7 @@ def main():
     
     # Generate thalamic input
     thal_start = time.time()
-    simulation.thalamus = thalamic_input.update(alpha=0.7)
+    simulation.thalamus = thalamic_input.update(alpha=THALAMIC_ALPHA)
     thal_time = time.time() - thal_start
     print(f"1. Thalamic update: {thal_time*1000:.2f} ms")
     

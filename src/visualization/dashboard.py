@@ -7,14 +7,14 @@ import plotly.graph_objects as go
 import numpy as np
 import dash_bootstrap_components as dbc
 from typing import Dict, List, Tuple
-import time
 import json
 
 from model.config import (
     COLORMAPS, UPDATE_INTERVAL, CELL_TYPES, LAYERS, LAYER_NAMES, 
-    THALAMIC_SCALING, VISUALIZATION_STEPS, LAYER_CONNECTIONS,
-    LAYER_CONNECTIVITY_PARAMS
+    THALAMIC_SCALING, LAYER_CONNECTIONS,
+    LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, NEURAL_TAU
 )
+from model.neurons import FIRING_THRESHOLD
 
 
 class DashboardApp:
@@ -168,28 +168,197 @@ class DashboardApp:
                         )
                     ], className="mb-3"),
                     
+                    # Time constants section
+                    html.Div([
+                        html.H5("Membrane Time Constants (ms)", className="mb-2 text-center",
+                               style={"textAlign": "center", "width": "100%"}),
+                        
+                        # E cell time constant
+                        dbc.Row([
+                            dbc.Col("E Cells:", width=3, className="d-flex align-items-center justify-content-end"),
+                            dbc.Col(
+                                dcc.Slider(
+                                    id='tau-e-slider',
+                                    min=1.0,
+                                    max=30.0,
+                                    step=0.5,
+                                    value=NEURAL_TAU,
+                                    marks={i: f"{i}" for i in range(5, 31, 5)},
+                                    tooltip={"placement": "bottom", "always_visible": False}
+                                ),
+                                width=7
+                            ),
+                            dbc.Col(
+                                html.Div(
+                                    id='tau-e-value',
+                                    children=f"{NEURAL_TAU:.1f}",
+                                    style={"textAlign": "center"}
+                                ),
+                                width=2
+                            )
+                        ], className="mb-2"),
+                        
+                        # SST cell time constant
+                        dbc.Row([
+                            dbc.Col("SST Cells:", width=3, className="d-flex align-items-center justify-content-end"),
+                            dbc.Col(
+                                dcc.Slider(
+                                    id='tau-sst-slider',
+                                    min=1.0,
+                                    max=30.0,
+                                    step=0.5,
+                                    value=NEURAL_TAU,
+                                    marks={i: f"{i}" for i in range(5, 31, 5)},
+                                    tooltip={"placement": "bottom", "always_visible": False}
+                                ),
+                                width=7
+                            ),
+                            dbc.Col(
+                                html.Div(
+                                    id='tau-sst-value',
+                                    children=f"{NEURAL_TAU:.1f}",
+                                    style={"textAlign": "center"}
+                                ),
+                                width=2
+                            )
+                        ], className="mb-2"),
+                        
+                        # PV cell time constant
+                        dbc.Row([
+                            dbc.Col("PV Cells:", width=3, className="d-flex align-items-center justify-content-end"),
+                            dbc.Col(
+                                dcc.Slider(
+                                    id='tau-pv-slider',
+                                    min=1.0,
+                                    max=30.0,
+                                    step=0.5,
+                                    value=NEURAL_TAU,
+                                    marks={i: f"{i}" for i in range(5, 31, 5)},
+                                    tooltip={"placement": "bottom", "always_visible": False}
+                                ),
+                                width=7
+                            ),
+                            dbc.Col(
+                                html.Div(
+                                    id='tau-pv-value',
+                                    children=f"{NEURAL_TAU:.1f}",
+                                    style={"textAlign": "center"}
+                                ),
+                                width=2
+                            )
+                        ])
+                    ], className="mb-3"),
+                    
+                    # Firing thresholds section (new)
+                    html.Div([
+                        html.H5("Firing Thresholds", className="mb-2 text-center",
+                               style={"textAlign": "center", "width": "100%"}),
+                        
+                        # E cell firing threshold
+                        dbc.Row([
+                            dbc.Col("E Cells:", width=3, className="d-flex align-items-center justify-content-end"),
+                            dbc.Col(
+                                dcc.Slider(
+                                    id='threshold-e-slider',
+                                    min=0.0,
+                                    max=0.5,
+                                    step=0.01,
+                                    value=FIRING_THRESHOLD,
+                                    marks={i/10: f"{i/10:.1f}" for i in range(0, 6, 1)},
+                                    tooltip={"placement": "bottom", "always_visible": False}
+                                ),
+                                width=7
+                            ),
+                            dbc.Col(
+                                html.Div(
+                                    id='threshold-e-value',
+                                    children=f"{FIRING_THRESHOLD:.2f}",
+                                    style={"textAlign": "center"}
+                                ),
+                                width=2
+                            )
+                        ], className="mb-2"),
+                        
+                        # SST cell firing threshold
+                        dbc.Row([
+                            dbc.Col("SST Cells:", width=3, className="d-flex align-items-center justify-content-end"),
+                            dbc.Col(
+                                dcc.Slider(
+                                    id='threshold-sst-slider',
+                                    min=0.0,
+                                    max=0.5,
+                                    step=0.01,
+                                    value=FIRING_THRESHOLD,
+                                    marks={i/10: f"{i/10:.1f}" for i in range(0, 6, 1)},
+                                    tooltip={"placement": "bottom", "always_visible": False}
+                                ),
+                                width=7
+                            ),
+                            dbc.Col(
+                                html.Div(
+                                    id='threshold-sst-value',
+                                    children=f"{FIRING_THRESHOLD:.2f}",
+                                    style={"textAlign": "center"}
+                                ),
+                                width=2
+                            )
+                        ], className="mb-2"),
+                        
+                        # PV cell firing threshold
+                        dbc.Row([
+                            dbc.Col("PV Cells:", width=3, className="d-flex align-items-center justify-content-end"),
+                            dbc.Col(
+                                dcc.Slider(
+                                    id='threshold-pv-slider',
+                                    min=0.0,
+                                    max=0.5,
+                                    step=0.01,
+                                    value=FIRING_THRESHOLD,
+                                    marks={i/10: f"{i/10:.1f}" for i in range(0, 6, 1)},
+                                    tooltip={"placement": "bottom", "always_visible": False}
+                                ),
+                                width=7
+                            ),
+                            dbc.Col(
+                                html.Div(
+                                    id='threshold-pv-value',
+                                    children=f"{FIRING_THRESHOLD:.2f}",
+                                    style={"textAlign": "center"}
+                                ),
+                                width=2
+                            )
+                        ])
+                    ], className="mb-3"),
+                    
                     # Thalamic input controls
                     html.Div([
-                        html.H5("Thalamic Input", className="mb-2"),
-                        dbc.Label("Intrinsic/Sensory Balance (α)", className="mb-1"),
+                        html.H5("Thalamic Input", className="mb-2 text-center",
+                               style={"textAlign": "center", "width": "100%"}),
+                        # Create a row with "Intrinsic" on left and "Sensory" on right
+                        dbc.Row([
+                            dbc.Col("Intrinsic", className="text-start", width=6),
+                            dbc.Col("Sensory", className="text-end", width=6),
+                        ], className="mb-1"),
                         dcc.Slider(
                             id='alpha-slider',
-                            min=0, max=1, step=0.1, value=0.7,
-                            marks={i/10: f"{i/10:.1f}" for i in range(11)}
+                            min=0, max=1, step=0.1, value=THALAMIC_ALPHA,
+                            marks={i/10: f"{i/10:.1f}" for i in range(11)},
+                            className="mt-1",
+                            tooltip={"placement": "bottom", "always_visible": False}
                         )
                     ], className="mb-3"),
                     
                     # Simulation controls
                     html.Div([
-                        html.H5("Simulation Control", className="mb-2"),
-                        dbc.Button(
-                            "Reset", id="reset-button",
-                            color="warning", className="me-2"
-                        ),
-                        dbc.Button(
-                            "Pause/Resume", id="pause-button",
-                            color="primary"
-                        )
+                        html.H5("Simulation Control", className="mb-2 text-center",
+                               style={"textAlign": "center", "width": "100%"}),
+                        # Center the pause/resume button
+                        html.Div([
+                            dbc.Button(
+                                "Pause/Resume", id="pause-button",
+                                color="primary"
+                            )
+                        ], style={"display": "flex", "justifyContent": "center"})
                     ])
                 ], width=5, className="ps-4")  # Adjust control panel column width
             ], className="g-4 px-4"),  # Add horizontal padding to row
@@ -282,8 +451,23 @@ class DashboardApp:
     def get_connection_value(self, source_layer, source_cell, target_layer, target_cell):
         """Get the current connection strength value."""
         conn_key = self.get_connection_key(source_layer, source_cell, target_layer, target_cell)
+        
+        # First try to get the value from the simulation connectivity
+        if hasattr(self, 'simulation') and hasattr(self.simulation, 'connectivity'):
+            # Convert 'Th' to 'thalamus' for the simulation API
+            source_layer_sim = 'thalamus' if source_layer == 'Th' else source_layer
+            try:
+                return self.simulation.connectivity.get_connection_strength(
+                    source_layer_sim, source_cell, target_layer, target_cell
+                )
+            except Exception as e:
+                print(f"Error getting connection from simulation: {e}")
+                
+        # Fall back to config-based lookup
         if conn_key in LAYER_CONNECTIVITY_PARAMS:
             return LAYER_CONNECTIVITY_PARAMS[conn_key]['amplitude']
+            
+        # Default to 0 if not found
         return 0.0
 
     def create_connection_matrix(self) -> html.Div:
@@ -452,8 +636,7 @@ class DashboardApp:
             for target_layer in LAYERS:
                 for target_cell in CELL_TYPES:
                     # Skip certain connection types
-                    if (source_layer == 'Th' and target_layer == 'Th') or \
-                       (source_cell == 'SST' and target_cell == 'SST'):
+                    if (source_layer == 'Th' and target_layer == 'Th'):
                         cells.append(html.Td(
                             "",
                             className="text-center",
@@ -535,8 +718,8 @@ class DashboardApp:
         """Create a slider component for a connection cell."""
         # Set slider range based on excitatory/inhibitory type
         is_excitatory = source_cell == 'E' or source_layer == 'Th'
-        slider_min = 0 if is_excitatory else -5.0
-        slider_max = 5.0
+        slider_min = 0 if is_excitatory else -2.0
+        slider_max = 2.0
         
         # Create unique ID for slider
         slider_id = f"{source_layer}-{source_cell or 'None'}-{target_layer}-{target_cell}"
@@ -791,7 +974,70 @@ class DashboardApp:
              Input('selected-cell', 'data')],
         )
         
-        # Update visualization based on simulation state
+        # Add callbacks for updating time constant values display
+        @self.app.callback(
+            Output('tau-e-value', 'children'),
+            [Input('tau-e-slider', 'value')]
+        )
+        def update_tau_e_display(value):
+            return f"{value:.1f}"
+        
+        @self.app.callback(
+            Output('tau-sst-value', 'children'),
+            [Input('tau-sst-slider', 'value')]
+        )
+        def update_tau_sst_display(value):
+            return f"{value:.1f}"
+        
+        @self.app.callback(
+            Output('tau-pv-value', 'children'),
+            [Input('tau-pv-slider', 'value')]
+        )
+        def update_tau_pv_display(value):
+            return f"{value:.1f}"
+        
+        # Add callbacks for updating firing threshold values display
+        @self.app.callback(
+            Output('threshold-e-value', 'children'),
+            [Input('threshold-e-slider', 'value')]
+        )
+        def update_threshold_e_display(value):
+            return f"{value:.2f}"
+        
+        @self.app.callback(
+            Output('threshold-sst-value', 'children'),
+            [Input('threshold-sst-slider', 'value')]
+        )
+        def update_threshold_sst_display(value):
+            return f"{value:.2f}"
+        
+        @self.app.callback(
+            Output('threshold-pv-value', 'children'),
+            [Input('threshold-pv-slider', 'value')]
+        )
+        def update_threshold_pv_display(value):
+            return f"{value:.2f}"
+        
+        # Add callback for updating time constants and thresholds in simulation
+        @self.app.callback(
+            [Output('interval-component', 'n_intervals')],  # Dummy output to trigger update
+            [Input('tau-e-slider', 'value'),
+             Input('tau-sst-slider', 'value'),
+             Input('tau-pv-slider', 'value'),
+             Input('threshold-e-slider', 'value'),
+             Input('threshold-sst-slider', 'value'),
+             Input('threshold-pv-slider', 'value')],
+            [State('interval-component', 'n_intervals')]
+        )
+        def update_neuron_parameters(tau_e, tau_sst, tau_pv, threshold_e, threshold_sst, threshold_pv, n_intervals):
+            # No need to update parameters here since it's already handled in update_graphs
+            # This callback is kept just to maintain the slider interactivity and force a refresh
+            # when the sliders are moved
+            
+            # Return unchanged intervals to not disrupt the update loop
+            return [n_intervals]
+        
+        # Update the graphs with neural activity
         @self.app.callback(
             # Outputs: all graph figures
             [Output(f'graph-{layer}-{cell_type}', 'figure')
@@ -799,41 +1045,61 @@ class DashboardApp:
              for cell_type in CELL_TYPES] +
             [Output('graph-thalamus', 'figure')],
             
-            # Inputs: interval trigger and alpha slider
+            # Inputs: interval trigger, alpha slider, time constant sliders and threshold sliders
             [Input('interval-component', 'n_intervals'),
-             Input('alpha-slider', 'value')],
+             Input('alpha-slider', 'value'),
+             Input('tau-e-slider', 'value'),
+             Input('tau-sst-slider', 'value'),
+             Input('tau-pv-slider', 'value'),
+             Input('threshold-e-slider', 'value'),
+             Input('threshold-sst-slider', 'value'),
+             Input('threshold-pv-slider', 'value')],
             
             # States: pause button state
             [State('pause-button', 'n_clicks')]
         )
-        def update_graphs(n_intervals, alpha, pause_clicks):
+        def update_graphs(n_intervals, alpha, tau_e, tau_sst, tau_pv, threshold_e, threshold_sst, threshold_pv, pause_clicks):
             # Check if simulation is paused
-            is_paused = pause_clicks and pause_clicks % 2 == 1
+            if pause_clicks is not None and pause_clicks % 2 == 1:
+                # If paused, return current figures without updates
+                return list(self.figures.values())
             
-            if not is_paused:
-                try:
-                    # Run simulation update
-                    activities = self.simulation.update(alpha)
-                    
-                    # Update figures efficiently by only changing the z data
-                    figures = []
-                    for layer in LAYERS:
-                        for cell_type in CELL_TYPES:
-                            fig_id = f'graph-{layer}-{cell_type}'
-                            self.figures[fig_id].data[0].z = activities[layer][cell_type]
-                            figures.append(self.figures[fig_id])
-                    
-                    # Update thalamus figure
-                    self.figures['graph-thalamus'].data[0].z = activities['thalamus']
-                    figures.append(self.figures['graph-thalamus'])
-                    
-                    return figures
-                except Exception as e:
-                    print(f"Error updating graphs: {e}")
-                    return [dash.no_update] * (len(LAYERS) * len(CELL_TYPES) + 1)
+            # Update neural parameters
+            self.simulation.set_time_constant('E', tau_e)
+            self.simulation.set_time_constant('SST', tau_sst)
+            self.simulation.set_time_constant('PV', tau_pv)
             
-            # If paused, don't update
-            return [dash.no_update] * (len(LAYERS) * len(CELL_TYPES) + 1)
+            self.simulation.set_firing_threshold('E', threshold_e)
+            self.simulation.set_firing_threshold('SST', threshold_sst)
+            self.simulation.set_firing_threshold('PV', threshold_pv)
+            
+            try:
+                # Update simulation state with new alpha value
+                activities = self.simulation.update(alpha=alpha)
+                
+                # Update all figures with current activity
+                updated_figures = []
+                
+                # Update all neural population figures
+                for layer in LAYERS:
+                    for cell_type in CELL_TYPES:
+                        fig_id = f'graph-{layer}-{cell_type}'
+                        fig = self.figures[fig_id]
+                        
+                        # Update the heatmap data
+                        fig.data[0].z = activities[layer][cell_type]
+                        updated_figures.append(fig)
+                
+                # Update thalamus figure
+                thalamus_fig = self.figures['graph-thalamus']
+                thalamus_fig.data[0].z = activities['thalamus']
+                updated_figures.append(thalamus_fig)
+                
+                return updated_figures
+            except Exception as e:
+                print(f"Error updating graphs: {e}")
+                # Return unchanged figures on error
+                return list(self.figures.values())
         
         # Toggle simulation pause state
         @self.app.callback(
@@ -842,16 +1108,6 @@ class DashboardApp:
         )
         def toggle_simulation(n_clicks):
             return n_clicks is not None and n_clicks % 2 == 1
-        
-        # Reset simulation
-        @self.app.callback(
-            Output('interval-component', 'n_intervals'),
-            [Input('reset-button', 'n_clicks')]
-        )
-        def reset_simulation(n_clicks):
-            if n_clicks is not None:
-                self.simulation.reset()
-            return 0
     
     def run(self, debug: bool = True, port: int = 8050):
         """Run the dashboard application."""

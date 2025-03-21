@@ -1,10 +1,12 @@
 """Main module for running the cortical circuit simulation."""
 
 import argparse
-from model.neurons import CorticalCircuit
+from model.neurons import CorticalCircuit, FIRING_THRESHOLD
 from model.thalamus import ThalamicInput
 from visualization.dashboard import DashboardApp
-from model.config import GRID_SIZE, INTEGRATION_STEPS
+from model.config import (
+    GRID_SIZE, INTEGRATION_STEPS, THALAMIC_ALPHA, NEURAL_TAU
+)
 
 
 class CorticalSimulation:
@@ -26,7 +28,7 @@ class CorticalSimulation:
         """Access the circuit's connectivity configuration."""
         return self.circuit.connectivity
         
-    def update(self, alpha: float = 0.7) -> dict:
+    def update(self, alpha: float = THALAMIC_ALPHA) -> dict:
         """Update the simulation state for one step.
         
         Args:
@@ -63,6 +65,44 @@ class CorticalSimulation:
         self.circuit.reset()
         self.thalamus.reset()
         self._cache = {}
+    
+    def set_time_constant(self, cell_type: str, tau: float) -> None:
+        """
+        Set the membrane time constant for a specific cell type.
+        
+        Args:
+            cell_type: The cell type to update ('E', 'SST', or 'PV')
+            tau: New time constant value in milliseconds
+        """
+        self.circuit.set_time_constant(cell_type, tau)
+    
+    def get_time_constants(self) -> dict:
+        """
+        Get current time constant values for all cell types.
+        
+        Returns:
+            Dictionary mapping cell types to their time constants
+        """
+        return self.circuit.get_time_constants()
+        
+    def set_firing_threshold(self, cell_type: str, threshold: float) -> None:
+        """
+        Set the firing threshold for a specific cell type.
+        
+        Args:
+            cell_type: The cell type to update ('E', 'SST', or 'PV')
+            threshold: New threshold value
+        """
+        self.circuit.set_firing_threshold(cell_type, threshold)
+    
+    def get_firing_thresholds(self) -> dict:
+        """
+        Get current firing threshold values for all cell types.
+        
+        Returns:
+            Dictionary mapping cell types to their firing thresholds
+        """
+        return self.circuit.get_firing_thresholds()
 
 
 def parse_arguments():

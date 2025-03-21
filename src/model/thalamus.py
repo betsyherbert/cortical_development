@@ -11,7 +11,8 @@ from .config import (
     GRID_SIZE, DT, 
     THALAMIC_INTRINSIC_FREQ, THALAMIC_INTRINSIC_SIGMA,
     THALAMIC_SENSORY_SIGMA, THALAMIC_SENSORY_DURATION,
-    THALAMIC_SENSORY_INTERVAL, THALAMIC_SCALING
+    THALAMIC_SENSORY_INTERVAL, THALAMIC_SCALING,
+    THALAMIC_ALPHA
 )
 
 
@@ -158,7 +159,7 @@ class ThalamicInput:
             
             self.sensory_bursts.append(new_burst)
     
-    def update(self, alpha: float = 0.7, n_steps: int = 10) -> np.ndarray:
+    def update(self, alpha: float = THALAMIC_ALPHA, n_steps: int = 10) -> np.ndarray:
         """Generate combined thalamic input for multiple time steps.
         
         Args:

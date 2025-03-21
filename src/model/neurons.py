@@ -8,6 +8,9 @@ from .config import (
     INTEGRATION_STEPS, CELL_TYPES, LAYERS
 )
 
+# Default firing threshold (0 for standard ReLU)
+FIRING_THRESHOLD = 0.0
+
 
 class NeuralLayer:
     """
@@ -17,17 +20,29 @@ class NeuralLayer:
     and parvalbumin-expressing (PV) interneurons, each with their own dynamics.
     """
     
-    def __init__(self, grid_size: int = GRID_SIZE, tau: float = NEURAL_TAU, dt: float = DT):
+    def __init__(self, grid_size: int = GRID_SIZE, tau: float = NEURAL_TAU, dt: float = DT, threshold: float = FIRING_THRESHOLD):
         """
         Initialize a neural layer with specified grid size and time constant.
         
         Args:
             grid_size: Size of the square grid
-            tau: Time constant in milliseconds
+            tau: Time constant in milliseconds (default value, can be overridden per cell type)
             dt: Time step in milliseconds
+            threshold: Firing threshold (default value, can be overridden per cell type)
         """
         self.grid_size = grid_size
-        self.tau = tau
+        # Initialize separate time constants for each cell type
+        self.tau = {
+            'E': tau,
+            'SST': tau,
+            'PV': tau
+        }
+        # Initialize separate firing thresholds for each cell type
+        self.threshold = {
+            'E': threshold,
+            'SST': threshold,
+            'PV': threshold
+        }
         self.dt = dt
         
         # Initialize membrane potentials and firing rates for all cell types
@@ -47,10 +62,10 @@ class NeuralLayer:
         # Noise amplitude for dynamics
         self.noise_amplitude = NOISE_AMPLITUDE
 
-    @staticmethod
-    def relu(x: np.ndarray) -> np.ndarray:
-        """ReLU activation function: max(0, x)."""
-        return np.maximum(0, x)
+    def relu(self, x: np.ndarray, threshold: float = FIRING_THRESHOLD) -> np.ndarray:
+        """ReLU activation function with threshold: max(0, x - threshold)."""
+        # More efficient single-step calculation
+        return np.maximum(0, x - threshold)
 
     def update(self, inputs: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
         """
@@ -72,20 +87,62 @@ class NeuralLayer:
         for cell_type in CELL_TYPES:
             if cell_type in inputs:
                 # Calculate voltage change: dV = (-V + I + noise) * dt/tau
-                dV = (-self.V[cell_type] + inputs[cell_type] + noise[cell_type]) * (self.dt / self.tau)
+                # Using cell-type specific time constant
+                dV = (-self.V[cell_type] + inputs[cell_type] + noise[cell_type]) * (self.dt / self.tau[cell_type])
                 self.V[cell_type] += dV
                 
-                # Update firing rates with ReLU activation
-                self.r[cell_type] = self.relu(self.V[cell_type])
+                # Update firing rates with ReLU activation and cell-type specific threshold
+                self.r[cell_type] = self.relu(self.V[cell_type], self.threshold[cell_type])
         
         # Return current firing rates
         return self.r
 
     def reset(self) -> None:
-        """Reset all state variables to zero."""
+        """Reset neural state variables to initial state, while preserving parameters."""
+        # Only reset state variables (V and r), not parameters (tau and threshold)
         for cell_type in CELL_TYPES:
             self.V[cell_type].fill(0)
             self.r[cell_type].fill(0)
+
+    def set_time_constant(self, cell_type: str, tau: float) -> None:
+        """
+        Set the membrane time constant for a specific cell type.
+        
+        Args:
+            cell_type: The cell type to update ('E', 'SST', or 'PV')
+            tau: New time constant value in milliseconds
+        """
+        if cell_type in CELL_TYPES:
+            self.tau[cell_type] = tau
+            
+    def get_time_constants(self) -> Dict[str, float]:
+        """
+        Get current time constant values for all cell types.
+        
+        Returns:
+            Dictionary mapping cell types to their time constants
+        """
+        return self.tau.copy()
+        
+    def set_firing_threshold(self, cell_type: str, threshold: float) -> None:
+        """
+        Set the firing threshold for a specific cell type.
+        
+        Args:
+            cell_type: The cell type to update ('E', 'SST', or 'PV')
+            threshold: New threshold value
+        """
+        if cell_type in CELL_TYPES:
+            self.threshold[cell_type] = threshold
+            
+    def get_firing_thresholds(self) -> Dict[str, float]:
+        """
+        Get current firing threshold values for all cell types.
+        
+        Returns:
+            Dictionary mapping cell types to their firing thresholds
+        """
+        return self.threshold.copy()
 
 
 class CorticalCircuit:
@@ -186,4 +243,46 @@ class CorticalCircuit:
                 self.layers[target_layer].update(layer_inputs)
         
         # Return current activities
-        return self.get_layer_activities() 
+        return self.get_layer_activities()
+        
+    def set_time_constant(self, cell_type: str, tau: float) -> None:
+        """
+        Set the membrane time constant for a specific cell type across all layers.
+        
+        Args:
+            cell_type: The cell type to update ('E', 'SST', or 'PV')
+            tau: New time constant value in milliseconds
+        """
+        for layer in self.layers.values():
+            layer.set_time_constant(cell_type, tau)
+            
+    def get_time_constants(self) -> Dict[str, float]:
+        """
+        Get current time constant values for all cell types (from L23 layer).
+        
+        Returns:
+            Dictionary mapping cell types to their time constants
+        """
+        # Return values from L23 layer as they're synced across all layers
+        return self.layers['L23'].get_time_constants()
+        
+    def set_firing_threshold(self, cell_type: str, threshold: float) -> None:
+        """
+        Set the firing threshold for a specific cell type across all layers.
+        
+        Args:
+            cell_type: The cell type to update ('E', 'SST', or 'PV') 
+            threshold: New threshold value
+        """
+        for layer in self.layers.values():
+            layer.set_firing_threshold(cell_type, threshold)
+            
+    def get_firing_thresholds(self) -> Dict[str, float]:
+        """
+        Get current firing threshold values for all cell types (from L23 layer).
+        
+        Returns:
+            Dictionary mapping cell types to their firing thresholds
+        """
+        # Return values from L23 layer as they're synced across all layers
+        return self.layers['L23'].get_firing_thresholds() 
