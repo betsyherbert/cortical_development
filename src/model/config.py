@@ -14,8 +14,8 @@ INTEGRATION_STEPS = 5  # Number of steps per update cycle - INCREASE for faster 
 VISUALIZATION_STEPS = 3  # Number of simulation steps per visualization update - DECREASE for more frequent visual updates
 
 # Thalamic input parameters
-THALAMIC_INTRINSIC_FREQ = 10.0  # Base frequency for intrinsic oscillations (Hz) - INCREASE for faster oscillations
-THALAMIC_INTRINSIC_SIGMA = 4.0  # Spatial spread of intrinsic activity (grid units) - DECREASE for more rapid spatial changes
+THALAMIC_INTRINSIC_FREQ = 8.0  # Base frequency for intrinsic oscillations (Hz) - INCREASE for faster oscillations
+THALAMIC_INTRINSIC_SIGMA = 3.0  # Spatial spread of intrinsic activity (grid units) - DECREASE for more rapid spatial changes
 THALAMIC_SENSORY_SIGMA = 1.5  # Spatial spread of sensory inputs (grid units)
 THALAMIC_SENSORY_DURATION = 20.0  # Duration of sensory bursts (ms) - DECREASE for faster transitions
 THALAMIC_SENSORY_INTERVAL = 50.0  # Mean interval between sensory bursts (ms) - DECREASE for more frequent activity changes
@@ -23,7 +23,6 @@ THALAMIC_SCALING = 1.0  # Overall scaling factor for thalamic input - INCREASE f
 THALAMIC_ALPHA = 0.2  # Balance between intrinsic (0) and sensory (1) thalamic activity
 
 # Neural network parameters
-NEURAL_TAU = 10.0  # Membrane time constant (ms) - DECREASE for faster neural dynamics and visual changes
 NOISE_AMPLITUDE = 0.00  # Standard deviation of neural noise - INCREASE for more rapid random activity changes
 
 # Network structure
@@ -46,145 +45,152 @@ LAYER_CONNECTIVITY_PARAMS = {
     # -----------------------------------------------------
     # L2/3 -> L2/3 connections
     # -----------------------------------------------------
-    'L23_E_to_L23_E': {'amplitude': 0.35, 'sigma': 2.0},
-    'L23_E_to_L23_SST': {'amplitude': 0.15, 'sigma': 2.0},
-    'L23_E_to_L23_PV': {'amplitude': 0.20, 'sigma': 2.0},
-    'L23_SST_to_L23_E': {'amplitude': -0.15, 'sigma': 3.0},
-    'L23_SST_to_L23_PV': {'amplitude': -0.08, 'sigma': 3.0},
-    'L23_PV_to_L23_E': {'amplitude': -0.20, 'sigma': 1.5},
-    'L23_PV_to_L23_SST': {'amplitude': -0.15, 'sigma': 1.5},
-    'L23_PV_to_L23_PV': {'amplitude': -0.12, 'sigma': 1.5},
+    'L23_E_to_L23_E': {'amplitude': 0.2, 'sigma': 2.0},
+    'L23_E_to_L23_SST': {'amplitude': 0.1, 'sigma': 2.0},
+    'L23_E_to_L23_PV': {'amplitude': 0.2, 'sigma': 2.0},
+    'L23_SST_to_L23_E': {'amplitude': 0.1, 'sigma': 3.0},
+    'L23_SST_to_L23_PV': {'amplitude': 0.0, 'sigma': 3.0},
+    'L23_PV_to_L23_E': {'amplitude': 0.0, 'sigma': 1.5},
+    'L23_PV_to_L23_SST': {'amplitude': 0.0, 'sigma': 1.5},
+    'L23_PV_to_L23_PV': {'amplitude': 0.0, 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L2/3 -> L4 connections
     # -----------------------------------------------------
-    'L23_E_to_L4_E': {'amplitude': 0.20, 'sigma': 2.5},
-    'L23_E_to_L4_SST': {'amplitude': 0.10, 'sigma': 2.5},
-    'L23_E_to_L4_PV': {'amplitude': 0.12, 'sigma': 2.5},
-    'L23_SST_to_L4_E': {'amplitude': -0.10, 'sigma': 3.0},
-    'L23_SST_to_L4_PV': {'amplitude': -0.05, 'sigma': 3.0},
-    'L23_PV_to_L4_E': {'amplitude': -0.15, 'sigma': 1.5},
-    'L23_PV_to_L4_SST': {'amplitude': -0.10, 'sigma': 1.5},
-    'L23_PV_to_L4_PV': {'amplitude': -0.08, 'sigma': 1.5},
+    'L23_E_to_L4_E': {'amplitude': 0.1, 'sigma': 2.5},
+    'L23_E_to_L4_SST': {'amplitude': 0.1, 'sigma': 2.5},
+    'L23_E_to_L4_PV': {'amplitude': 0.5, 'sigma': 2.5},
+    'L23_SST_to_L4_E': {'amplitude': 0.0, 'sigma': 3.0},
+    'L23_SST_to_L4_PV': {'amplitude': 0.0, 'sigma': 3.0},
+    'L23_PV_to_L4_E': {'amplitude': 0.0, 'sigma': 1.5},
+    'L23_PV_to_L4_SST': {'amplitude': 0.0, 'sigma': 1.5},
+    'L23_PV_to_L4_PV': {'amplitude': 0.0, 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L2/3 -> L5 connections
     # -----------------------------------------------------
-    'L23_E_to_L5_E': {'amplitude': 0.25, 'sigma': 3.0},
-    'L23_E_to_L5_SST': {'amplitude': 0.12, 'sigma': 3.0},
-    'L23_E_to_L5_PV': {'amplitude': 0.15, 'sigma': 3.0},
-    'L23_SST_to_L5_E': {'amplitude': -0.12, 'sigma': 3.0},
-    'L23_SST_to_L5_PV': {'amplitude': -0.06, 'sigma': 3.0},
-    'L23_PV_to_L5_E': {'amplitude': -0.15, 'sigma': 1.5},
-    'L23_PV_to_L5_SST': {'amplitude': -0.10, 'sigma': 1.5},
-    'L23_PV_to_L5_PV': {'amplitude': -0.08, 'sigma': 1.5},
+    'L23_E_to_L5_E': {'amplitude': 0.1, 'sigma': 3.0},
+    'L23_E_to_L5_SST': {'amplitude': 0.1, 'sigma': 3.0},
+    'L23_E_to_L5_PV': {'amplitude': 0.1, 'sigma': 3.0},
+    'L23_SST_to_L5_E': {'amplitude': 0.0, 'sigma': 3.0},
+    'L23_SST_to_L5_PV': {'amplitude': 0.0, 'sigma': 3.0},
+    'L23_PV_to_L5_E': {'amplitude': 0.0, 'sigma': 1.5},
+    'L23_PV_to_L5_SST': {'amplitude': 0.0, 'sigma': 1.5},
+    'L23_PV_to_L5_PV': {'amplitude': 0.0, 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L4 -> L2/3 connections
     # -----------------------------------------------------
-    'L4_E_to_L23_E': {'amplitude': 0.20, 'sigma': 2.5},
-    'L4_E_to_L23_SST': {'amplitude': 0.10, 'sigma': 2.5},
-    'L4_E_to_L23_PV': {'amplitude': 0.12, 'sigma': 2.5},
-    'L4_SST_to_L23_E': {'amplitude': -0.12, 'sigma': 3.0},
-    'L4_SST_to_L23_PV': {'amplitude': -0.06, 'sigma': 3.0},
-    'L4_PV_to_L23_E': {'amplitude': -0.18, 'sigma': 1.5},
-    'L4_PV_to_L23_SST': {'amplitude': -0.12, 'sigma': 1.5},
-    'L4_PV_to_L23_PV': {'amplitude': -0.10, 'sigma': 1.5},
+    'L4_E_to_L23_E': {'amplitude': 0.1, 'sigma': 2.5},
+    'L4_E_to_L23_SST': {'amplitude': 0.1, 'sigma': 2.5},
+    'L4_E_to_L23_PV': {'amplitude': 0.1, 'sigma': 2.5},
+    'L4_SST_to_L23_E': {'amplitude': 0.1, 'sigma': 3.0},
+    'L4_SST_to_L23_PV': {'amplitude': 0.0, 'sigma': 3.0},
+    'L4_PV_to_L23_E': {'amplitude': 0.0, 'sigma': 1.5},
+    'L4_PV_to_L23_SST': {'amplitude': 0.0, 'sigma': 1.5},
+    'L4_PV_to_L23_PV': {'amplitude': 0.0, 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L4 -> L4 connections
     # -----------------------------------------------------
-    'L4_E_to_L4_E': {'amplitude': 0.35, 'sigma': 2.0},
-    'L4_E_to_L4_SST': {'amplitude': 0.15, 'sigma': 2.0},
-    'L4_E_to_L4_PV': {'amplitude': 0.20, 'sigma': 2.0},
-    'L4_SST_to_L4_E': {'amplitude': -0.15, 'sigma': 3.0},
-    'L4_SST_to_L4_PV': {'amplitude': -0.08, 'sigma': 3.0},
-    'L4_PV_to_L4_E': {'amplitude': -0.20, 'sigma': 1.5},
-    'L4_PV_to_L4_SST': {'amplitude': -0.15, 'sigma': 1.5},
-    'L4_PV_to_L4_PV': {'amplitude': -0.12, 'sigma': 1.5},
+    'L4_E_to_L4_E': {'amplitude': 0.1, 'sigma': 2.0},
+    'L4_E_to_L4_SST': {'amplitude': 0.1, 'sigma': 2.0},
+    'L4_E_to_L4_PV': {'amplitude': 0.1, 'sigma': 2.0},
+    'L4_SST_to_L4_E': {'amplitude': 0.0, 'sigma': 3.0},
+    'L4_SST_to_L4_PV': {'amplitude': 0.0, 'sigma': 3.0},
+    'L4_PV_to_L4_E': {'amplitude': 0.0, 'sigma': 1.5},
+    'L4_PV_to_L4_SST': {'amplitude': 0.0, 'sigma': 1.5},
+    'L4_PV_to_L4_PV': {'amplitude': 0.0, 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L4 -> L5 connections
     # -----------------------------------------------------
-    'L4_E_to_L5_E': {'amplitude': 0.18, 'sigma': 2.5},
-    'L4_E_to_L5_SST': {'amplitude': 0.09, 'sigma': 2.5},
-    'L4_E_to_L5_PV': {'amplitude': 0.12, 'sigma': 2.5},
-    'L4_SST_to_L5_E': {'amplitude': -0.10, 'sigma': 3.0},
-    'L4_SST_to_L5_PV': {'amplitude': -0.05, 'sigma': 3.0},
-    'L4_PV_to_L5_E': {'amplitude': -0.15, 'sigma': 1.5},
-    'L4_PV_to_L5_SST': {'amplitude': -0.10, 'sigma': 1.5},
-    'L4_PV_to_L5_PV': {'amplitude': -0.08, 'sigma': 1.5},
+    'L4_E_to_L5_E': {'amplitude': 0.1, 'sigma': 2.5},
+    'L4_E_to_L5_SST': {'amplitude': 0.5, 'sigma': 2.5},
+    'L4_E_to_L5_PV': {'amplitude': 0.1, 'sigma': 2.5},
+    'L4_SST_to_L5_E': {'amplitude': 0.0, 'sigma': 3.0},
+    'L4_SST_to_L5_PV': {'amplitude': 0.0, 'sigma': 3.0},
+    'L4_PV_to_L5_E': {'amplitude': 0.0, 'sigma': 1.5},
+    'L4_PV_to_L5_SST': {'amplitude': 0.0, 'sigma': 1.5},
+    'L4_PV_to_L5_PV': {'amplitude': 0.0, 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L5 -> L2/3 connections
     # -----------------------------------------------------
-    'L5_E_to_L23_E': {'amplitude': 0.20, 'sigma': 3.0},
-    'L5_E_to_L23_SST': {'amplitude': 0.10, 'sigma': 3.0},
-    'L5_E_to_L23_PV': {'amplitude': 0.12, 'sigma': 3.0},
-    'L5_SST_to_L23_E': {'amplitude': -0.10, 'sigma': 3.0},
-    'L5_SST_to_L23_PV': {'amplitude': -0.05, 'sigma': 3.0},
-    'L5_PV_to_L23_E': {'amplitude': -0.15, 'sigma': 1.5},
-    'L5_PV_to_L23_SST': {'amplitude': -0.10, 'sigma': 1.5},
-    'L5_PV_to_L23_PV': {'amplitude': -0.08, 'sigma': 1.5},
+    'L5_E_to_L23_E': {'amplitude': 0.5, 'sigma': 3.0},
+    'L5_E_to_L23_SST': {'amplitude': 0.1, 'sigma': 3.0},
+    'L5_E_to_L23_PV': {'amplitude': 0.1, 'sigma': 3.0},
+    'L5_SST_to_L23_E': {'amplitude': 0.2, 'sigma': 3.0},
+    'L5_SST_to_L23_PV': {'amplitude': 0.0, 'sigma': 3.0},
+    'L5_PV_to_L23_E': {'amplitude': 0.0, 'sigma': 1.5},
+    'L5_PV_to_L23_SST': {'amplitude': 0.0, 'sigma': 1.5},
+    'L5_PV_to_L23_PV': {'amplitude': 0.0, 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L5 -> L4 connections
     # -----------------------------------------------------
-    'L5_E_to_L4_E': {'amplitude': 0.15, 'sigma': 3.0},
-    'L5_E_to_L4_SST': {'amplitude': 0.08, 'sigma': 3.0},
-    'L5_E_to_L4_PV': {'amplitude': 0.10, 'sigma': 3.0},
-    'L5_SST_to_L4_E': {'amplitude': -0.10, 'sigma': 3.0},
-    'L5_SST_to_L4_PV': {'amplitude': -0.05, 'sigma': 3.0},
-    'L5_PV_to_L4_E': {'amplitude': -0.15, 'sigma': 1.5},
-    'L5_PV_to_L4_SST': {'amplitude': -0.10, 'sigma': 1.5},
-    'L5_PV_to_L4_PV': {'amplitude': -0.08, 'sigma': 1.5},
+    'L5_E_to_L4_E': {'amplitude': 0.1, 'sigma': 3.0},
+    'L5_E_to_L4_SST': {'amplitude': 0.1, 'sigma': 3.0},
+    'L5_E_to_L4_PV': {'amplitude': 0.1, 'sigma': 3.0},
+    'L5_SST_to_L4_E': {'amplitude': 0.5, 'sigma': 3.0},
+    'L5_SST_to_L4_PV': {'amplitude': 0.5, 'sigma': 3.0},
+    'L5_PV_to_L4_E': {'amplitude': 0.0, 'sigma': 1.5},
+    'L5_PV_to_L4_SST': {'amplitude': 0.0, 'sigma': 1.5},
+    'L5_PV_to_L4_PV': {'amplitude': 0.0, 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L5 -> L5 connections
     # -----------------------------------------------------
-    'L5_E_to_L5_E': {'amplitude': 0.35, 'sigma': 2.0},
-    'L5_E_to_L5_SST': {'amplitude': 0.15, 'sigma': 2.0},
-    'L5_E_to_L5_PV': {'amplitude': 0.20, 'sigma': 2.0},
-    'L5_SST_to_L5_E': {'amplitude': -0.15, 'sigma': 3.0},
-    'L5_SST_to_L5_PV': {'amplitude': -0.08, 'sigma': 3.0},
-    'L5_PV_to_L5_E': {'amplitude': -0.20, 'sigma': 1.5},
-    'L5_PV_to_L5_SST': {'amplitude': -0.15, 'sigma': 1.5},
-    'L5_PV_to_L5_PV': {'amplitude': -0.12, 'sigma': 1.5},
+    'L5_E_to_L5_E': {'amplitude': 0.1, 'sigma': 2.0},
+    'L5_E_to_L5_SST': {'amplitude': 0.1, 'sigma': 2.0},
+    'L5_E_to_L5_PV': {'amplitude': 0.1, 'sigma': 2.0},
+    'L5_SST_to_L5_E': {'amplitude': 0.5, 'sigma': 3.0},
+    'L5_SST_to_L5_PV': {'amplitude': 0.5, 'sigma': 3.0},
+    'L5_PV_to_L5_E': {'amplitude': 0.0, 'sigma': 1.5},
+    'L5_PV_to_L5_SST': {'amplitude': 0.0, 'sigma': 1.5},
+    'L5_PV_to_L5_PV': {'amplitude': 0.0, 'sigma': 1.5},
     
     # -----------------------------------------------------
     # Thalamic connections to all layers
     # -----------------------------------------------------
-    'thalamus_to_L23_E': {'amplitude': 0.25, 'sigma': 2.0},
-    'thalamus_to_L23_SST': {'amplitude': -0.10, 'sigma': 2.0},
-    'thalamus_to_L23_PV': {'amplitude': -0.12, 'sigma': 2.0},
+    'thalamus_to_L23_E': {'amplitude': 0.1, 'sigma': 2.0},
+    'thalamus_to_L23_SST': {'amplitude': 0.0, 'sigma': 2.0},
+    'thalamus_to_L23_PV': {'amplitude': 0.0, 'sigma': 2.0},
     
-    'thalamus_to_L4_E': {'amplitude': 0.35, 'sigma': 2.0},
-    'thalamus_to_L4_SST': {'amplitude': -0.15, 'sigma': 2.0},
-    'thalamus_to_L4_PV': {'amplitude': -0.18, 'sigma': 2.0},
+    'thalamus_to_L4_E': {'amplitude': 0.5, 'sigma': 2.0},
+    'thalamus_to_L4_SST': {'amplitude': 0.3, 'sigma': 2.0},
+    'thalamus_to_L4_PV': {'amplitude': 0.1, 'sigma': 2.0},
     
-    'thalamus_to_L5_E': {'amplitude': 0.30, 'sigma': 2.0},
-    'thalamus_to_L5_SST': {'amplitude': -0.12, 'sigma': 2.0},
-    'thalamus_to_L5_PV': {'amplitude': -0.15, 'sigma': 2.0}
+    'thalamus_to_L5_E': {'amplitude': 0.1, 'sigma': 2.0},
+    'thalamus_to_L5_SST': {'amplitude': 0.5, 'sigma': 2.0},
+    'thalamus_to_L5_PV': {'amplitude': 0.1, 'sigma': 2.0}
 }
 
-# Keep the old format for backward compatibility
-CONNECTIVITY_PARAMS = {
-    # Excitatory connections
-    'E_to_E': {'amplitude': 0.2, 'sigma': 2.0},
-    'E_to_SST': {'amplitude': 0.1, 'sigma': 2.0},
-    'E_to_PV': {'amplitude': 0.15, 'sigma': 2.0},
-    
-    # Inhibitory connections
-    'SST_to_E': {'amplitude': -0.1, 'sigma': 3.0},
-    'SST_to_PV': {'amplitude': -0.05, 'sigma': 3.0},
-    'PV_to_E': {'amplitude': -0.15, 'sigma': 1.5},
-    'PV_to_SST': {'amplitude': -0.1, 'sigma': 1.5},
-    'PV_to_PV': {'amplitude': -0.1, 'sigma': 1.5},
-    
-    # Thalamic inputs
-    'thalamus_to_E': {'amplitude': 0.15, 'sigma': 2.0},
-    'thalamus_to_SST': {'amplitude': 0.1, 'sigma': 2.0},
-    'thalamus_to_PV': {'amplitude': 0.12, 'sigma': 2.0}
+# Initial values for connection widths
+INITIAL_THALAMIC_WIDTHS = {
+    'E': 6.0,    # Initial thalamic input width for E cells
+    'SST': 6.0,  # Initial thalamic input width for SST cells
+    'PV': 6.0    # Initial thalamic input width for PV cells
+}
+
+INITIAL_OUTGOING_WIDTHS = {
+    'E': 4.0,    # Initial outgoing width for E cells
+    'SST': 4.0,  # Initial outgoing width for SST cells
+    'PV': 4.0    # Initial outgoing width for PV cells
+}
+
+# Initial values for time constants (ms)
+INITIAL_TIME_CONSTANTS = {
+    'E': 80.0,   # Initial time constant for E cells
+    'SST': 60.0, # Initial time constant for SST cells
+    'PV': 40.0   # Initial time constant for PV cells
+}
+
+# Initial values for firing thresholds
+INITIAL_FIRING_THRESHOLDS = {
+    'E': 0.05,   # Initial firing threshold for E cells
+    'SST': 0.1,  # Initial firing threshold for SST cells
+    'PV': 0.05   # Initial firing threshold for PV cells
 }
 
 # Layer specific connection list (source_layer, source_cell, target_layer, target_cell)

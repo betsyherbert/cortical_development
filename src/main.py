@@ -5,7 +5,7 @@ from model.neurons import CorticalCircuit, FIRING_THRESHOLD
 from model.thalamus import ThalamicInput
 from visualization.dashboard import DashboardApp
 from model.config import (
-    GRID_SIZE, INTEGRATION_STEPS, THALAMIC_ALPHA, NEURAL_TAU
+    GRID_SIZE, INTEGRATION_STEPS, THALAMIC_ALPHA
 )
 
 

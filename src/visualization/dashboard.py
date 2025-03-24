@@ -12,9 +12,12 @@ import json
 from model.config import (
     COLORMAPS, UPDATE_INTERVAL, CELL_TYPES, LAYERS, LAYER_NAMES, 
     THALAMIC_SCALING, LAYER_CONNECTIONS,
-    LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, NEURAL_TAU, CONNECTIONS
+    LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, CONNECTIONS,
+    GRID_SIZE, INITIAL_THALAMIC_WIDTHS, INITIAL_OUTGOING_WIDTHS,
+    INITIAL_TIME_CONSTANTS, INITIAL_FIRING_THRESHOLDS
 )
 from model.neurons import FIRING_THRESHOLD
+from model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
 
 
 class DashboardApp:
@@ -90,6 +93,15 @@ class DashboardApp:
                     /* Reduce left margin in left column labels */
                     .cell-type-label {
                         padding-right: 1rem !important;
+                    }
+                    /* Remove rightmost and bottommost borders */
+                    .connection-matrix tr:last-child td, 
+                    .connection-matrix tr:last-child th {
+                        border-bottom: none !important;
+                    }
+                    .connection-matrix tr td:last-child, 
+                    .connection-matrix tr th:last-child {
+                        border-right: none !important;
                     }
                 </style>
             </head>
@@ -200,11 +212,29 @@ class DashboardApp:
                 
                 # Right column: control panel
                 dbc.Col([
+                    # Preset Buttons (moved here)
+                    html.Div([
+                        html.Div([
+                            dbc.Button("P4", id="p4-preset-button", color="dark", 
+                                    className="mx-2 px-3", 
+                                    style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
+                            dbc.Button("P8", id="p8-preset-button", color="dark", 
+                                    className="mx-2 px-3", 
+                                    style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
+                            dbc.Button("P12", id="p12-preset-button", color="dark", 
+                                     className="mx-2 px-3", 
+                                     style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
+                            dbc.Button("P16", id="p16-preset-button", color="dark", 
+                                     className="mx-2 px-3", 
+                                     style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"})
+                        ], style={"display": "flex", "justifyContent": "center"})
+                    ], className="mb-4"),
+                    
                     # Connection Strength Matrix
                     html.Div([
                         html.H5("Connection Strengths", 
-                               className="mb-4 text-center",
-                               style={"textAlign": "center", "width": "100%"}),  # Ensure true centering
+                              className="mb-4 text-center",
+                              style={"textAlign": "center", "width": "100%"}),
                         
                         # Connection Matrix Container
                         html.Div(
@@ -252,7 +282,7 @@ class DashboardApp:
                                         min=1.0,
                                         max=100.0,
                                         step=1.0,
-                                        value=NEURAL_TAU,
+                                        value=INITIAL_TIME_CONSTANTS['E'],
                                         marks={i: f"{i}" for i in range(20, 101, 20)},
                                         tooltip={"placement": "bottom", "always_visible": False},
                                         className="custom-slider"
@@ -267,7 +297,7 @@ class DashboardApp:
                                         min=0.0,
                                         max=0.5,
                                         step=0.01,
-                                        value=FIRING_THRESHOLD,
+                                        value=INITIAL_FIRING_THRESHOLDS['E'],
                                         marks={i/10: f"{i/10:.1f}" for i in range(0, 6, 1)},
                                         tooltip={"placement": "bottom", "always_visible": False},
                                         className="custom-slider"
@@ -288,7 +318,7 @@ class DashboardApp:
                                         min=1.0,
                                         max=100.0,
                                         step=1.0,
-                                        value=NEURAL_TAU,
+                                        value=INITIAL_TIME_CONSTANTS['SST'],
                                         marks={i: f"{i}" for i in range(20, 101, 20)},
                                         tooltip={"placement": "bottom", "always_visible": False},
                                         className="custom-slider"
@@ -303,7 +333,7 @@ class DashboardApp:
                                         min=0.0,
                                         max=0.5,
                                         step=0.01,
-                                        value=FIRING_THRESHOLD,
+                                        value=INITIAL_FIRING_THRESHOLDS['SST'],
                                         marks={i/10: f"{i/10:.1f}" for i in range(0, 6, 1)},
                                         tooltip={"placement": "bottom", "always_visible": False},
                                         className="custom-slider"
@@ -324,7 +354,7 @@ class DashboardApp:
                                         min=1.0,
                                         max=100.0,
                                         step=1.0,
-                                        value=NEURAL_TAU,
+                                        value=INITIAL_TIME_CONSTANTS['PV'],
                                         marks={i: f"{i}" for i in range(20, 101, 20)},
                                         tooltip={"placement": "bottom", "always_visible": False},
                                         className="custom-slider"
@@ -339,7 +369,7 @@ class DashboardApp:
                                         min=0.0,
                                         max=0.5,
                                         step=0.01,
-                                        value=FIRING_THRESHOLD,
+                                        value=INITIAL_FIRING_THRESHOLDS['PV'],
                                         marks={i/10: f"{i/10:.1f}" for i in range(0, 6, 1)},
                                         tooltip={"placement": "bottom", "always_visible": False},
                                         className="custom-slider"
@@ -367,30 +397,30 @@ class DashboardApp:
                             dbc.Row([
                                 # Cell type label
                                 dbc.Col(html.Strong("E"), width=2, className="d-flex align-items-center justify-content-end"),
-                                # Thalamus -> E slider
+                                # Thalamic input width slider
                                 dbc.Col(
                                     dcc.Slider(
-                                        id='sigma-thal-e-slider',
-                                        min=0.5,
+                                        id='thalamic-width-e-slider',
+                                        min=0.1,
                                         max=10.0,
                                         step=0.1,
-                                        value=2.0,
-                                        marks={i: f"{i}" for i in range(1, 11)},
+                                        value=INITIAL_THALAMIC_WIDTHS['E'],
+                                        marks={i: f"{i}" for i in range(0, 11, 2)},
                                         tooltip={"placement": "bottom", "always_visible": False},
                                         className="custom-slider"
                                     ),
                                     width=5,
                                     style={"paddingRight": "15px"}
                                 ),
-                                # E outgoing slider
+                                # Outgoing width slider
                                 dbc.Col(
                                     dcc.Slider(
-                                        id='sigma-e-out-slider',
-                                        min=0.5,
+                                        id='outgoing-width-e-slider',
+                                        min=0.1,
                                         max=10.0,
                                         step=0.1,
-                                        value=2.0,
-                                        marks={i: f"{i}" for i in range(1, 11)},
+                                        value=INITIAL_OUTGOING_WIDTHS['E'],
+                                        marks={i: f"{i}" for i in range(0, 11, 2)},
                                         tooltip={"placement": "bottom", "always_visible": False},
                                         className="custom-slider"
                                     ),
@@ -403,30 +433,30 @@ class DashboardApp:
                             dbc.Row([
                                 # Cell type label
                                 dbc.Col(html.Strong("SST"), width=2, className="d-flex align-items-center justify-content-end"),
-                                # Thalamus -> SST slider
+                                # Thalamic input width slider
                                 dbc.Col(
                                     dcc.Slider(
-                                        id='sigma-thal-sst-slider',
-                                        min=0.5,
+                                        id='thalamic-width-sst-slider',
+                                        min=0.1,
                                         max=10.0,
                                         step=0.1,
-                                        value=2.0,
-                                        marks={i: f"{i}" for i in range(1, 11)},
+                                        value=INITIAL_THALAMIC_WIDTHS['SST'],
+                                        marks={i: f"{i}" for i in range(0, 11, 2)},
                                         tooltip={"placement": "bottom", "always_visible": False},
                                         className="custom-slider"
                                     ),
                                     width=5,
                                     style={"paddingRight": "15px"}
                                 ),
-                                # SST outgoing slider
+                                # Outgoing width slider
                                 dbc.Col(
                                     dcc.Slider(
-                                        id='sigma-sst-out-slider',
-                                        min=0.5,
+                                        id='outgoing-width-sst-slider',
+                                        min=0.1,
                                         max=10.0,
                                         step=0.1,
-                                        value=3.0,
-                                        marks={i: f"{i}" for i in range(1, 11)},
+                                        value=INITIAL_OUTGOING_WIDTHS['SST'],
+                                        marks={i: f"{i}" for i in range(0, 11, 2)},
                                         tooltip={"placement": "bottom", "always_visible": False},
                                         className="custom-slider"
                                     ),
@@ -439,30 +469,30 @@ class DashboardApp:
                             dbc.Row([
                                 # Cell type label
                                 dbc.Col(html.Strong("PV"), width=2, className="d-flex align-items-center justify-content-end"),
-                                # Thalamus -> PV slider
+                                # Thalamic input width slider
                                 dbc.Col(
                                     dcc.Slider(
-                                        id='sigma-thal-pv-slider',
-                                        min=0.5,
+                                        id='thalamic-width-pv-slider',
+                                        min=0.1,
                                         max=10.0,
                                         step=0.1,
-                                        value=2.0,
-                                        marks={i: f"{i}" for i in range(1, 11)},
+                                        value=INITIAL_THALAMIC_WIDTHS['PV'],
+                                        marks={i: f"{i}" for i in range(0, 11, 2)},
                                         tooltip={"placement": "bottom", "always_visible": False},
                                         className="custom-slider"
                                     ),
                                     width=5,
                                     style={"paddingRight": "15px"}
                                 ),
-                                # PV outgoing slider
+                                # Outgoing width slider
                                 dbc.Col(
                                     dcc.Slider(
-                                        id='sigma-pv-out-slider',
-                                        min=0.5,
+                                        id='outgoing-width-pv-slider',
+                                        min=0.1,
                                         max=10.0,
                                         step=0.1,
-                                        value=1.5,
-                                        marks={i: f"{i}" for i in range(1, 11)},
+                                        value=INITIAL_OUTGOING_WIDTHS['PV'],
+                                        marks={i: f"{i}" for i in range(0, 11, 2)},
                                         tooltip={"placement": "bottom", "always_visible": False},
                                         className="custom-slider"
                                     ),
@@ -700,6 +730,9 @@ class DashboardApp:
                           "#752f00" if cell_type == "SST" else \
                           "#661111"  # PV
                 
+                # Add right border to last cell in each layer
+                right_border = "1px solid #555" if cell_type == "PV" else "none"
+                
                 sub_header_cells.append(
                     html.Th(
                         cell_type,
@@ -714,7 +747,8 @@ class DashboardApp:
                             "maxWidth": f"{HEADER_WIDTH}px",
                             "minHeight": f"{HEADER_HEIGHT}px",
                             "maxHeight": f"{HEADER_HEIGHT}px",
-                            "fontSize": "0.9rem"  # Consistent font size
+                            "fontSize": "0.9rem",  # Consistent font size
+                            "borderRight": right_border
                         }
                     )
                 )
@@ -823,6 +857,9 @@ class DashboardApp:
                         bg_color = "rgba(80, 80, 80, 0.1)"
                         hover_color = "rgba(100, 100, 100, 0.3)"
                     
+                    # Determine if this cell is at a layer boundary (add border to right side of last cell in layer)
+                    right_border = "1px solid #555" if target_cell == "PV" else "none"
+                    
                     # Create cell with unique ID for callbacks
                     cell_id = f"{source_layer}-{source_cell or 'None'}-{target_layer}-{target_cell}"
                     cells.append(html.Td(
@@ -840,7 +877,8 @@ class DashboardApp:
                             "minHeight": f"{CELL_SIZE}px",
                             "maxHeight": f"{CELL_SIZE}px",
                             "padding": "5px",
-                            "fontSize": "0.8rem"  # Consistent font size for values
+                            "fontSize": "0.8rem",  # Consistent font size for values
+                            "borderRight": right_border
                         },
                         **{
                             'data-highlight-color': hover_color
@@ -848,26 +886,43 @@ class DashboardApp:
                     ))
             
             # Create row with header (if needed) and cells
+            # Add bottom border to rows at layer boundaries
+            is_last_in_layer = (source_layer != 'Th' and source_cell == 'PV') or \
+                             (source_layer == 'Th')
+            
+            bottom_border = {"borderBottom": "1px solid #555"} if is_last_in_layer else {}
+            
             if row_header:
-                rows.append(html.Tr([row_header, cell_type_header] + cells))
+                row_style = {"marginLeft": "0", "marginRight": "0", **bottom_border}
+                rows.append(html.Tr([row_header, cell_type_header] + cells, style=row_style))
             else:
-                rows.append(html.Tr([cell_type_header] + cells))
+                row_style = {"marginLeft": "0", "marginRight": "0", **bottom_border}
+                rows.append(html.Tr([cell_type_header] + cells, style=row_style))
         
         # Create table
         return html.Div([
             html.Table(
                 [main_header_row, sub_header_row] + rows,
-                className="table table-bordered connection-matrix",
+                className="table connection-matrix",
                 style={
                     "tableLayout": "fixed", 
                     "fontSize": "0.8rem",
                     "borderCollapse": "collapse",
                     "width": "auto",
                     "margin": "0 auto",
-                    "borderSpacing": "0"
+                    "borderSpacing": "0",
+                    "border": "none"  # Remove outermost border
                 }
             )
-        ])  # Removed the horizontal scrolling
+        ], style={
+            # Add custom CSS to override any remaining table borders
+            "& table tr:last-child td, & table tr:last-child th": {
+                "borderBottom": "none"
+            },
+            "& table tr td:last-child, & table tr th:last-child": {
+                "borderRight": "none"
+            }
+        })  # Removed the horizontal scrolling
 
     def create_slider_for_cell(self, source_layer, source_cell, target_layer, target_cell, value):
         """Create a slider component for a connection cell."""
@@ -904,6 +959,165 @@ class DashboardApp:
 
     def setup_callbacks(self):
         """Set up the dashboard callbacks for interactivity."""
+        # Create a generic preset application function to avoid code duplication
+        def apply_preset(preset):
+            # Update all connection strengths
+            for conn_key, strength in preset['connection_strengths'].items():
+                # Parse the connection key to get source and target info
+                parts = conn_key.split('_to_')
+                source_parts = parts[0].split('_')
+                target_parts = parts[1].split('_')
+                
+                if source_parts[0] == 'thalamus':
+                    source_layer = 'thalamus'
+                    source_cell = None
+                    target_layer = target_parts[0]
+                    target_cell = target_parts[1]
+                else:
+                    source_layer = source_parts[0]
+                    source_cell = source_parts[1]
+                    target_layer = target_parts[0]
+                    target_cell = target_parts[1]
+                
+                # Update the connection strength in the simulation
+                self.simulation.connectivity.set_connection_strength(
+                    source_layer, source_cell, target_layer, target_cell, strength
+                )
+            
+            # Regenerate the connection matrix to reflect the updated values
+            updated_matrix = self.create_connection_matrix()
+                
+            return [
+                # Time constants
+                preset['time_constants']['E'],
+                preset['time_constants']['SST'],
+                preset['time_constants']['PV'],
+                # Firing thresholds
+                preset['firing_thresholds']['E'],
+                preset['firing_thresholds']['SST'],
+                preset['firing_thresholds']['PV'],
+                # Thalamic widths
+                preset['thalamic_widths']['E'],
+                preset['thalamic_widths']['SST'],
+                preset['thalamic_widths']['PV'],
+                # Outgoing widths
+                preset['outgoing_widths']['E'],
+                preset['outgoing_widths']['SST'],
+                preset['outgoing_widths']['PV'],
+                # Thalamic alpha
+                preset['thalamic_alpha'],
+                # Updated connection matrix
+                updated_matrix
+            ]
+        
+        # Add callback for P4 preset button
+        @self.app.callback(
+            [
+                Output('tau-e-slider', 'value'),
+                Output('tau-sst-slider', 'value'),
+                Output('tau-pv-slider', 'value'),
+                Output('threshold-e-slider', 'value'),
+                Output('threshold-sst-slider', 'value'),
+                Output('threshold-pv-slider', 'value'),
+                Output('thalamic-width-e-slider', 'value'),
+                Output('thalamic-width-sst-slider', 'value'),
+                Output('thalamic-width-pv-slider', 'value'),
+                Output('outgoing-width-e-slider', 'value'),
+                Output('outgoing-width-sst-slider', 'value'),
+                Output('outgoing-width-pv-slider', 'value'),
+                Output('alpha-slider', 'value'),
+                Output('connection-matrix-container', 'children')
+            ],
+            Input('p4-preset-button', 'n_clicks'),
+            prevent_initial_call=True
+        )
+        def apply_p4_preset(n_clicks):
+            """Apply the P4 preset values to all parameters."""
+            if n_clicks is None:
+                raise dash.exceptions.PreventUpdate
+            return apply_preset(P4_PRESET)
+        
+        # Add callback for P8 preset button
+        @self.app.callback(
+            [
+                Output('tau-e-slider', 'value', allow_duplicate=True),
+                Output('tau-sst-slider', 'value', allow_duplicate=True),
+                Output('tau-pv-slider', 'value', allow_duplicate=True),
+                Output('threshold-e-slider', 'value', allow_duplicate=True),
+                Output('threshold-sst-slider', 'value', allow_duplicate=True),
+                Output('threshold-pv-slider', 'value', allow_duplicate=True),
+                Output('thalamic-width-e-slider', 'value', allow_duplicate=True),
+                Output('thalamic-width-sst-slider', 'value', allow_duplicate=True),
+                Output('thalamic-width-pv-slider', 'value', allow_duplicate=True),
+                Output('outgoing-width-e-slider', 'value', allow_duplicate=True),
+                Output('outgoing-width-sst-slider', 'value', allow_duplicate=True),
+                Output('outgoing-width-pv-slider', 'value', allow_duplicate=True),
+                Output('alpha-slider', 'value', allow_duplicate=True),
+                Output('connection-matrix-container', 'children', allow_duplicate=True)
+            ],
+            Input('p8-preset-button', 'n_clicks'),
+            prevent_initial_call=True
+        )
+        def apply_p8_preset(n_clicks):
+            """Apply the P8 preset values to all parameters."""
+            if n_clicks is None:
+                raise dash.exceptions.PreventUpdate
+            return apply_preset(P8_PRESET)
+        
+        # Add callback for P12 preset button
+        @self.app.callback(
+            [
+                Output('tau-e-slider', 'value', allow_duplicate=True),
+                Output('tau-sst-slider', 'value', allow_duplicate=True),
+                Output('tau-pv-slider', 'value', allow_duplicate=True),
+                Output('threshold-e-slider', 'value', allow_duplicate=True),
+                Output('threshold-sst-slider', 'value', allow_duplicate=True),
+                Output('threshold-pv-slider', 'value', allow_duplicate=True),
+                Output('thalamic-width-e-slider', 'value', allow_duplicate=True),
+                Output('thalamic-width-sst-slider', 'value', allow_duplicate=True),
+                Output('thalamic-width-pv-slider', 'value', allow_duplicate=True),
+                Output('outgoing-width-e-slider', 'value', allow_duplicate=True),
+                Output('outgoing-width-sst-slider', 'value', allow_duplicate=True),
+                Output('outgoing-width-pv-slider', 'value', allow_duplicate=True),
+                Output('alpha-slider', 'value', allow_duplicate=True),
+                Output('connection-matrix-container', 'children', allow_duplicate=True)
+            ],
+            Input('p12-preset-button', 'n_clicks'),
+            prevent_initial_call=True
+        )
+        def apply_p12_preset(n_clicks):
+            """Apply the P12 preset values to all parameters."""
+            if n_clicks is None:
+                raise dash.exceptions.PreventUpdate
+            return apply_preset(P12_PRESET)
+        
+        # Add callback for P16 preset button
+        @self.app.callback(
+            [
+                Output('tau-e-slider', 'value', allow_duplicate=True),
+                Output('tau-sst-slider', 'value', allow_duplicate=True),
+                Output('tau-pv-slider', 'value', allow_duplicate=True),
+                Output('threshold-e-slider', 'value', allow_duplicate=True),
+                Output('threshold-sst-slider', 'value', allow_duplicate=True),
+                Output('threshold-pv-slider', 'value', allow_duplicate=True),
+                Output('thalamic-width-e-slider', 'value', allow_duplicate=True),
+                Output('thalamic-width-sst-slider', 'value', allow_duplicate=True),
+                Output('thalamic-width-pv-slider', 'value', allow_duplicate=True),
+                Output('outgoing-width-e-slider', 'value', allow_duplicate=True),
+                Output('outgoing-width-sst-slider', 'value', allow_duplicate=True),
+                Output('outgoing-width-pv-slider', 'value', allow_duplicate=True),
+                Output('alpha-slider', 'value', allow_duplicate=True),
+                Output('connection-matrix-container', 'children', allow_duplicate=True)
+            ],
+            Input('p16-preset-button', 'n_clicks'),
+            prevent_initial_call=True
+        )
+        def apply_p16_preset(n_clicks):
+            """Apply the P16 preset values to all parameters."""
+            if n_clicks is None:
+                raise dash.exceptions.PreventUpdate
+            return apply_preset(P16_PRESET)
+
         # Initialize slider container (hidden)
         @self.app.callback(
             [Output('slider-container', 'style'),
@@ -1151,12 +1365,12 @@ class DashboardApp:
         # Add callback for updating connectivity widths in simulation
         @self.app.callback(
             [Output('interval-component', 'n_intervals', allow_duplicate=True)],
-            [Input('sigma-thal-e-slider', 'value'),
-             Input('sigma-thal-sst-slider', 'value'),
-             Input('sigma-thal-pv-slider', 'value'),
-             Input('sigma-e-out-slider', 'value'),
-             Input('sigma-sst-out-slider', 'value'),
-             Input('sigma-pv-out-slider', 'value')],
+            [Input('thalamic-width-e-slider', 'value'),
+             Input('thalamic-width-sst-slider', 'value'),
+             Input('thalamic-width-pv-slider', 'value'),
+             Input('outgoing-width-e-slider', 'value'),
+             Input('outgoing-width-sst-slider', 'value'),
+             Input('outgoing-width-pv-slider', 'value')],
             [State('interval-component', 'n_intervals')],
             prevent_initial_call=True
         )
@@ -1218,12 +1432,12 @@ class DashboardApp:
              Input('threshold-e-slider', 'value'),
              Input('threshold-sst-slider', 'value'),
              Input('threshold-pv-slider', 'value'),
-             Input('sigma-thal-e-slider', 'value'),
-             Input('sigma-thal-sst-slider', 'value'),
-             Input('sigma-thal-pv-slider', 'value'),
-             Input('sigma-e-out-slider', 'value'),
-             Input('sigma-sst-out-slider', 'value'),
-             Input('sigma-pv-out-slider', 'value')],
+             Input('thalamic-width-e-slider', 'value'),
+             Input('thalamic-width-sst-slider', 'value'),
+             Input('thalamic-width-pv-slider', 'value'),
+             Input('outgoing-width-e-slider', 'value'),
+             Input('outgoing-width-sst-slider', 'value'),
+             Input('outgoing-width-pv-slider', 'value')],
             
             # States: pause button state
             [State('pause-button', 'n_clicks')]

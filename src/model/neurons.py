@@ -4,7 +4,7 @@ import numpy as np
 from typing import Tuple, List, Optional, Dict, Any
 from .connectivity import LayerConnectivity
 from .config import (
-    GRID_SIZE, DT, NEURAL_TAU, NOISE_AMPLITUDE,
+    GRID_SIZE, DT, NOISE_AMPLITUDE,
     INTEGRATION_STEPS, CELL_TYPES, LAYERS
 )
 
@@ -20,22 +20,21 @@ class NeuralLayer:
     and parvalbumin-expressing (PV) interneurons, each with their own dynamics.
     """
     
-    def __init__(self, grid_size: int = GRID_SIZE, tau: float = NEURAL_TAU, dt: float = DT, threshold: float = FIRING_THRESHOLD):
+    def __init__(self, grid_size: int = GRID_SIZE, dt: float = DT, threshold: float = FIRING_THRESHOLD):
         """
         Initialize a neural layer with specified grid size and time constant.
         
         Args:
             grid_size: Size of the square grid
-            tau: Time constant in milliseconds (default value, can be overridden per cell type)
             dt: Time step in milliseconds
             threshold: Firing threshold (default value, can be overridden per cell type)
         """
         self.grid_size = grid_size
         # Initialize separate time constants for each cell type
         self.tau = {
-            'E': tau,
-            'SST': tau,
-            'PV': tau
+            'E': 80.0,    # Default time constant for E cells
+            'SST': 60.0,  # Default time constant for SST cells
+            'PV': 40.0    # Default time constant for PV cells
         }
         # Initialize separate firing thresholds for each cell type
         self.threshold = {
