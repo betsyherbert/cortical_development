@@ -12,7 +12,7 @@ import json
 from model.config import (
     COLORMAPS, UPDATE_INTERVAL, CELL_TYPES, LAYERS, LAYER_NAMES, 
     THALAMIC_SCALING, LAYER_CONNECTIONS,
-    LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, NEURAL_TAU
+    LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, NEURAL_TAU, CONNECTIONS
 )
 from model.neurons import FIRING_THRESHOLD
 
@@ -42,6 +42,67 @@ class DashboardApp:
             external_stylesheets=[dbc.themes.DARKLY],
             suppress_callback_exceptions=True
         )
+        
+        # Add custom CSS for sliders
+        self.app.index_string = '''
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                {%metas%}
+                <title>{%title%}</title>
+                {%favicon%}
+                {%css%}
+                <style>
+                    .custom-slider .rc-slider-track {
+                        background-color: white !important;
+                    }
+                    .custom-slider .rc-slider-rail {
+                        background-color: #555 !important;
+                    }
+                    .custom-slider .rc-slider-handle {
+                        border-color: white !important;
+                        background-color: white !important;
+                    }
+                    .custom-slider .rc-slider-handle:hover {
+                        border-color: white !important;
+                    }
+                    .custom-slider .rc-slider-handle:active {
+                        border-color: white !important;
+                        box-shadow: 0 0 5px white !important;
+                    }
+                    .custom-slider .rc-slider-dot {
+                        border-color: #888 !important;
+                        background-color: #888 !important;
+                    }
+                    .custom-slider .rc-slider-dot-active {
+                        border-color: white !important;
+                        background-color: white !important;
+                    }
+                    /* Make the control panel take less width */
+                    .control-panel-column {
+                        padding-left: 1rem !important;
+                        padding-right: 1rem !important;
+                        margin-left: -2rem !important; 
+                        max-width: 600px !important;
+                    }
+                    /* Reduce left margin in left column labels */
+                    .cell-type-label {
+                        padding-right: 1rem !important;
+                    }
+                </style>
+            </head>
+            <body>
+                {%app_entry%}
+                <footer>
+                    {%config%}
+                    {%scripts%}
+                    {%renderer%}
+                </footer>
+            </body>
+        </html>
+        '''
         
         # Pre-create all figures for better performance
         self.figures = {}
@@ -135,7 +196,7 @@ class DashboardApp:
                         ], style={"height": "180px"}),
                         className="mt-5"  # Match vertical spacing with other layers
                     )
-                ], width=6),  # Adjust visualization column width
+                ], width=7, style={"paddingLeft": "0rem", "paddingRight": "1rem"}),  # Adjust left column width and padding
                 
                 # Right column: control panel
                 dbc.Col([
@@ -168,190 +229,284 @@ class DashboardApp:
                         )
                     ], className="mb-3"),
                     
-                    # Time constants section
+                    # Time constants and firing thresholds section
                     html.Div([
-                        html.H5("Membrane Time Constants (ms)", className="mb-2 text-center",
-                               style={"textAlign": "center", "width": "100%"}),
-                        
-                        # E cell time constant
-                        dbc.Row([
-                            dbc.Col("E Cells:", width=3, className="d-flex align-items-center justify-content-end"),
-                            dbc.Col(
-                                dcc.Slider(
-                                    id='tau-e-slider',
-                                    min=1.0,
-                                    max=30.0,
-                                    step=0.5,
-                                    value=NEURAL_TAU,
-                                    marks={i: f"{i}" for i in range(5, 31, 5)},
-                                    tooltip={"placement": "bottom", "always_visible": False}
+                        html.Div([
+                            dbc.Row([
+                                # Empty header for label column
+                                dbc.Col("", width=2),
+                                # Header for time constants column
+                                dbc.Col("Time Constants (ms)", className="text-center", width=5),
+                                # Header for firing thresholds column
+                                dbc.Col("Firing Thresholds", className="text-center", width=5),
+                            ], className="mb-2", style={"marginLeft": "0", "marginRight": "0"}),
+                            
+                            # E cells row
+                            dbc.Row([
+                                # Cell type label
+                                dbc.Col(html.Strong("E"), width=2, className="d-flex align-items-center justify-content-end"),
+                                # Time constant slider
+                                dbc.Col(
+                                    dcc.Slider(
+                                        id='tau-e-slider',
+                                        min=1.0,
+                                        max=100.0,
+                                        step=1.0,
+                                        value=NEURAL_TAU,
+                                        marks={i: f"{i}" for i in range(20, 101, 20)},
+                                        tooltip={"placement": "bottom", "always_visible": False},
+                                        className="custom-slider"
+                                    ),
+                                    width=5,
+                                    style={"paddingRight": "15px"}
                                 ),
-                                width=7
-                            ),
-                            dbc.Col(
-                                html.Div(
-                                    id='tau-e-value',
-                                    children=f"{NEURAL_TAU:.1f}",
-                                    style={"textAlign": "center"}
+                                # Firing threshold slider
+                                dbc.Col(
+                                    dcc.Slider(
+                                        id='threshold-e-slider',
+                                        min=0.0,
+                                        max=0.5,
+                                        step=0.01,
+                                        value=FIRING_THRESHOLD,
+                                        marks={i/10: f"{i/10:.1f}" for i in range(0, 6, 1)},
+                                        tooltip={"placement": "bottom", "always_visible": False},
+                                        className="custom-slider"
+                                    ),
+                                    width=5,
+                                    style={"paddingLeft": "15px"}
                                 ),
-                                width=2
-                            )
-                        ], className="mb-2"),
-                        
-                        # SST cell time constant
-                        dbc.Row([
-                            dbc.Col("SST Cells:", width=3, className="d-flex align-items-center justify-content-end"),
-                            dbc.Col(
-                                dcc.Slider(
-                                    id='tau-sst-slider',
-                                    min=1.0,
-                                    max=30.0,
-                                    step=0.5,
-                                    value=NEURAL_TAU,
-                                    marks={i: f"{i}" for i in range(5, 31, 5)},
-                                    tooltip={"placement": "bottom", "always_visible": False}
+                            ], className="mb-3", style={"marginLeft": "0", "marginRight": "0"}),
+                            
+                            # SST cells row
+                            dbc.Row([
+                                # Cell type label
+                                dbc.Col(html.Strong("SST"), width=2, className="d-flex align-items-center justify-content-end"),
+                                # Time constant slider
+                                dbc.Col(
+                                    dcc.Slider(
+                                        id='tau-sst-slider',
+                                        min=1.0,
+                                        max=100.0,
+                                        step=1.0,
+                                        value=NEURAL_TAU,
+                                        marks={i: f"{i}" for i in range(20, 101, 20)},
+                                        tooltip={"placement": "bottom", "always_visible": False},
+                                        className="custom-slider"
+                                    ),
+                                    width=5,
+                                    style={"paddingRight": "15px"}
                                 ),
-                                width=7
-                            ),
-                            dbc.Col(
-                                html.Div(
-                                    id='tau-sst-value',
-                                    children=f"{NEURAL_TAU:.1f}",
-                                    style={"textAlign": "center"}
+                                # Firing threshold slider
+                                dbc.Col(
+                                    dcc.Slider(
+                                        id='threshold-sst-slider',
+                                        min=0.0,
+                                        max=0.5,
+                                        step=0.01,
+                                        value=FIRING_THRESHOLD,
+                                        marks={i/10: f"{i/10:.1f}" for i in range(0, 6, 1)},
+                                        tooltip={"placement": "bottom", "always_visible": False},
+                                        className="custom-slider"
+                                    ),
+                                    width=5,
+                                    style={"paddingLeft": "15px"}
                                 ),
-                                width=2
-                            )
-                        ], className="mb-2"),
-                        
-                        # PV cell time constant
-                        dbc.Row([
-                            dbc.Col("PV Cells:", width=3, className="d-flex align-items-center justify-content-end"),
-                            dbc.Col(
-                                dcc.Slider(
-                                    id='tau-pv-slider',
-                                    min=1.0,
-                                    max=30.0,
-                                    step=0.5,
-                                    value=NEURAL_TAU,
-                                    marks={i: f"{i}" for i in range(5, 31, 5)},
-                                    tooltip={"placement": "bottom", "always_visible": False}
+                            ], className="mb-3", style={"marginLeft": "0", "marginRight": "0"}),
+                            
+                            # PV cells row
+                            dbc.Row([
+                                # Cell type label
+                                dbc.Col(html.Strong("PV"), width=2, className="d-flex align-items-center justify-content-end"),
+                                # Time constant slider
+                                dbc.Col(
+                                    dcc.Slider(
+                                        id='tau-pv-slider',
+                                        min=1.0,
+                                        max=100.0,
+                                        step=1.0,
+                                        value=NEURAL_TAU,
+                                        marks={i: f"{i}" for i in range(20, 101, 20)},
+                                        tooltip={"placement": "bottom", "always_visible": False},
+                                        className="custom-slider"
+                                    ),
+                                    width=5,
+                                    style={"paddingRight": "15px"}
                                 ),
-                                width=7
-                            ),
-                            dbc.Col(
-                                html.Div(
-                                    id='tau-pv-value',
-                                    children=f"{NEURAL_TAU:.1f}",
-                                    style={"textAlign": "center"}
+                                # Firing threshold slider
+                                dbc.Col(
+                                    dcc.Slider(
+                                        id='threshold-pv-slider',
+                                        min=0.0,
+                                        max=0.5,
+                                        step=0.01,
+                                        value=FIRING_THRESHOLD,
+                                        marks={i/10: f"{i/10:.1f}" for i in range(0, 6, 1)},
+                                        tooltip={"placement": "bottom", "always_visible": False},
+                                        className="custom-slider"
+                                    ),
+                                    width=5, 
+                                    style={"paddingLeft": "15px"}
                                 ),
-                                width=2
-                            )
-                        ])
-                    ], className="mb-3"),
+                            ], style={"marginLeft": "0", "marginRight": "0"}),
+                        ]),
+                    ], className="mb-4"),
                     
-                    # Firing thresholds section (new)
+                    # Connectivity width section
                     html.Div([
-                        html.H5("Firing Thresholds", className="mb-2 text-center",
-                               style={"textAlign": "center", "width": "100%"}),
-                        
-                        # E cell firing threshold
-                        dbc.Row([
-                            dbc.Col("E Cells:", width=3, className="d-flex align-items-center justify-content-end"),
-                            dbc.Col(
-                                dcc.Slider(
-                                    id='threshold-e-slider',
-                                    min=0.0,
-                                    max=0.5,
-                                    step=0.01,
-                                    value=FIRING_THRESHOLD,
-                                    marks={i/10: f"{i/10:.1f}" for i in range(0, 6, 1)},
-                                    tooltip={"placement": "bottom", "always_visible": False}
+                        html.Div([
+                            dbc.Row([
+                                # Empty header for label column
+                                dbc.Col("", width=2),
+                                # Header for thalamic connections column
+                                dbc.Col("Thalamic Input Width", className="text-center", width=5),
+                                # Header for outgoing connections column
+                                dbc.Col("Outgoing Width", className="text-center", width=5),
+                            ], className="mb-2", style={"marginLeft": "0", "marginRight": "0"}),
+                            
+                            # E row
+                            dbc.Row([
+                                # Cell type label
+                                dbc.Col(html.Strong("E"), width=2, className="d-flex align-items-center justify-content-end"),
+                                # Thalamus -> E slider
+                                dbc.Col(
+                                    dcc.Slider(
+                                        id='sigma-thal-e-slider',
+                                        min=0.5,
+                                        max=10.0,
+                                        step=0.1,
+                                        value=2.0,
+                                        marks={i: f"{i}" for i in range(1, 11)},
+                                        tooltip={"placement": "bottom", "always_visible": False},
+                                        className="custom-slider"
+                                    ),
+                                    width=5,
+                                    style={"paddingRight": "15px"}
                                 ),
-                                width=7
-                            ),
-                            dbc.Col(
-                                html.Div(
-                                    id='threshold-e-value',
-                                    children=f"{FIRING_THRESHOLD:.2f}",
-                                    style={"textAlign": "center"}
+                                # E outgoing slider
+                                dbc.Col(
+                                    dcc.Slider(
+                                        id='sigma-e-out-slider',
+                                        min=0.5,
+                                        max=10.0,
+                                        step=0.1,
+                                        value=2.0,
+                                        marks={i: f"{i}" for i in range(1, 11)},
+                                        tooltip={"placement": "bottom", "always_visible": False},
+                                        className="custom-slider"
+                                    ),
+                                    width=5,
+                                    style={"paddingLeft": "15px"}
                                 ),
-                                width=2
-                            )
-                        ], className="mb-2"),
-                        
-                        # SST cell firing threshold
-                        dbc.Row([
-                            dbc.Col("SST Cells:", width=3, className="d-flex align-items-center justify-content-end"),
-                            dbc.Col(
-                                dcc.Slider(
-                                    id='threshold-sst-slider',
-                                    min=0.0,
-                                    max=0.5,
-                                    step=0.01,
-                                    value=FIRING_THRESHOLD,
-                                    marks={i/10: f"{i/10:.1f}" for i in range(0, 6, 1)},
-                                    tooltip={"placement": "bottom", "always_visible": False}
+                            ], className="mb-3", style={"marginLeft": "0", "marginRight": "0"}),
+                            
+                            # SST row
+                            dbc.Row([
+                                # Cell type label
+                                dbc.Col(html.Strong("SST"), width=2, className="d-flex align-items-center justify-content-end"),
+                                # Thalamus -> SST slider
+                                dbc.Col(
+                                    dcc.Slider(
+                                        id='sigma-thal-sst-slider',
+                                        min=0.5,
+                                        max=10.0,
+                                        step=0.1,
+                                        value=2.0,
+                                        marks={i: f"{i}" for i in range(1, 11)},
+                                        tooltip={"placement": "bottom", "always_visible": False},
+                                        className="custom-slider"
+                                    ),
+                                    width=5,
+                                    style={"paddingRight": "15px"}
                                 ),
-                                width=7
-                            ),
-                            dbc.Col(
-                                html.Div(
-                                    id='threshold-sst-value',
-                                    children=f"{FIRING_THRESHOLD:.2f}",
-                                    style={"textAlign": "center"}
+                                # SST outgoing slider
+                                dbc.Col(
+                                    dcc.Slider(
+                                        id='sigma-sst-out-slider',
+                                        min=0.5,
+                                        max=10.0,
+                                        step=0.1,
+                                        value=3.0,
+                                        marks={i: f"{i}" for i in range(1, 11)},
+                                        tooltip={"placement": "bottom", "always_visible": False},
+                                        className="custom-slider"
+                                    ),
+                                    width=5,
+                                    style={"paddingLeft": "15px"}
                                 ),
-                                width=2
-                            )
-                        ], className="mb-2"),
-                        
-                        # PV cell firing threshold
-                        dbc.Row([
-                            dbc.Col("PV Cells:", width=3, className="d-flex align-items-center justify-content-end"),
-                            dbc.Col(
-                                dcc.Slider(
-                                    id='threshold-pv-slider',
-                                    min=0.0,
-                                    max=0.5,
-                                    step=0.01,
-                                    value=FIRING_THRESHOLD,
-                                    marks={i/10: f"{i/10:.1f}" for i in range(0, 6, 1)},
-                                    tooltip={"placement": "bottom", "always_visible": False}
+                            ], className="mb-3", style={"marginLeft": "0", "marginRight": "0"}),
+                            
+                            # PV row
+                            dbc.Row([
+                                # Cell type label
+                                dbc.Col(html.Strong("PV"), width=2, className="d-flex align-items-center justify-content-end"),
+                                # Thalamus -> PV slider
+                                dbc.Col(
+                                    dcc.Slider(
+                                        id='sigma-thal-pv-slider',
+                                        min=0.5,
+                                        max=10.0,
+                                        step=0.1,
+                                        value=2.0,
+                                        marks={i: f"{i}" for i in range(1, 11)},
+                                        tooltip={"placement": "bottom", "always_visible": False},
+                                        className="custom-slider"
+                                    ),
+                                    width=5,
+                                    style={"paddingRight": "15px"}
                                 ),
-                                width=7
-                            ),
-                            dbc.Col(
-                                html.Div(
-                                    id='threshold-pv-value',
-                                    children=f"{FIRING_THRESHOLD:.2f}",
-                                    style={"textAlign": "center"}
+                                # PV outgoing slider
+                                dbc.Col(
+                                    dcc.Slider(
+                                        id='sigma-pv-out-slider',
+                                        min=0.5,
+                                        max=10.0,
+                                        step=0.1,
+                                        value=1.5,
+                                        marks={i: f"{i}" for i in range(1, 11)},
+                                        tooltip={"placement": "bottom", "always_visible": False},
+                                        className="custom-slider"
+                                    ),
+                                    width=5,
+                                    style={"paddingLeft": "15px"}
                                 ),
-                                width=2
-                            )
-                        ])
-                    ], className="mb-3"),
+                            ], style={"marginLeft": "0", "marginRight": "0"}),
+                        ]),
+                    ], className="mb-4"),
                     
                     # Thalamic input controls
                     html.Div([
-                        html.H5("Thalamic Input", className="mb-2 text-center",
-                               style={"textAlign": "center", "width": "100%"}),
-                        # Create a row with "Intrinsic" on left and "Sensory" on right
                         dbc.Row([
-                            dbc.Col("Intrinsic", className="text-start", width=6),
-                            dbc.Col("Sensory", className="text-end", width=6),
-                        ], className="mb-1"),
-                        dcc.Slider(
-                            id='alpha-slider',
-                            min=0, max=1, step=0.1, value=THALAMIC_ALPHA,
-                            marks={i/10: f"{i/10:.1f}" for i in range(11)},
-                            className="mt-1",
-                            tooltip={"placement": "bottom", "always_visible": False}
-                        )
-                    ], className="mb-3"),
+                            # Empty header for label column
+                            dbc.Col("", width=2),
+                            # Header for thalamic input slider
+                            dbc.Col([
+                                dbc.Row([
+                                    dbc.Col("Intrinsic", className="text-start", width=6),
+                                    dbc.Col("Sensory", className="text-end", width=6),
+                                ], className="mb-1")
+                            ], width=10),
+                        ], className="mb-2", style={"marginLeft": "0", "marginRight": "0"}),
+                        
+                        dbc.Row([
+                            # Label
+                            dbc.Col(html.Strong("Input"), width=2, className="d-flex align-items-center justify-content-end"),
+                            # Alpha slider
+                            dbc.Col(
+                                dcc.Slider(
+                                    id='alpha-slider',
+                                    min=0, max=1, step=0.1, value=THALAMIC_ALPHA,
+                                    marks={i/10: f"{i/10:.1f}" for i in range(11)},
+                                    tooltip={"placement": "bottom", "always_visible": False},
+                                    className="custom-slider"
+                                ),
+                                width=10,
+                                style={"paddingLeft": "15px", "paddingRight": "15px"}
+                            )
+                        ], style={"marginLeft": "0", "marginRight": "0"}),
+                    ], className="mb-4"),
                     
                     # Simulation controls
                     html.Div([
-                        html.H5("Simulation Control", className="mb-2 text-center",
-                               style={"textAlign": "center", "width": "100%"}),
                         # Center the pause/resume button
                         html.Div([
                             dbc.Button(
@@ -360,7 +515,7 @@ class DashboardApp:
                             )
                         ], style={"display": "flex", "justifyContent": "center"})
                     ])
-                ], width=5, className="ps-4")  # Adjust control panel column width
+                ], width=5, className="ps-4 control-panel-column")  # Adjust control panel column width
             ], className="g-4 px-4"),  # Add horizontal padding to row
         ], fluid=True, className="py-3 px-0")  # Added more padding to container
     
@@ -974,50 +1129,6 @@ class DashboardApp:
              Input('selected-cell', 'data')],
         )
         
-        # Add callbacks for updating time constant values display
-        @self.app.callback(
-            Output('tau-e-value', 'children'),
-            [Input('tau-e-slider', 'value')]
-        )
-        def update_tau_e_display(value):
-            return f"{value:.1f}"
-        
-        @self.app.callback(
-            Output('tau-sst-value', 'children'),
-            [Input('tau-sst-slider', 'value')]
-        )
-        def update_tau_sst_display(value):
-            return f"{value:.1f}"
-        
-        @self.app.callback(
-            Output('tau-pv-value', 'children'),
-            [Input('tau-pv-slider', 'value')]
-        )
-        def update_tau_pv_display(value):
-            return f"{value:.1f}"
-        
-        # Add callbacks for updating firing threshold values display
-        @self.app.callback(
-            Output('threshold-e-value', 'children'),
-            [Input('threshold-e-slider', 'value')]
-        )
-        def update_threshold_e_display(value):
-            return f"{value:.2f}"
-        
-        @self.app.callback(
-            Output('threshold-sst-value', 'children'),
-            [Input('threshold-sst-slider', 'value')]
-        )
-        def update_threshold_sst_display(value):
-            return f"{value:.2f}"
-        
-        @self.app.callback(
-            Output('threshold-pv-value', 'children'),
-            [Input('threshold-pv-slider', 'value')]
-        )
-        def update_threshold_pv_display(value):
-            return f"{value:.2f}"
-        
         # Add callback for updating time constants and thresholds in simulation
         @self.app.callback(
             [Output('interval-component', 'n_intervals')],  # Dummy output to trigger update
@@ -1037,6 +1148,59 @@ class DashboardApp:
             # Return unchanged intervals to not disrupt the update loop
             return [n_intervals]
         
+        # Add callback for updating connectivity widths in simulation
+        @self.app.callback(
+            [Output('interval-component', 'n_intervals', allow_duplicate=True)],
+            [Input('sigma-thal-e-slider', 'value'),
+             Input('sigma-thal-sst-slider', 'value'),
+             Input('sigma-thal-pv-slider', 'value'),
+             Input('sigma-e-out-slider', 'value'),
+             Input('sigma-sst-out-slider', 'value'),
+             Input('sigma-pv-out-slider', 'value')],
+            [State('interval-component', 'n_intervals')],
+            prevent_initial_call=True
+        )
+        def update_connectivity_parameters(sigma_thal_e, sigma_thal_sst, sigma_thal_pv, 
+                                          sigma_e_out, sigma_sst_out, sigma_pv_out, n_intervals):
+            # Update thalamic connections for all layers
+            for layer in LAYERS:
+                # Set Thalamus -> E connections
+                self.simulation.set_connection_sigma('thalamus', None, layer, 'E', sigma_thal_e)
+                
+                # Set Thalamus -> SST connections
+                self.simulation.set_connection_sigma('thalamus', None, layer, 'SST', sigma_thal_sst)
+                
+                # Set Thalamus -> PV connections
+                self.simulation.set_connection_sigma('thalamus', None, layer, 'PV', sigma_thal_pv)
+            
+            # Update all E outgoing connections
+            for source_layer in LAYERS:
+                for target_layer in LAYERS:
+                    for target_cell in CELL_TYPES:
+                        # Check if this connection exists in the model
+                        if ('E', target_cell) in CONNECTIONS:
+                            self.simulation.set_connection_sigma(source_layer, 'E', target_layer, target_cell, sigma_e_out)
+                            
+            # Update all SST outgoing connections
+            for source_layer in LAYERS:
+                for target_layer in LAYERS:
+                    # SST connections only go to E and PV cells (not to SST)
+                    if ('SST', 'E') in CONNECTIONS:
+                        self.simulation.set_connection_sigma(source_layer, 'SST', target_layer, 'E', sigma_sst_out)
+                    if ('SST', 'PV') in CONNECTIONS:
+                        self.simulation.set_connection_sigma(source_layer, 'SST', target_layer, 'PV', sigma_sst_out)
+                
+            # Update all PV outgoing connections
+            for source_layer in LAYERS:
+                for target_layer in LAYERS:
+                    for target_cell in CELL_TYPES:
+                        # Check if this connection exists in the model
+                        if ('PV', target_cell) in CONNECTIONS:
+                            self.simulation.set_connection_sigma(source_layer, 'PV', target_layer, target_cell, sigma_pv_out)
+            
+            # Return unchanged intervals to not disrupt the update loop
+            return [n_intervals]
+        
         # Update the graphs with neural activity
         @self.app.callback(
             # Outputs: all graph figures
@@ -1045,7 +1209,7 @@ class DashboardApp:
              for cell_type in CELL_TYPES] +
             [Output('graph-thalamus', 'figure')],
             
-            # Inputs: interval trigger, alpha slider, time constant sliders and threshold sliders
+            # Inputs: interval trigger, alpha slider, time constant sliders, threshold sliders and connectivity width sliders
             [Input('interval-component', 'n_intervals'),
              Input('alpha-slider', 'value'),
              Input('tau-e-slider', 'value'),
@@ -1053,12 +1217,20 @@ class DashboardApp:
              Input('tau-pv-slider', 'value'),
              Input('threshold-e-slider', 'value'),
              Input('threshold-sst-slider', 'value'),
-             Input('threshold-pv-slider', 'value')],
+             Input('threshold-pv-slider', 'value'),
+             Input('sigma-thal-e-slider', 'value'),
+             Input('sigma-thal-sst-slider', 'value'),
+             Input('sigma-thal-pv-slider', 'value'),
+             Input('sigma-e-out-slider', 'value'),
+             Input('sigma-sst-out-slider', 'value'),
+             Input('sigma-pv-out-slider', 'value')],
             
             # States: pause button state
             [State('pause-button', 'n_clicks')]
         )
-        def update_graphs(n_intervals, alpha, tau_e, tau_sst, tau_pv, threshold_e, threshold_sst, threshold_pv, pause_clicks):
+        def update_graphs(n_intervals, alpha, tau_e, tau_sst, tau_pv, threshold_e, threshold_sst, threshold_pv, 
+                         sigma_thal_e, sigma_thal_sst, sigma_thal_pv, sigma_e_out, sigma_sst_out, sigma_pv_out, 
+                         pause_clicks):
             # Check if simulation is paused
             if pause_clicks is not None and pause_clicks % 2 == 1:
                 # If paused, return current figures without updates

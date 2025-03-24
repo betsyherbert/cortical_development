@@ -355,4 +355,87 @@ class LayerConnectivity:
         # Update the weight matrix
         self.W[tuple_key] = self.profile.compute_weight_matrix(
             amplitude, sigma, size, size
+        )
+
+    def get_connection_sigma(self, source_layer: str, source_cell: str, 
+                           target_layer: str, target_cell: str) -> float:
+        """
+        Get the current connection width (sigma) between two populations.
+        
+        Args:
+            source_layer: Source layer ('L23', 'L4', 'L5', or 'thalamus')
+            source_cell: Source cell type ('E', 'SST', 'PV', or None for thalamus)
+            target_layer: Target layer ('L23', 'L4', 'L5')
+            target_cell: Target cell type ('E', 'SST', 'PV')
+            
+        Returns:
+            Connection sigma or default value if connection doesn't exist
+        """
+        # Generate the connection key
+        if source_layer == 'thalamus':
+            conn_key = f'thalamus_to_{target_layer}_{target_cell}'
+        else:
+            conn_key = f'{source_layer}_{source_cell}_to_{target_layer}_{target_cell}'
+        
+        # Check if this connection has parameters defined
+        if conn_key in self.layer_params:
+            return self.layer_params[conn_key]['sigma']
+        
+        # Determine default sigma based on cell type patterns if connection doesn't exist
+        if source_cell == 'E' or source_layer == 'thalamus':
+            return 2.0  # Default for excitatory connections
+        elif source_cell == 'SST':
+            return 3.0  # Default for SST connections (wider)
+        elif source_cell == 'PV':
+            return 1.5  # Default for PV connections (narrower)
+        
+        return 2.0  # Default fallback
+
+    def set_connection_sigma(self, source_layer: str, source_cell: str, 
+                           target_layer: str, target_cell: str, 
+                           sigma: float) -> None:
+        """
+        Set the connection width (sigma) between two populations.
+        
+        Args:
+            source_layer: Source layer ('L23', 'L4', 'L5', or 'thalamus')
+            source_cell: Source cell type ('E', 'SST', 'PV', or None for thalamus)
+            target_layer: Target layer ('L23', 'L4', 'L5')
+            target_cell: Target cell type ('E', 'SST', 'PV')
+            sigma: Connection width (Gaussian sigma)
+        """
+        # Generate the connection key
+        if source_layer == 'thalamus':
+            conn_key = f'thalamus_to_{target_layer}_{target_cell}'
+        else:
+            conn_key = f'{source_layer}_{source_cell}_to_{target_layer}_{target_cell}'
+        
+        # Create connection parameter entry if it doesn't exist
+        if conn_key not in self.layer_params:
+            # Determine appropriate amplitude based on common patterns
+            if source_cell == 'E' or source_layer == 'thalamus':
+                amplitude = 0.2  # Default for excitatory
+            elif source_cell == 'SST' or source_cell == 'PV':
+                amplitude = -0.1  # Default for inhibitory
+            else:
+                amplitude = 0.0  # Default fallback
+                
+            # Add the new connection parameters
+            self.layer_params[conn_key] = {'amplitude': amplitude, 'sigma': sigma}
+        else:
+            # Update the parameter
+            self.layer_params[conn_key]['sigma'] = sigma
+            
+        # Get current amplitude
+        amplitude = self.layer_params[conn_key]['amplitude']
+            
+        # Update the weight matrix
+        size = (self.grid_size, self.grid_size)
+            
+        # Create the connection tuple key
+        tuple_key = (source_layer, source_cell, target_layer, target_cell)
+            
+        # Update the weight matrix
+        self.W[tuple_key] = self.profile.compute_weight_matrix(
+            amplitude, sigma, size, size
         ) 

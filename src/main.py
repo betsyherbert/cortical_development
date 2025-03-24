@@ -103,6 +103,41 @@ class CorticalSimulation:
             Dictionary mapping cell types to their firing thresholds
         """
         return self.circuit.get_firing_thresholds()
+        
+    def set_connection_sigma(self, source_layer: str, source_cell: str, 
+                           target_layer: str, target_cell: str, 
+                           sigma: float) -> None:
+        """
+        Set the connection width (sigma) for a specific connection.
+        
+        Args:
+            source_layer: Source layer ('L23', 'L4', 'L5', or 'thalamus')
+            source_cell: Source cell type ('E', 'SST', 'PV', or None for thalamus)
+            target_layer: Target layer ('L23', 'L4', 'L5')
+            target_cell: Target cell type ('E', 'SST', 'PV')
+            sigma: Connection width (Gaussian sigma)
+        """
+        self.circuit.connectivity.set_connection_sigma(
+            source_layer, source_cell, target_layer, target_cell, sigma
+        )
+        
+    def get_connection_sigma(self, source_layer: str, source_cell: str, 
+                           target_layer: str, target_cell: str) -> float:
+        """
+        Get the current connection width (sigma) for a specific connection.
+        
+        Args:
+            source_layer: Source layer ('L23', 'L4', 'L5', or 'thalamus')
+            source_cell: Source cell type ('E', 'SST', 'PV', or None for thalamus)
+            target_layer: Target layer ('L23', 'L4', 'L5')
+            target_cell: Target cell type ('E', 'SST', 'PV')
+            
+        Returns:
+            Current connection sigma value
+        """
+        return self.circuit.connectivity.get_connection_sigma(
+            source_layer, source_cell, target_layer, target_cell
+        )
 
 
 def parse_arguments():
@@ -118,7 +153,7 @@ def main():
     args = parse_arguments()
     sim = CorticalSimulation()
     app = DashboardApp(sim)
-    app.run(debug=args.debug, port=args.port)
+    app.run(debug=args.debug, port=8051)
 
 
 if __name__ == "__main__":
