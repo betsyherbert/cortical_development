@@ -1,7 +1,7 @@
 """Thalamic input module for the cortical circuit simulation.
 
 This module generates realistic thalamic activity patterns that combine:
-1. Intrinsic oscillations - ongoing rhythmic activity
+1. Intrinsic bursts - ongoing random burst activity with wave-like properties
 2. Sensory inputs - localized stimulus-driven responses
 """
 
@@ -9,10 +9,11 @@ import numpy as np
 from typing import Tuple, List, Dict
 from .config import (
     GRID_SIZE, DT, 
-    THALAMIC_INTRINSIC_FREQ, THALAMIC_INTRINSIC_SIGMA,
+    THALAMIC_INTRINSIC_SIGMA, THALAMIC_INTRINSIC_DURATION,
+    THALAMIC_INTRINSIC_INTERVAL, THALAMIC_INTRINSIC_AMP,
     THALAMIC_SENSORY_SIGMA, THALAMIC_SENSORY_DURATION,
-    THALAMIC_SENSORY_INTERVAL, THALAMIC_SCALING,
-    THALAMIC_ALPHA
+    THALAMIC_SENSORY_INTERVAL, THALAMIC_SENSORY_AMP,
+    THALAMIC_SCALING, THALAMIC_ALPHA
 )
 
 
@@ -20,12 +21,7 @@ class ThalamicInput:
     """Generates thalamic activity patterns combining intrinsic and sensory components."""
     
     def __init__(self, grid_size: int = GRID_SIZE, dt: float = DT):
-        """Initialize the thalamic input generator.
-        
-        Args:
-            grid_size: Size of the 2D grid for spatial patterns
-            dt: Time step in milliseconds
-        """
+        """Initialize the thalamic input generator."""
         self.grid_size = grid_size
         self.dt = dt
         self.t = 0.0
@@ -35,51 +31,19 @@ class ThalamicInput:
         self.coords = np.stack([x, y])
         self._spatial_cache = {}
         
-        # Initialize intrinsic oscillators
-        self.n_oscillators = 5
-        self.oscillator_phases = np.random.uniform(0, 2*np.pi, self.n_oscillators)
-        self.oscillator_freqs = THALAMIC_INTRINSIC_FREQ * np.random.uniform(0.5, 1.5, self.n_oscillators)
-        self.intrinsic_patterns = self._create_intrinsic_patterns()
-        
-        # Initialize sensory parameters
-        self.sensory_sigma = THALAMIC_SENSORY_SIGMA
-        self.sensory_duration = THALAMIC_SENSORY_DURATION
-        self.sensory_interval = THALAMIC_SENSORY_INTERVAL
+        # Initialize burst lists
+        self.intrinsic_bursts = []
         self.sensory_bursts = []
+        self.max_intrinsic_bursts = 8
         self.max_sensory_bursts = 3
         
-        # Pre-compute components for frequently used calculations
+        # Pre-compute components
         self._prepare_gaussian_components()
     
     def _prepare_gaussian_components(self):
         """Pre-compute coordinate arrays for faster Gaussian calculation."""
         self.x_coords, self.y_coords = self.coords
-        # Pre-compute grid centers for common operations
         self.grid_center = (self.grid_size // 2, self.grid_size // 2)
-    
-    def _create_intrinsic_patterns(self) -> List[np.ndarray]:
-        """Create spatial patterns for intrinsic activity using random Gaussian bumps."""
-        patterns = []
-        for _ in range(self.n_oscillators):
-            pattern = np.zeros((self.grid_size, self.grid_size))
-            n_bumps = np.random.randint(2, 8)
-            
-            for _ in range(n_bumps):
-                cx = np.random.randint(0, self.grid_size)
-                cy = np.random.randint(0, self.grid_size)
-                sigma = THALAMIC_INTRINSIC_SIGMA * np.random.uniform(0.5, 1.5)
-                weight = np.random.uniform(0.5, 1.0)
-                
-                x, y = self.coords
-                d_squared = (x - cx)**2 + (y - cy)**2
-                bump = weight * np.exp(-0.5 * d_squared / sigma**2)
-                pattern += bump
-            
-            if np.max(pattern) > 0:
-                pattern /= np.max(pattern)
-            patterns.append(pattern)
-        
-        return patterns
     
     def gaussian_spatial(self, center: Tuple[int, int], sigma: float) -> np.ndarray:
         """Generate a 2D Gaussian spatial profile with caching."""
@@ -93,108 +57,143 @@ class ThalamicInput:
         self._spatial_cache[cache_key] = profile
         return profile
     
-    def generate_intrinsic(self) -> np.ndarray:
-        """Generate intrinsic thalamic activity by combining oscillating patterns."""
-        # Vectorize amplitude calculation for all oscillators at once
-        amplitudes = 0.5 * (1 + np.tanh(2 * np.sin(self.oscillator_phases)))
+    def _compute_temporal_profile(self, time_since_start: float, duration: float, 
+                                phase: float = 0.0, n_oscillations: float = 2.0) -> float:
+        """Compute temporal profile with oscillations and smooth transitions."""
+        normalized_time = time_since_start / duration
         
-        # Multiply each pattern by its amplitude and sum
-        activity = np.zeros((self.grid_size, self.grid_size))
-        for i, pattern in enumerate(self.intrinsic_patterns):
-            activity += amplitudes[i] * pattern
-        
-        # Normalize if needed
-        max_val = np.max(activity)
-        if max_val > 0:
-            activity /= max_val
-        
-        return activity
-    
-    def generate_sensory(self) -> np.ndarray:
-        """Generate sensory thalamic activity as localized pulses."""
-        activity = np.zeros((self.grid_size, self.grid_size))
-        active_bursts = []
-        
-        for burst in self.sensory_bursts:
-            time_since_start = self.t - burst['start_time']
+        # Base envelope function
+        if normalized_time < 0.3:
+            envelope = normalized_time / 0.3
+        elif normalized_time > 0.7:
+            envelope = 1.0 - (normalized_time - 0.7) / 0.3
+        else:
+            envelope = 1.0
             
-            if time_since_start < burst['duration']:
-                # Calculate temporal profile
-                normalized_time = time_since_start / burst['duration']
-                if normalized_time < 0.3:
-                    temporal = normalized_time / 0.3
-                elif normalized_time > 0.7:
-                    temporal = 1.0 - (normalized_time - 0.7) / 0.3
-                else:
-                    temporal = 1.0
-                
-                spatial = self.gaussian_spatial(burst['center'], burst['sigma'])
-                burst_activity = burst['amplitude'] * temporal * spatial
-                activity = np.maximum(activity, burst_activity)
-                active_bursts.append(burst)
+        # Add oscillations
+        oscillation = np.sin(2 * np.pi * n_oscillations * normalized_time + phase)
         
-        self.sensory_bursts = active_bursts
-        return activity
+        return envelope * (0.5 + 0.5 * oscillation)
     
-    def _update_oscillators(self) -> None:
-        """Update oscillator phases based on their frequencies."""
-        dt_sec = self.dt / 1000.0
-        self.oscillator_phases += 2 * np.pi * self.oscillator_freqs * dt_sec
-    
-    def _maybe_add_sensory_burst(self) -> None:
-        """Add a new sensory burst if conditions are met."""
-        if (len(self.sensory_bursts) < self.max_sensory_bursts and 
-            np.random.random() < self.dt / self.sensory_interval):
-            
-            new_burst = {
-                'center': (
-                    np.random.randint(0, self.grid_size),
-                    np.random.randint(0, self.grid_size)
-                ),
-                'sigma': self.sensory_sigma * np.random.uniform(0.3, 2.2),
-                'duration': self.sensory_duration * np.random.uniform(0.6, 1.4),
-                'amplitude': np.random.uniform(0.4, 1.4),
-                'start_time': self.t
-            }
-            
-            self.sensory_bursts.append(new_burst)
-    
-    def update(self, alpha: float = THALAMIC_ALPHA, n_steps: int = 10) -> np.ndarray:
-        """Generate combined thalamic input for multiple time steps.
+    def _generate_burst_activity(self, bursts: List[Dict], is_intrinsic: bool = False) -> np.ndarray:
+        """Generate activity from a list of bursts.
         
         Args:
-            alpha: Weight for sensory component (0 = pure intrinsic, 1 = pure sensory)
-            n_steps: Number of time steps to simulate
+            bursts: List of burst dictionaries
+            is_intrinsic: Whether these are intrinsic bursts (affects combination method)
             
         Returns:
             Combined activity pattern
         """
-        # Calculate time increment for entire update at once
+        activity = np.zeros((self.grid_size, self.grid_size))
+        active_bursts = []
+        
+        for burst in bursts:
+            time_since_start = self.t - burst['start_time']
+            
+            if time_since_start < burst['duration']:
+                # Calculate temporal profile
+                if is_intrinsic:
+                    temporal = self._compute_temporal_profile(
+                        time_since_start, 
+                        burst['duration'],
+                        burst['phase'],
+                        burst['n_oscillations']
+                    )
+                    # Phase-dependent combination for intrinsic bursts
+                    burst_activity = burst['amplitude'] * temporal * self.gaussian_spatial(burst['center'], burst['sigma'])
+                    activity += burst_activity * np.cos(burst['phase'])
+                else:
+                    # Simple temporal profile for sensory bursts
+                    normalized_time = time_since_start / burst['duration']
+                    if normalized_time < 0.3:
+                        temporal = normalized_time / 0.3
+                    elif normalized_time > 0.7:
+                        temporal = 1.0 - (normalized_time - 0.7) / 0.3
+                    else:
+                        temporal = 1.0
+                    
+                    burst_activity = burst['amplitude'] * temporal * self.gaussian_spatial(burst['center'], burst['sigma'])
+                    activity = np.maximum(activity, burst_activity)
+                
+                active_bursts.append(burst)
+        
+        if is_intrinsic:
+            activity = np.maximum(0, activity)  # Ensure non-negative activity
+            
+        return activity, active_bursts
+    
+    def generate_intrinsic(self) -> np.ndarray:
+        """Generate intrinsic thalamic activity as random bursts with wave-like properties."""
+        activity, self.intrinsic_bursts = self._generate_burst_activity(self.intrinsic_bursts, is_intrinsic=True)
+        return activity
+    
+    def generate_sensory(self) -> np.ndarray:
+        """Generate sensory thalamic activity as localized pulses."""
+        activity, self.sensory_bursts = self._generate_burst_activity(self.sensory_bursts, is_intrinsic=False)
+        return activity
+    
+    def _create_burst(self, center: Tuple[int, int], sigma: float, duration: float, 
+                     amplitude: float, is_intrinsic: bool = False) -> Dict:
+        """Create a new burst with appropriate parameters."""
+        burst = {
+            'center': center,
+            'sigma': sigma * np.random.uniform(0.5, 1.5),
+            'duration': duration * np.random.uniform(0.5, 1.5),
+            'amplitude': amplitude * np.random.uniform(0.5, 1.5),
+            'start_time': self.t
+        }
+        
+        if is_intrinsic:
+            burst.update({
+                'phase': np.random.uniform(0, 2 * np.pi),
+                'n_oscillations': np.random.uniform(1.5, 3.0)
+            })
+            
+        return burst
+    
+    def _maybe_add_burst(self, is_intrinsic: bool = False) -> None:
+        """Add a new burst if conditions are met."""
+        if is_intrinsic:
+            max_bursts = self.max_intrinsic_bursts
+            interval = THALAMIC_INTRINSIC_INTERVAL
+            sigma = THALAMIC_INTRINSIC_SIGMA
+            duration = THALAMIC_INTRINSIC_DURATION
+            amplitude = THALAMIC_INTRINSIC_AMP
+            bursts = self.intrinsic_bursts
+        else:
+            max_bursts = self.max_sensory_bursts
+            interval = THALAMIC_SENSORY_INTERVAL
+            sigma = THALAMIC_SENSORY_SIGMA
+            duration = THALAMIC_SENSORY_DURATION
+            amplitude = THALAMIC_SENSORY_AMP
+            bursts = self.sensory_bursts
+        
+        if len(bursts) < max_bursts and np.random.random() < self.dt / interval:
+            center = (np.random.randint(0, self.grid_size), np.random.randint(0, self.grid_size))
+            new_burst = self._create_burst(center, sigma, duration, amplitude, is_intrinsic)
+            bursts.append(new_burst)
+    
+    def update(self, alpha: float = THALAMIC_ALPHA, n_steps: int = 10) -> np.ndarray:
+        """Generate combined thalamic input for multiple time steps."""
         time_increment = self.dt * n_steps
         self.t += time_increment
         
-        # Update oscillator phases based on their frequencies
-        self.oscillator_phases += 2 * np.pi * self.oscillator_freqs * time_increment / 1000.0
-        
-        # Add sensory bursts
+        # Add new bursts
         for _ in range(n_steps):
-            self._maybe_add_sensory_burst()
+            self._maybe_add_burst(is_intrinsic=True)
+            self._maybe_add_burst(is_intrinsic=False)
         
-        # Generate final output
+        # Generate and combine activity
         intrinsic = self.generate_intrinsic()
         sensory = self.generate_sensory()
-        
-        # Combine intrinsic and sensory components
         combined = (1 - alpha) * intrinsic + alpha * sensory
-        result = combined * THALAMIC_SCALING
         
-        return result
+        return combined * THALAMIC_SCALING
     
     def reset(self) -> None:
         """Reset the generator to initial state."""
         self.t = 0.0
-        self.oscillator_phases = np.random.uniform(0, 2*np.pi, self.n_oscillators)
-        self.oscillator_freqs = THALAMIC_INTRINSIC_FREQ * np.random.uniform(0.6, 1.6, self.n_oscillators)
-        self.intrinsic_patterns = self._create_intrinsic_patterns()
+        self.intrinsic_bursts = []
         self.sensory_bursts = []
         self._spatial_cache.clear() 

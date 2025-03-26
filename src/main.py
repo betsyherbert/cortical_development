@@ -1,7 +1,7 @@
 """Main module for running the cortical circuit simulation."""
 
 import argparse
-from model.neurons import CorticalCircuit, FIRING_THRESHOLD
+from model.neurons import CorticalCircuit, GAIN
 from model.thalamus import ThalamicInput
 from visualization.dashboard import DashboardApp
 from model.config import (
@@ -85,24 +85,24 @@ class CorticalSimulation:
         """
         return self.circuit.get_time_constants()
         
-    def set_firing_threshold(self, cell_type: str, threshold: float) -> None:
+    def set_gain(self, cell_type: str, gain: float) -> None:
         """
-        Set the firing threshold for a specific cell type.
+        Set the gain for a specific cell type.
         
         Args:
             cell_type: The cell type to update ('E', 'SST', or 'PV')
-            threshold: New threshold value
+            gain: New gain value
         """
-        self.circuit.set_firing_threshold(cell_type, threshold)
+        self.circuit.set_gain(cell_type, gain)
     
-    def get_firing_thresholds(self) -> dict:
+    def get_gains(self) -> dict:
         """
-        Get current firing threshold values for all cell types.
+        Get current gain values for all cell types.
         
         Returns:
-            Dictionary mapping cell types to their firing thresholds
+            Dictionary mapping cell types to their gains
         """
-        return self.circuit.get_firing_thresholds()
+        return self.circuit.get_gains()
         
     def set_connection_sigma(self, source_layer: str, source_cell: str, 
                            target_layer: str, target_cell: str, 

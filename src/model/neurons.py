@@ -8,8 +8,8 @@ from .config import (
     INTEGRATION_STEPS, CELL_TYPES, LAYERS
 )
 
-# Default firing threshold (0 for standard ReLU)
-FIRING_THRESHOLD = 0.0
+# Default gain (1.0 for standard ReLU)
+GAIN = 1.0
 
 
 class NeuralLayer:
@@ -20,27 +20,27 @@ class NeuralLayer:
     and parvalbumin-expressing (PV) interneurons, each with their own dynamics.
     """
     
-    def __init__(self, grid_size: int = GRID_SIZE, dt: float = DT, threshold: float = FIRING_THRESHOLD):
+    def __init__(self, grid_size: int = GRID_SIZE, dt: float = DT, gain: float = GAIN):
         """
         Initialize a neural layer with specified grid size and time constant.
         
         Args:
             grid_size: Size of the square grid
             dt: Time step in milliseconds
-            threshold: Firing threshold (default value, can be overridden per cell type)
+            gain: Gain parameter (default value, can be overridden per cell type)
         """
         self.grid_size = grid_size
         # Initialize separate time constants for each cell type
         self.tau = {
-            'E': 80.0,    # Default time constant for E cells
-            'SST': 60.0,  # Default time constant for SST cells
-            'PV': 40.0    # Default time constant for PV cells
+            'E': 0.0,    # Will be set by preset
+            'SST': 0.0,  # Will be set by preset
+            'PV': 0.0    # Will be set by preset
         }
-        # Initialize separate firing thresholds for each cell type
-        self.threshold = {
-            'E': threshold,
-            'SST': threshold,
-            'PV': threshold
+        # Initialize separate gains for each cell type
+        self.gain = {
+            'E': 0.0,    # Will be set by preset
+            'SST': 0.0,  # Will be set by preset
+            'PV': 0.0    # Will be set by preset
         }
         self.dt = dt
         
@@ -61,10 +61,9 @@ class NeuralLayer:
         # Noise amplitude for dynamics
         self.noise_amplitude = NOISE_AMPLITUDE
 
-    def relu(self, x: np.ndarray, threshold: float = FIRING_THRESHOLD) -> np.ndarray:
-        """ReLU activation function with threshold: max(0, x - threshold)."""
-        # More efficient single-step calculation
-        return np.maximum(0, x - threshold)
+    def relu(self, x: np.ndarray, gain: float = GAIN) -> np.ndarray:
+        """ReLU activation function with gain: max(0, gain * x)."""
+        return np.maximum(0, gain * x)
 
     def update(self, inputs: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
         """
@@ -90,15 +89,15 @@ class NeuralLayer:
                 dV = (-self.V[cell_type] + inputs[cell_type] + noise[cell_type]) * (self.dt / self.tau[cell_type])
                 self.V[cell_type] += dV
                 
-                # Update firing rates with ReLU activation and cell-type specific threshold
-                self.r[cell_type] = self.relu(self.V[cell_type], self.threshold[cell_type])
+                # Update firing rates with ReLU activation and cell-type specific gain
+                self.r[cell_type] = self.relu(self.V[cell_type], self.gain[cell_type])
         
         # Return current firing rates
         return self.r
 
     def reset(self) -> None:
         """Reset neural state variables to initial state, while preserving parameters."""
-        # Only reset state variables (V and r), not parameters (tau and threshold)
+        # Only reset state variables (V and r), not parameters (tau and gain)
         for cell_type in CELL_TYPES:
             self.V[cell_type].fill(0)
             self.r[cell_type].fill(0)
@@ -123,25 +122,25 @@ class NeuralLayer:
         """
         return self.tau.copy()
         
-    def set_firing_threshold(self, cell_type: str, threshold: float) -> None:
+    def set_gain(self, cell_type: str, gain: float) -> None:
         """
-        Set the firing threshold for a specific cell type.
+        Set the gain for a specific cell type.
         
         Args:
             cell_type: The cell type to update ('E', 'SST', or 'PV')
-            threshold: New threshold value
+            gain: New gain value
         """
         if cell_type in CELL_TYPES:
-            self.threshold[cell_type] = threshold
+            self.gain[cell_type] = gain
             
-    def get_firing_thresholds(self) -> Dict[str, float]:
+    def get_gains(self) -> Dict[str, float]:
         """
-        Get current firing threshold values for all cell types.
+        Get current gain values for all cell types.
         
         Returns:
-            Dictionary mapping cell types to their firing thresholds
+            Dictionary mapping cell types to their gains
         """
-        return self.threshold.copy()
+        return self.gain.copy()
 
 
 class CorticalCircuit:
@@ -265,23 +264,23 @@ class CorticalCircuit:
         # Return values from L23 layer as they're synced across all layers
         return self.layers['L23'].get_time_constants()
         
-    def set_firing_threshold(self, cell_type: str, threshold: float) -> None:
+    def set_gain(self, cell_type: str, gain: float) -> None:
         """
-        Set the firing threshold for a specific cell type across all layers.
+        Set the gain for a specific cell type across all layers.
         
         Args:
-            cell_type: The cell type to update ('E', 'SST', or 'PV') 
-            threshold: New threshold value
+            cell_type: The cell type to update ('E', 'SST', or 'PV')
+            gain: New gain value
         """
         for layer in self.layers.values():
-            layer.set_firing_threshold(cell_type, threshold)
+            layer.set_gain(cell_type, gain)
             
-    def get_firing_thresholds(self) -> Dict[str, float]:
+    def get_gains(self) -> Dict[str, float]:
         """
-        Get current firing threshold values for all cell types (from L23 layer).
+        Get current gain values for all cell types (from L23 layer).
         
         Returns:
-            Dictionary mapping cell types to their firing thresholds
+            Dictionary mapping cell types to their gains
         """
         # Return values from L23 layer as they're synced across all layers
-        return self.layers['L23'].get_firing_thresholds() 
+        return self.layers['L23'].get_gains() 

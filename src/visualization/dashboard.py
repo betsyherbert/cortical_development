@@ -14,9 +14,9 @@ from model.config import (
     THALAMIC_SCALING, LAYER_CONNECTIONS,
     LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, CONNECTIONS,
     GRID_SIZE, INITIAL_THALAMIC_WIDTHS, INITIAL_OUTGOING_WIDTHS,
-    INITIAL_TIME_CONSTANTS, INITIAL_FIRING_THRESHOLDS
+    INITIAL_TIME_CONSTANTS, INITIAL_GAINS
 )
-from model.neurons import FIRING_THRESHOLD
+from model.neurons import GAIN
 from model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
 
 
@@ -46,75 +46,8 @@ class DashboardApp:
             suppress_callback_exceptions=True
         )
         
-        # Add custom CSS for sliders
-        self.app.index_string = '''
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                {%metas%}
-                <title>{%title%}</title>
-                {%favicon%}
-                {%css%}
-                <style>
-                    .custom-slider .rc-slider-track {
-                        background-color: white !important;
-                    }
-                    .custom-slider .rc-slider-rail {
-                        background-color: #555 !important;
-                    }
-                    .custom-slider .rc-slider-handle {
-                        border-color: white !important;
-                        background-color: white !important;
-                    }
-                    .custom-slider .rc-slider-handle:hover {
-                        border-color: white !important;
-                    }
-                    .custom-slider .rc-slider-handle:active {
-                        border-color: white !important;
-                        box-shadow: 0 0 5px white !important;
-                    }
-                    .custom-slider .rc-slider-dot {
-                        border-color: #888 !important;
-                        background-color: #888 !important;
-                    }
-                    .custom-slider .rc-slider-dot-active {
-                        border-color: white !important;
-                        background-color: white !important;
-                    }
-                    /* Make the control panel take less width */
-                    .control-panel-column {
-                        padding-left: 1rem !important;
-                        padding-right: 1rem !important;
-                        margin-left: -2rem !important; 
-                        max-width: 600px !important;
-                    }
-                    /* Reduce left margin in left column labels */
-                    .cell-type-label {
-                        padding-right: 1rem !important;
-                    }
-                    /* Remove rightmost and bottommost borders */
-                    .connection-matrix tr:last-child td, 
-                    .connection-matrix tr:last-child th {
-                        border-bottom: none !important;
-                    }
-                    .connection-matrix tr td:last-child, 
-                    .connection-matrix tr th:last-child {
-                        border-right: none !important;
-                    }
-                </style>
-            </head>
-            <body>
-                {%app_entry%}
-                <footer>
-                    {%config%}
-                    {%scripts%}
-                    {%renderer%}
-                </footer>
-            </body>
-        </html>
-        '''
+        # Apply P4 preset by default
+        self.apply_preset(P4_PRESET)
         
         # Pre-create all figures for better performance
         self.figures = {}
@@ -259,16 +192,16 @@ class DashboardApp:
                         )
                     ], className="mb-3"),
                     
-                    # Time constants and firing thresholds section
+                    # Time constants and gains section
                     html.Div([
                         html.Div([
                             dbc.Row([
                                 # Empty header for label column
                                 dbc.Col("", width=2),
                                 # Header for time constants column
-                                dbc.Col("Time Constants (ms)", className="text-center", width=5),
-                                # Header for firing thresholds column
-                                dbc.Col("Firing Thresholds", className="text-center", width=5),
+                                dbc.Col("Time Constant (ms)", className="text-center", width=5),
+                                # Header for gains column
+                                dbc.Col("Gain", className="text-center", width=5),
                             ], className="mb-2", style={"marginLeft": "0", "marginRight": "0"}),
                             
                             # E cells row
@@ -290,15 +223,15 @@ class DashboardApp:
                                     width=5,
                                     style={"paddingRight": "15px"}
                                 ),
-                                # Firing threshold slider
+                                # Gain slider
                                 dbc.Col(
                                     dcc.Slider(
-                                        id='threshold-e-slider',
-                                        min=0.0,
-                                        max=0.5,
-                                        step=0.01,
-                                        value=INITIAL_FIRING_THRESHOLDS['E'],
-                                        marks={i/10: f"{i/10:.1f}" for i in range(0, 6, 1)},
+                                        id='gain-e-slider',
+                                        min=0,
+                                        max=1.0,
+                                        step=0.1,
+                                        value=INITIAL_GAINS['E'],
+                                        marks={0: '0.0', 0.2: '0.2', 0.4: '0.4', 0.6: '0.6', 0.8: '0.8', 1.0: '1.0'},
                                         tooltip={"placement": "bottom", "always_visible": False},
                                         className="custom-slider"
                                     ),
@@ -326,15 +259,15 @@ class DashboardApp:
                                     width=5,
                                     style={"paddingRight": "15px"}
                                 ),
-                                # Firing threshold slider
+                                # Gain slider
                                 dbc.Col(
                                     dcc.Slider(
-                                        id='threshold-sst-slider',
-                                        min=0.0,
-                                        max=0.5,
-                                        step=0.01,
-                                        value=INITIAL_FIRING_THRESHOLDS['SST'],
-                                        marks={i/10: f"{i/10:.1f}" for i in range(0, 6, 1)},
+                                        id='gain-sst-slider',
+                                        min=0,
+                                        max=1.0,
+                                        step=0.1,
+                                        value=INITIAL_GAINS['SST'],
+                                        marks={0: '0.0', 0.2: '0.2', 0.4: '0.4', 0.6: '0.6', 0.8: '0.8', 1.0: '1.0'},
                                         tooltip={"placement": "bottom", "always_visible": False},
                                         className="custom-slider"
                                     ),
@@ -362,15 +295,15 @@ class DashboardApp:
                                     width=5,
                                     style={"paddingRight": "15px"}
                                 ),
-                                # Firing threshold slider
+                                # Gain slider
                                 dbc.Col(
                                     dcc.Slider(
-                                        id='threshold-pv-slider',
-                                        min=0.0,
-                                        max=0.5,
-                                        step=0.01,
-                                        value=INITIAL_FIRING_THRESHOLDS['PV'],
-                                        marks={i/10: f"{i/10:.1f}" for i in range(0, 6, 1)},
+                                        id='gain-pv-slider',
+                                        min=0,
+                                        max=1.0,
+                                        step=0.1,
+                                        value=INITIAL_GAINS['PV'],
+                                        marks={0: '0.0', 0.2: '0.2', 0.4: '0.4', 0.6: '0.6', 0.8: '0.8', 1.0: '1.0'},
                                         tooltip={"placement": "bottom", "always_visible": False},
                                         className="custom-slider"
                                     ),
@@ -992,10 +925,10 @@ class DashboardApp:
                 preset['time_constants']['E'],
                 preset['time_constants']['SST'],
                 preset['time_constants']['PV'],
-                # Firing thresholds
-                preset['firing_thresholds']['E'],
-                preset['firing_thresholds']['SST'],
-                preset['firing_thresholds']['PV'],
+                # Gains
+                preset['gains']['E'],
+                preset['gains']['SST'],
+                preset['gains']['PV'],
                 # Thalamic widths
                 preset['thalamic_widths']['E'],
                 preset['thalamic_widths']['SST'],
@@ -1016,9 +949,9 @@ class DashboardApp:
                 Output('tau-e-slider', 'value'),
                 Output('tau-sst-slider', 'value'),
                 Output('tau-pv-slider', 'value'),
-                Output('threshold-e-slider', 'value'),
-                Output('threshold-sst-slider', 'value'),
-                Output('threshold-pv-slider', 'value'),
+                Output('gain-e-slider', 'value'),
+                Output('gain-sst-slider', 'value'),
+                Output('gain-pv-slider', 'value'),
                 Output('thalamic-width-e-slider', 'value'),
                 Output('thalamic-width-sst-slider', 'value'),
                 Output('thalamic-width-pv-slider', 'value'),
@@ -1043,9 +976,9 @@ class DashboardApp:
                 Output('tau-e-slider', 'value', allow_duplicate=True),
                 Output('tau-sst-slider', 'value', allow_duplicate=True),
                 Output('tau-pv-slider', 'value', allow_duplicate=True),
-                Output('threshold-e-slider', 'value', allow_duplicate=True),
-                Output('threshold-sst-slider', 'value', allow_duplicate=True),
-                Output('threshold-pv-slider', 'value', allow_duplicate=True),
+                Output('gain-e-slider', 'value', allow_duplicate=True),
+                Output('gain-sst-slider', 'value', allow_duplicate=True),
+                Output('gain-pv-slider', 'value', allow_duplicate=True),
                 Output('thalamic-width-e-slider', 'value', allow_duplicate=True),
                 Output('thalamic-width-sst-slider', 'value', allow_duplicate=True),
                 Output('thalamic-width-pv-slider', 'value', allow_duplicate=True),
@@ -1070,9 +1003,9 @@ class DashboardApp:
                 Output('tau-e-slider', 'value', allow_duplicate=True),
                 Output('tau-sst-slider', 'value', allow_duplicate=True),
                 Output('tau-pv-slider', 'value', allow_duplicate=True),
-                Output('threshold-e-slider', 'value', allow_duplicate=True),
-                Output('threshold-sst-slider', 'value', allow_duplicate=True),
-                Output('threshold-pv-slider', 'value', allow_duplicate=True),
+                Output('gain-e-slider', 'value', allow_duplicate=True),
+                Output('gain-sst-slider', 'value', allow_duplicate=True),
+                Output('gain-pv-slider', 'value', allow_duplicate=True),
                 Output('thalamic-width-e-slider', 'value', allow_duplicate=True),
                 Output('thalamic-width-sst-slider', 'value', allow_duplicate=True),
                 Output('thalamic-width-pv-slider', 'value', allow_duplicate=True),
@@ -1097,9 +1030,9 @@ class DashboardApp:
                 Output('tau-e-slider', 'value', allow_duplicate=True),
                 Output('tau-sst-slider', 'value', allow_duplicate=True),
                 Output('tau-pv-slider', 'value', allow_duplicate=True),
-                Output('threshold-e-slider', 'value', allow_duplicate=True),
-                Output('threshold-sst-slider', 'value', allow_duplicate=True),
-                Output('threshold-pv-slider', 'value', allow_duplicate=True),
+                Output('gain-e-slider', 'value', allow_duplicate=True),
+                Output('gain-sst-slider', 'value', allow_duplicate=True),
+                Output('gain-pv-slider', 'value', allow_duplicate=True),
                 Output('thalamic-width-e-slider', 'value', allow_duplicate=True),
                 Output('thalamic-width-sst-slider', 'value', allow_duplicate=True),
                 Output('thalamic-width-pv-slider', 'value', allow_duplicate=True),
@@ -1343,18 +1276,18 @@ class DashboardApp:
              Input('selected-cell', 'data')],
         )
         
-        # Add callback for updating time constants and thresholds in simulation
+        # Add callback for updating time constants and gains in simulation
         @self.app.callback(
             [Output('interval-component', 'n_intervals')],  # Dummy output to trigger update
             [Input('tau-e-slider', 'value'),
              Input('tau-sst-slider', 'value'),
              Input('tau-pv-slider', 'value'),
-             Input('threshold-e-slider', 'value'),
-             Input('threshold-sst-slider', 'value'),
-             Input('threshold-pv-slider', 'value')],
+             Input('gain-e-slider', 'value'),
+             Input('gain-sst-slider', 'value'),
+             Input('gain-pv-slider', 'value')],
             [State('interval-component', 'n_intervals')]
         )
-        def update_neuron_parameters(tau_e, tau_sst, tau_pv, threshold_e, threshold_sst, threshold_pv, n_intervals):
+        def update_neuron_parameters(tau_e, tau_sst, tau_pv, gain_e, gain_sst, gain_pv, n_intervals):
             # No need to update parameters here since it's already handled in update_graphs
             # This callback is kept just to maintain the slider interactivity and force a refresh
             # when the sliders are moved
@@ -1423,15 +1356,15 @@ class DashboardApp:
              for cell_type in CELL_TYPES] +
             [Output('graph-thalamus', 'figure')],
             
-            # Inputs: interval trigger, alpha slider, time constant sliders, threshold sliders and connectivity width sliders
+            # Inputs: interval trigger, alpha slider, time constant sliders, gain sliders and connectivity width sliders
             [Input('interval-component', 'n_intervals'),
              Input('alpha-slider', 'value'),
              Input('tau-e-slider', 'value'),
              Input('tau-sst-slider', 'value'),
              Input('tau-pv-slider', 'value'),
-             Input('threshold-e-slider', 'value'),
-             Input('threshold-sst-slider', 'value'),
-             Input('threshold-pv-slider', 'value'),
+             Input('gain-e-slider', 'value'),
+             Input('gain-sst-slider', 'value'),
+             Input('gain-pv-slider', 'value'),
              Input('thalamic-width-e-slider', 'value'),
              Input('thalamic-width-sst-slider', 'value'),
              Input('thalamic-width-pv-slider', 'value'),
@@ -1442,7 +1375,7 @@ class DashboardApp:
             # States: pause button state
             [State('pause-button', 'n_clicks')]
         )
-        def update_graphs(n_intervals, alpha, tau_e, tau_sst, tau_pv, threshold_e, threshold_sst, threshold_pv, 
+        def update_graphs(n_intervals, alpha, tau_e, tau_sst, tau_pv, gain_e, gain_sst, gain_pv, 
                          sigma_thal_e, sigma_thal_sst, sigma_thal_pv, sigma_e_out, sigma_sst_out, sigma_pv_out, 
                          pause_clicks):
             # Check if simulation is paused
@@ -1455,9 +1388,9 @@ class DashboardApp:
             self.simulation.set_time_constant('SST', tau_sst)
             self.simulation.set_time_constant('PV', tau_pv)
             
-            self.simulation.set_firing_threshold('E', threshold_e)
-            self.simulation.set_firing_threshold('SST', threshold_sst)
-            self.simulation.set_firing_threshold('PV', threshold_pv)
+            self.simulation.set_gain('E', gain_e)
+            self.simulation.set_gain('SST', gain_sst)
+            self.simulation.set_gain('PV', gain_pv)
             
             try:
                 # Update simulation state with new alpha value

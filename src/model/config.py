@@ -14,12 +14,17 @@ INTEGRATION_STEPS = 5  # Number of steps per update cycle - INCREASE for faster 
 VISUALIZATION_STEPS = 3  # Number of simulation steps per visualization update - DECREASE for more frequent visual updates
 
 # Thalamic input parameters
-THALAMIC_INTRINSIC_FREQ = 8.0  # Base frequency for intrinsic oscillations (Hz) - INCREASE for faster oscillations
-THALAMIC_INTRINSIC_SIGMA = 3.0  # Spatial spread of intrinsic activity (grid units) - DECREASE for more rapid spatial changes
+THALAMIC_INTRINSIC_SIGMA = 4.0  # Mean spatial spread of intrinsic bursts (grid units)
+THALAMIC_INTRINSIC_DURATION = 30.0  # Mean duration of intrinsic bursts (ms)
+THALAMIC_INTRINSIC_INTERVAL = 20.0  # Mean interval between intrinsic bursts (ms)
+THALAMIC_INTRINSIC_AMP = 2.0  # Mean amplitude of intrinsic bursts
+
 THALAMIC_SENSORY_SIGMA = 1.5  # Spatial spread of sensory inputs (grid units)
-THALAMIC_SENSORY_DURATION = 20.0  # Duration of sensory bursts (ms) - DECREASE for faster transitions
-THALAMIC_SENSORY_INTERVAL = 50.0  # Mean interval between sensory bursts (ms) - DECREASE for more frequent activity changes
-THALAMIC_SCALING = 1.0  # Overall scaling factor for thalamic input - INCREASE for more dramatic visual changes
+THALAMIC_SENSORY_DURATION = 10.0  # Duration of sensory bursts (ms)
+THALAMIC_SENSORY_INTERVAL = 10.0  # Mean interval between sensory bursts (ms)
+THALAMIC_SENSORY_AMP = 1.0  # Mean amplitude of sensory bursts
+
+THALAMIC_SCALING = 1.0  # Overall scaling factor for thalamic input
 THALAMIC_ALPHA = 0.2  # Balance between intrinsic (0) and sensory (1) thalamic activity
 
 # Neural network parameters
@@ -164,33 +169,6 @@ LAYER_CONNECTIVITY_PARAMS = {
     'thalamus_to_L5_E': {'amplitude': 0.1, 'sigma': 2.0},
     'thalamus_to_L5_SST': {'amplitude': 0.5, 'sigma': 2.0},
     'thalamus_to_L5_PV': {'amplitude': 0.1, 'sigma': 2.0}
-}
-
-# Initial values for connection widths
-INITIAL_THALAMIC_WIDTHS = {
-    'E': 6.0,    # Initial thalamic input width for E cells
-    'SST': 6.0,  # Initial thalamic input width for SST cells
-    'PV': 6.0    # Initial thalamic input width for PV cells
-}
-
-INITIAL_OUTGOING_WIDTHS = {
-    'E': 4.0,    # Initial outgoing width for E cells
-    'SST': 4.0,  # Initial outgoing width for SST cells
-    'PV': 4.0    # Initial outgoing width for PV cells
-}
-
-# Initial values for time constants (ms)
-INITIAL_TIME_CONSTANTS = {
-    'E': 80.0,   # Initial time constant for E cells
-    'SST': 60.0, # Initial time constant for SST cells
-    'PV': 40.0   # Initial time constant for PV cells
-}
-
-# Initial values for firing thresholds
-INITIAL_FIRING_THRESHOLDS = {
-    'E': 0.05,   # Initial firing threshold for E cells
-    'SST': 0.1,  # Initial firing threshold for SST cells
-    'PV': 0.05   # Initial firing threshold for PV cells
 }
 
 # Layer specific connection list (source_layer, source_cell, target_layer, target_cell)
