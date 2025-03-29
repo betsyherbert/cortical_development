@@ -32,15 +32,15 @@ class NeuralLayer:
         self.grid_size = grid_size
         # Initialize separate time constants for each cell type
         self.tau = {
-            'E': 0.0,    # Will be set by preset
-            'SST': 0.0,  # Will be set by preset
-            'PV': 0.0    # Will be set by preset
+            'E': 80.0,    # Default time constant for E cells
+            'SST': 60.0,  # Default time constant for SST cells
+            'PV': 40.0    # Default time constant for PV cells
         }
         # Initialize separate gains for each cell type
         self.gain = {
-            'E': 0.0,    # Will be set by preset
-            'SST': 0.0,  # Will be set by preset
-            'PV': 0.0    # Will be set by preset
+            'E': gain,
+            'SST': gain,
+            'PV': gain
         }
         self.dt = dt
         

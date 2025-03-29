@@ -46,8 +46,75 @@ class DashboardApp:
             suppress_callback_exceptions=True
         )
         
-        # Apply P4 preset by default
-        self.apply_preset(P4_PRESET)
+        # Add custom CSS for sliders
+        self.app.index_string = '''
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                {%metas%}
+                <title>{%title%}</title>
+                {%favicon%}
+                {%css%}
+                <style>
+                    .custom-slider .rc-slider-track {
+                        background-color: white !important;
+                    }
+                    .custom-slider .rc-slider-rail {
+                        background-color: #555 !important;
+                    }
+                    .custom-slider .rc-slider-handle {
+                        border-color: white !important;
+                        background-color: white !important;
+                    }
+                    .custom-slider .rc-slider-handle:hover {
+                        border-color: white !important;
+                    }
+                    .custom-slider .rc-slider-handle:active {
+                        border-color: white !important;
+                        box-shadow: 0 0 5px white !important;
+                    }
+                    .custom-slider .rc-slider-dot {
+                        border-color: #888 !important;
+                        background-color: #888 !important;
+                    }
+                    .custom-slider .rc-slider-dot-active {
+                        border-color: white !important;
+                        background-color: white !important;
+                    }
+                    /* Make the control panel take less width */
+                    .control-panel-column {
+                        padding-left: 1rem !important;
+                        padding-right: 1rem !important;
+                        margin-left: -2rem !important; 
+                        max-width: 600px !important;
+                    }
+                    /* Reduce left margin in left column labels */
+                    .cell-type-label {
+                        padding-right: 1rem !important;
+                    }
+                    /* Remove rightmost and bottommost borders */
+                    .connection-matrix tr:last-child td, 
+                    .connection-matrix tr:last-child th {
+                        border-bottom: none !important;
+                    }
+                    .connection-matrix tr td:last-child, 
+                    .connection-matrix tr th:last-child {
+                        border-right: none !important;
+                    }
+                </style>
+            </head>
+            <body>
+                {%app_entry%}
+                <footer>
+                    {%config%}
+                    {%scripts%}
+                    {%renderer%}
+                </footer>
+            </body>
+        </html>
+        '''
         
         # Pre-create all figures for better performance
         self.figures = {}

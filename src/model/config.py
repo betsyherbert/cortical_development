@@ -171,6 +171,33 @@ LAYER_CONNECTIVITY_PARAMS = {
     'thalamus_to_L5_PV': {'amplitude': 0.1, 'sigma': 2.0}
 }
 
+# Initial values for connection widths
+INITIAL_THALAMIC_WIDTHS = {
+    'E': 6.0,    # Initial thalamic input width for E cells
+    'SST': 6.0,  # Initial thalamic input width for SST cells
+    'PV': 6.0    # Initial thalamic input width for PV cells
+}
+
+INITIAL_OUTGOING_WIDTHS = {
+    'E': 4.0,    # Initial outgoing width for E cells
+    'SST': 4.0,  # Initial outgoing width for SST cells
+    'PV': 4.0    # Initial outgoing width for PV cells
+}
+
+# Initial values for time constants (ms)
+INITIAL_TIME_CONSTANTS = {
+    'E': 80.0,   # Initial time constant for E cells
+    'SST': 60.0, # Initial time constant for SST cells
+    'PV': 40.0   # Initial time constant for PV cells
+}
+
+# Initial values for gains
+INITIAL_GAINS = {
+    'E': 1.0,    # Initial gain for E cells
+    'SST': 1.0,  # Initial gain for SST cells
+    'PV': 1.0    # Initial gain for PV cells
+}
+
 # Layer specific connection list (source_layer, source_cell, target_layer, target_cell)
 LAYER_CONNECTIONS = [
     # Generate all valid layer-specific connections
