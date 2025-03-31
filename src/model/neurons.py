@@ -213,13 +213,18 @@ class CorticalCircuit:
                 # Initialize inputs for this layer
                 layer_inputs = {cell_type: np.zeros(grid_shape) for cell_type in CELL_TYPES}
                 
-                # Add thalamic inputs
+                # Add thalamic inputs - using weight matrices to properly apply strength scaling and sparsity
                 for target_cell in CELL_TYPES:
-                    conn_key = f'thalamus_to_{target_layer}_{target_cell}'
-                    if conn_key in self.connectivity.layer_params:
-                        layer_inputs[target_cell] += (
-                            self.connectivity.layer_params[conn_key]['amplitude'] * self.thalamus
-                        )
+                    # Create the connection tuple key - for thalamic connections, source_cell is None
+                    conn_key = ('thalamus', None, target_layer, target_cell)
+                    if conn_key in self.connectivity.W:
+                        # Get the weight matrix with scaling and sparsity already applied
+                        weight_matrix = self.connectivity.W[conn_key]
+                        
+                        # Apply the weight matrix to thalamic rates
+                        thalamic_rates = self.thalamus.flatten()
+                        input_curr = weight_matrix @ thalamic_rates
+                        layer_inputs[target_cell] += input_curr.reshape(grid_shape)
                 
                 # Add inputs from all layers
                 for source_layer in LAYERS:

@@ -14,7 +14,8 @@ from model.config import (
     THALAMIC_SCALING, LAYER_CONNECTIONS,
     LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, CONNECTIONS,
     GRID_SIZE, INITIAL_THALAMIC_WIDTHS, INITIAL_OUTGOING_WIDTHS,
-    INITIAL_TIME_CONSTANTS, INITIAL_GAINS, CELL_COLORS, CELL_ACTIVITY_COLORS
+    INITIAL_TIME_CONSTANTS, INITIAL_GAINS, CELL_COLORS, CELL_ACTIVITY_COLORS,
+    INITIAL_STRENGTH_SCALING, INITIAL_SPARSITY
 )
 from model.neurons import GAIN
 from model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
@@ -131,7 +132,7 @@ class DashboardApp:
                     # .connection-matrix tr td:last-child, 
                     # .connection-matrix tr th:last-child {
                     #     border-right: none !important;
-                    }
+                    # }
                 </style>
             </head>
             <body>
@@ -315,34 +316,19 @@ class DashboardApp:
                     ], className="mb-3"),
                 ], width=MIDDLE_COL_WIDTH, className="px-5"),  # Increased padding further
                     
-                # Right column: control sliders
+                # Right column: Control panel
                 dbc.Col([
-                    # Time constants and gains section
-                    html.Div([
-                        html.H5("Neural Parameters", className="mb-2 text-center"),  # Reduced from mb-4 to mb-2
-                        self.create_parameter_sliders()
-                    ], className="mb-4"),
-                    
-                    # Connectivity width section
-                    html.Div([
-                        html.H5("Connectivity Parameters", className="mb-2 text-center"),  # Reduced from mb-4 to mb-2
-                        self.create_connectivity_sliders()
-                    ], className="mb-4"),
-                    
-                    # Thalamic input controls
-                    html.Div([
-                        html.H5("Input Control", className="mb-2 text-center"),  # Reduced from mb-4 to mb-2
-                        self.create_input_controls()
-                    ], className="mb-4"),
-                    
-                    # Simulation controls
-                        html.Div([
-                            dbc.Button(
-                                "Pause/Resume", id="pause-button",
-                            color="primary", className="w-100"
-                        )
-                    ])
-                ], width=RIGHT_COL_WIDTH, className="px-3")
+                    # Container for control sliders
+                    html.Div(
+                        self.create_control_panel(),
+                        className="control-panel-column",
+                        style={
+                            "backgroundColor": "#28323f", 
+                            "borderRadius": "10px", 
+                            "padding": "15px"
+                        }
+                    )
+                ], width=RIGHT_COL_WIDTH, className="px-4")
             ], className="g-0"),  # Remove gutters from main row
         ], fluid=True, className="py-3")
     
@@ -715,6 +701,16 @@ class DashboardApp:
                     source_layer, source_cell, target_layer, target_cell, strength
                 )
             
+            # Update strength scaling factors if present in the preset
+            if 'strength_scaling' in preset:
+                for cell_type, scaling in preset['strength_scaling'].items():
+                    self.simulation.set_strength_scaling(cell_type, scaling)
+                    
+            # Update sparsity factors if present in the preset
+            if 'sparsity' in preset:
+                for cell_type, sparsity in preset['sparsity'].items():
+                    self.simulation.set_sparsity(cell_type, sparsity)
+            
             # Regenerate the connection matrix to reflect the updated values
             updated_matrix = self.create_connection_matrix()
                 
@@ -756,6 +752,14 @@ class DashboardApp:
                 Output('outgoing-width-e-slider', 'value'),
                 Output('outgoing-width-sst-slider', 'value'),
                 Output('outgoing-width-pv-slider', 'value'),
+                Output('strength-scaling-e-slider', 'value'),
+                Output('strength-scaling-sst-slider', 'value'),
+                Output('strength-scaling-pv-slider', 'value'),
+                Output('strength-scaling-thalamus-slider', 'value'),
+                Output('sparsity-e-slider', 'value'),
+                Output('sparsity-sst-slider', 'value'),
+                Output('sparsity-pv-slider', 'value'),
+                Output('sparsity-thalamus-slider', 'value'),
                 Output('alpha-slider', 'value'),
                 Output('connection-matrix-container', 'children')
             ],
@@ -763,10 +767,65 @@ class DashboardApp:
             prevent_initial_call=True
         )
         def apply_p4_preset(n_clicks):
-            """Apply the P4 preset values to all parameters."""
-            if n_clicks is None:
-                raise dash.exceptions.PreventUpdate
-            return apply_preset(P4_PRESET)
+            """Apply the P4 preset configuration."""
+            # Apply the preset
+            apply_preset(P4_PRESET)
+            
+            # Get values from the preset object
+            try:
+                tau_e = P4_PRESET.get_tau('E')
+                tau_sst = P4_PRESET.get_tau('SST')
+                tau_pv = P4_PRESET.get_tau('PV')
+                gain_e = P4_PRESET.get_gain('E')
+                gain_sst = P4_PRESET.get_gain('SST')
+                gain_pv = P4_PRESET.get_gain('PV')
+                sigma_thal_e = P4_PRESET.get_sigma('thalamus', 'E')
+                sigma_thal_sst = P4_PRESET.get_sigma('thalamus', 'SST')
+                sigma_thal_pv = P4_PRESET.get_sigma('thalamus', 'PV')
+                sigma_e_out = P4_PRESET.get_outgoing_sigma('E')
+                sigma_sst_out = P4_PRESET.get_outgoing_sigma('SST')
+                sigma_pv_out = P4_PRESET.get_outgoing_sigma('PV')
+                strength_e = P4_PRESET.get('strength_scaling', {}).get('E', 1.0)
+                strength_sst = P4_PRESET.get('strength_scaling', {}).get('SST', 1.0)
+                strength_pv = P4_PRESET.get('strength_scaling', {}).get('PV', 1.0)
+                strength_thal = P4_PRESET.get('strength_scaling', {}).get('thalamus', 1.0)
+                sparsity_e = P4_PRESET.get('sparsity', {}).get('E', 1.0)
+                sparsity_sst = P4_PRESET.get('sparsity', {}).get('SST', 1.0)
+                sparsity_pv = P4_PRESET.get('sparsity', {}).get('PV', 1.0)
+                sparsity_thal = P4_PRESET.get('sparsity', {}).get('thalamus', 1.0)
+                alpha = P4_PRESET.get_thalamic_alpha()
+            except (AttributeError, TypeError):
+                # If the preset is a dictionary, access values directly
+                tau_e = P4_PRESET['time_constants']['E']
+                tau_sst = P4_PRESET['time_constants']['SST']
+                tau_pv = P4_PRESET['time_constants']['PV']
+                gain_e = P4_PRESET['gains']['E']
+                gain_sst = P4_PRESET['gains']['SST']
+                gain_pv = P4_PRESET['gains']['PV']
+                sigma_thal_e = P4_PRESET['thalamic_widths']['E']
+                sigma_thal_sst = P4_PRESET['thalamic_widths']['SST']
+                sigma_thal_pv = P4_PRESET['thalamic_widths']['PV']
+                sigma_e_out = P4_PRESET['outgoing_widths']['E']
+                sigma_sst_out = P4_PRESET['outgoing_widths']['SST']
+                sigma_pv_out = P4_PRESET['outgoing_widths']['PV']
+                strength_e = P4_PRESET['strength_scaling']['E']
+                strength_sst = P4_PRESET['strength_scaling']['SST']
+                strength_pv = P4_PRESET['strength_scaling']['PV']
+                strength_thal = P4_PRESET['strength_scaling']['thalamus']
+                sparsity_e = P4_PRESET['sparsity']['E']
+                sparsity_sst = P4_PRESET['sparsity']['SST']
+                sparsity_pv = P4_PRESET['sparsity']['PV']
+                sparsity_thal = P4_PRESET['sparsity']['thalamus']
+                alpha = P4_PRESET['thalamic_alpha']
+                
+            # Return all values, including our new scaling and sparsity factors
+            return (tau_e, tau_sst, tau_pv,
+                   gain_e, gain_sst, gain_pv,
+                   sigma_thal_e, sigma_thal_sst, sigma_thal_pv,
+                   sigma_e_out, sigma_sst_out, sigma_pv_out,
+                   strength_e, strength_sst, strength_pv, strength_thal,
+                   sparsity_e, sparsity_sst, sparsity_pv, sparsity_thal,
+                   alpha, self.create_connection_matrix())
         
         # Add callback for P8 preset button
         @self.app.callback(
@@ -783,6 +842,14 @@ class DashboardApp:
                 Output('outgoing-width-e-slider', 'value', allow_duplicate=True),
                 Output('outgoing-width-sst-slider', 'value', allow_duplicate=True),
                 Output('outgoing-width-pv-slider', 'value', allow_duplicate=True),
+                Output('strength-scaling-e-slider', 'value', allow_duplicate=True),
+                Output('strength-scaling-sst-slider', 'value', allow_duplicate=True),
+                Output('strength-scaling-pv-slider', 'value', allow_duplicate=True),
+                Output('strength-scaling-thalamus-slider', 'value', allow_duplicate=True),
+                Output('sparsity-e-slider', 'value', allow_duplicate=True),
+                Output('sparsity-sst-slider', 'value', allow_duplicate=True),
+                Output('sparsity-pv-slider', 'value', allow_duplicate=True),
+                Output('sparsity-thalamus-slider', 'value', allow_duplicate=True),
                 Output('alpha-slider', 'value', allow_duplicate=True),
                 Output('connection-matrix-container', 'children', allow_duplicate=True)
             ],
@@ -790,10 +857,65 @@ class DashboardApp:
             prevent_initial_call=True
         )
         def apply_p8_preset(n_clicks):
-            """Apply the P8 preset values to all parameters."""
-            if n_clicks is None:
-                raise dash.exceptions.PreventUpdate
-            return apply_preset(P8_PRESET)
+            """Apply the P8 preset configuration."""
+            # Apply the preset
+            apply_preset(P8_PRESET)
+            
+            # Get values from the preset object
+            try:
+                tau_e = P8_PRESET.get_tau('E')
+                tau_sst = P8_PRESET.get_tau('SST')
+                tau_pv = P8_PRESET.get_tau('PV')
+                gain_e = P8_PRESET.get_gain('E')
+                gain_sst = P8_PRESET.get_gain('SST')
+                gain_pv = P8_PRESET.get_gain('PV')
+                sigma_thal_e = P8_PRESET.get_sigma('thalamus', 'E')
+                sigma_thal_sst = P8_PRESET.get_sigma('thalamus', 'SST')
+                sigma_thal_pv = P8_PRESET.get_sigma('thalamus', 'PV')
+                sigma_e_out = P8_PRESET.get_outgoing_sigma('E')
+                sigma_sst_out = P8_PRESET.get_outgoing_sigma('SST')
+                sigma_pv_out = P8_PRESET.get_outgoing_sigma('PV')
+                strength_e = P8_PRESET.get('strength_scaling', {}).get('E', 1.0)
+                strength_sst = P8_PRESET.get('strength_scaling', {}).get('SST', 1.0)
+                strength_pv = P8_PRESET.get('strength_scaling', {}).get('PV', 1.0)
+                strength_thal = P8_PRESET.get('strength_scaling', {}).get('thalamus', 1.0)
+                sparsity_e = P8_PRESET.get('sparsity', {}).get('E', 1.0)
+                sparsity_sst = P8_PRESET.get('sparsity', {}).get('SST', 1.0)
+                sparsity_pv = P8_PRESET.get('sparsity', {}).get('PV', 1.0)
+                sparsity_thal = P8_PRESET.get('sparsity', {}).get('thalamus', 1.0)
+                alpha = P8_PRESET.get_thalamic_alpha()
+            except (AttributeError, TypeError):
+                # If the preset is a dictionary, access values directly
+                tau_e = P8_PRESET['time_constants']['E']
+                tau_sst = P8_PRESET['time_constants']['SST']
+                tau_pv = P8_PRESET['time_constants']['PV']
+                gain_e = P8_PRESET['gains']['E']
+                gain_sst = P8_PRESET['gains']['SST']
+                gain_pv = P8_PRESET['gains']['PV']
+                sigma_thal_e = P8_PRESET['thalamic_widths']['E']
+                sigma_thal_sst = P8_PRESET['thalamic_widths']['SST']
+                sigma_thal_pv = P8_PRESET['thalamic_widths']['PV']
+                sigma_e_out = P8_PRESET['outgoing_widths']['E']
+                sigma_sst_out = P8_PRESET['outgoing_widths']['SST']
+                sigma_pv_out = P8_PRESET['outgoing_widths']['PV']
+                strength_e = P8_PRESET['strength_scaling']['E']
+                strength_sst = P8_PRESET['strength_scaling']['SST']
+                strength_pv = P8_PRESET['strength_scaling']['PV']
+                strength_thal = P8_PRESET['strength_scaling']['thalamus']
+                sparsity_e = P8_PRESET['sparsity']['E']
+                sparsity_sst = P8_PRESET['sparsity']['SST']
+                sparsity_pv = P8_PRESET['sparsity']['PV']
+                sparsity_thal = P8_PRESET['sparsity']['thalamus']
+                alpha = P8_PRESET['thalamic_alpha']
+                
+            # Return all values, including our new scaling and sparsity factors
+            return (tau_e, tau_sst, tau_pv,
+                   gain_e, gain_sst, gain_pv,
+                   sigma_thal_e, sigma_thal_sst, sigma_thal_pv,
+                   sigma_e_out, sigma_sst_out, sigma_pv_out,
+                   strength_e, strength_sst, strength_pv, strength_thal,
+                   sparsity_e, sparsity_sst, sparsity_pv, sparsity_thal,
+                   alpha, self.create_connection_matrix())
         
         # Add callback for P12 preset button
         @self.app.callback(
@@ -810,6 +932,14 @@ class DashboardApp:
                 Output('outgoing-width-e-slider', 'value', allow_duplicate=True),
                 Output('outgoing-width-sst-slider', 'value', allow_duplicate=True),
                 Output('outgoing-width-pv-slider', 'value', allow_duplicate=True),
+                Output('strength-scaling-e-slider', 'value', allow_duplicate=True),
+                Output('strength-scaling-sst-slider', 'value', allow_duplicate=True),
+                Output('strength-scaling-pv-slider', 'value', allow_duplicate=True),
+                Output('strength-scaling-thalamus-slider', 'value', allow_duplicate=True),
+                Output('sparsity-e-slider', 'value', allow_duplicate=True),
+                Output('sparsity-sst-slider', 'value', allow_duplicate=True),
+                Output('sparsity-pv-slider', 'value', allow_duplicate=True),
+                Output('sparsity-thalamus-slider', 'value', allow_duplicate=True),
                 Output('alpha-slider', 'value', allow_duplicate=True),
                 Output('connection-matrix-container', 'children', allow_duplicate=True)
             ],
@@ -817,10 +947,65 @@ class DashboardApp:
             prevent_initial_call=True
         )
         def apply_p12_preset(n_clicks):
-            """Apply the P12 preset values to all parameters."""
-            if n_clicks is None:
-                raise dash.exceptions.PreventUpdate
-            return apply_preset(P12_PRESET)
+            """Apply the P12 preset configuration."""
+            # Apply the preset
+            apply_preset(P12_PRESET)
+            
+            # Get values from the preset object
+            try:
+                tau_e = P12_PRESET.get_tau('E')
+                tau_sst = P12_PRESET.get_tau('SST')
+                tau_pv = P12_PRESET.get_tau('PV')
+                gain_e = P12_PRESET.get_gain('E')
+                gain_sst = P12_PRESET.get_gain('SST')
+                gain_pv = P12_PRESET.get_gain('PV')
+                sigma_thal_e = P12_PRESET.get_sigma('thalamus', 'E')
+                sigma_thal_sst = P12_PRESET.get_sigma('thalamus', 'SST')
+                sigma_thal_pv = P12_PRESET.get_sigma('thalamus', 'PV')
+                sigma_e_out = P12_PRESET.get_outgoing_sigma('E')
+                sigma_sst_out = P12_PRESET.get_outgoing_sigma('SST')
+                sigma_pv_out = P12_PRESET.get_outgoing_sigma('PV')
+                strength_e = P12_PRESET.get('strength_scaling', {}).get('E', 1.0)
+                strength_sst = P12_PRESET.get('strength_scaling', {}).get('SST', 1.0)
+                strength_pv = P12_PRESET.get('strength_scaling', {}).get('PV', 1.0)
+                strength_thal = P12_PRESET.get('strength_scaling', {}).get('thalamus', 1.0)
+                sparsity_e = P12_PRESET.get('sparsity', {}).get('E', 1.0)
+                sparsity_sst = P12_PRESET.get('sparsity', {}).get('SST', 1.0)
+                sparsity_pv = P12_PRESET.get('sparsity', {}).get('PV', 1.0)
+                sparsity_thal = P12_PRESET.get('sparsity', {}).get('thalamus', 1.0)
+                alpha = P12_PRESET.get_thalamic_alpha()
+            except (AttributeError, TypeError):
+                # If the preset is a dictionary, access values directly
+                tau_e = P12_PRESET['time_constants']['E']
+                tau_sst = P12_PRESET['time_constants']['SST']
+                tau_pv = P12_PRESET['time_constants']['PV']
+                gain_e = P12_PRESET['gains']['E']
+                gain_sst = P12_PRESET['gains']['SST']
+                gain_pv = P12_PRESET['gains']['PV']
+                sigma_thal_e = P12_PRESET['thalamic_widths']['E']
+                sigma_thal_sst = P12_PRESET['thalamic_widths']['SST']
+                sigma_thal_pv = P12_PRESET['thalamic_widths']['PV']
+                sigma_e_out = P12_PRESET['outgoing_widths']['E']
+                sigma_sst_out = P12_PRESET['outgoing_widths']['SST']
+                sigma_pv_out = P12_PRESET['outgoing_widths']['PV']
+                strength_e = P12_PRESET['strength_scaling']['E']
+                strength_sst = P12_PRESET['strength_scaling']['SST']
+                strength_pv = P12_PRESET['strength_scaling']['PV']
+                strength_thal = P12_PRESET['strength_scaling']['thalamus']
+                sparsity_e = P12_PRESET['sparsity']['E']
+                sparsity_sst = P12_PRESET['sparsity']['SST']
+                sparsity_pv = P12_PRESET['sparsity']['PV']
+                sparsity_thal = P12_PRESET['sparsity']['thalamus']
+                alpha = P12_PRESET['thalamic_alpha']
+                
+            # Return all values, including our new scaling and sparsity factors
+            return (tau_e, tau_sst, tau_pv,
+                   gain_e, gain_sst, gain_pv,
+                   sigma_thal_e, sigma_thal_sst, sigma_thal_pv,
+                   sigma_e_out, sigma_sst_out, sigma_pv_out,
+                   strength_e, strength_sst, strength_pv, strength_thal,
+                   sparsity_e, sparsity_sst, sparsity_pv, sparsity_thal,
+                   alpha, self.create_connection_matrix())
         
         # Add callback for P16 preset button
         @self.app.callback(
@@ -837,6 +1022,14 @@ class DashboardApp:
                 Output('outgoing-width-e-slider', 'value', allow_duplicate=True),
                 Output('outgoing-width-sst-slider', 'value', allow_duplicate=True),
                 Output('outgoing-width-pv-slider', 'value', allow_duplicate=True),
+                Output('strength-scaling-e-slider', 'value', allow_duplicate=True),
+                Output('strength-scaling-sst-slider', 'value', allow_duplicate=True),
+                Output('strength-scaling-pv-slider', 'value', allow_duplicate=True),
+                Output('strength-scaling-thalamus-slider', 'value', allow_duplicate=True),
+                Output('sparsity-e-slider', 'value', allow_duplicate=True),
+                Output('sparsity-sst-slider', 'value', allow_duplicate=True),
+                Output('sparsity-pv-slider', 'value', allow_duplicate=True),
+                Output('sparsity-thalamus-slider', 'value', allow_duplicate=True),
                 Output('alpha-slider', 'value', allow_duplicate=True),
                 Output('connection-matrix-container', 'children', allow_duplicate=True)
             ],
@@ -844,11 +1037,66 @@ class DashboardApp:
             prevent_initial_call=True
         )
         def apply_p16_preset(n_clicks):
-            """Apply the P16 preset values to all parameters."""
-            if n_clicks is None:
-                raise dash.exceptions.PreventUpdate
-            return apply_preset(P16_PRESET)
-
+            """Apply the P16 preset configuration."""
+            # Apply the preset
+            apply_preset(P16_PRESET)
+            
+            # Get values from the preset object
+            try:
+                tau_e = P16_PRESET.get_tau('E')
+                tau_sst = P16_PRESET.get_tau('SST')
+                tau_pv = P16_PRESET.get_tau('PV')
+                gain_e = P16_PRESET.get_gain('E')
+                gain_sst = P16_PRESET.get_gain('SST')
+                gain_pv = P16_PRESET.get_gain('PV')
+                sigma_thal_e = P16_PRESET.get_sigma('thalamus', 'E')
+                sigma_thal_sst = P16_PRESET.get_sigma('thalamus', 'SST')
+                sigma_thal_pv = P16_PRESET.get_sigma('thalamus', 'PV')
+                sigma_e_out = P16_PRESET.get_outgoing_sigma('E')
+                sigma_sst_out = P16_PRESET.get_outgoing_sigma('SST')
+                sigma_pv_out = P16_PRESET.get_outgoing_sigma('PV')
+                strength_e = P16_PRESET.get('strength_scaling', {}).get('E', 1.0)
+                strength_sst = P16_PRESET.get('strength_scaling', {}).get('SST', 1.0)
+                strength_pv = P16_PRESET.get('strength_scaling', {}).get('PV', 1.0)
+                strength_thal = P16_PRESET.get('strength_scaling', {}).get('thalamus', 1.0)
+                sparsity_e = P16_PRESET.get('sparsity', {}).get('E', 1.0)
+                sparsity_sst = P16_PRESET.get('sparsity', {}).get('SST', 1.0)
+                sparsity_pv = P16_PRESET.get('sparsity', {}).get('PV', 1.0)
+                sparsity_thal = P16_PRESET.get('sparsity', {}).get('thalamus', 1.0)
+                alpha = P16_PRESET.get_thalamic_alpha()
+            except (AttributeError, TypeError):
+                # If the preset is a dictionary, access values directly
+                tau_e = P16_PRESET['time_constants']['E']
+                tau_sst = P16_PRESET['time_constants']['SST']
+                tau_pv = P16_PRESET['time_constants']['PV']
+                gain_e = P16_PRESET['gains']['E']
+                gain_sst = P16_PRESET['gains']['SST']
+                gain_pv = P16_PRESET['gains']['PV']
+                sigma_thal_e = P16_PRESET['thalamic_widths']['E']
+                sigma_thal_sst = P16_PRESET['thalamic_widths']['SST']
+                sigma_thal_pv = P16_PRESET['thalamic_widths']['PV']
+                sigma_e_out = P16_PRESET['outgoing_widths']['E']
+                sigma_sst_out = P16_PRESET['outgoing_widths']['SST']
+                sigma_pv_out = P16_PRESET['outgoing_widths']['PV']
+                strength_e = P16_PRESET['strength_scaling']['E']
+                strength_sst = P16_PRESET['strength_scaling']['SST']
+                strength_pv = P16_PRESET['strength_scaling']['PV']
+                strength_thal = P16_PRESET['strength_scaling']['thalamus']
+                sparsity_e = P16_PRESET['sparsity']['E']
+                sparsity_sst = P16_PRESET['sparsity']['SST']
+                sparsity_pv = P16_PRESET['sparsity']['PV']
+                sparsity_thal = P16_PRESET['sparsity']['thalamus']
+                alpha = P16_PRESET['thalamic_alpha']
+                
+            # Return all values, including our new scaling and sparsity factors
+            return (tau_e, tau_sst, tau_pv,
+                   gain_e, gain_sst, gain_pv,
+                   sigma_thal_e, sigma_thal_sst, sigma_thal_pv,
+                   sigma_e_out, sigma_sst_out, sigma_pv_out,
+                   strength_e, strength_sst, strength_pv, strength_thal,
+                   sparsity_e, sparsity_sst, sparsity_pv, sparsity_thal,
+                   alpha, self.create_connection_matrix())
+        
         # Initialize slider container (hidden)
         @self.app.callback(
             [Output('slider-container', 'style'),
@@ -1179,7 +1427,8 @@ class DashboardApp:
              for cell_type in CELL_TYPES] +
             [Output('graph-thalamus', 'figure')],
             
-            # Inputs: interval trigger, alpha slider, time constant sliders, gain sliders and connectivity width sliders
+            # Inputs: interval trigger, alpha slider, time constant sliders, gain sliders, connectivity width sliders
+            # Remove the strength scaling and sparsity sliders from the inputs
             [Input('interval-component', 'n_intervals'),
              Input('alpha-slider', 'value'),
              Input('tau-e-slider', 'value'),
@@ -1199,46 +1448,76 @@ class DashboardApp:
             [State('pause-button', 'n_clicks')]
         )
         def update_graphs(n_intervals, alpha, tau_e, tau_sst, tau_pv, gain_e, gain_sst, gain_pv, 
-                         sigma_thal_e, sigma_thal_sst, sigma_thal_pv, sigma_e_out, sigma_sst_out, sigma_pv_out, 
+                         sigma_thal_e, sigma_thal_sst, sigma_thal_pv, sigma_e_out, sigma_sst_out, sigma_pv_out,
                          pause_clicks):
-            """Update all neural activity visualizations."""
-            # Return current figures if simulation is paused
-            if pause_clicks is not None and pause_clicks % 2 == 1:
-                return list(self.figures.values())
+            """Update all graphs based on current slider values."""
+            # Check if simulation is paused
+            is_paused = pause_clicks is not None and pause_clicks % 2 == 1
+            if is_paused:
+                # Return current figures without updating if paused
+                return [self.figures[f'graph-{layer}-{cell_type}'] 
+                        for layer in LAYERS
+                        for cell_type in CELL_TYPES] + [self.figures['graph-thalamus']]
             
-            try:
-                # Update neural parameters
-                for cell_type, tau, gain in [
-                    ('E', tau_e, gain_e),
-                    ('SST', tau_sst, gain_sst),
-                    ('PV', tau_pv, gain_pv)
-                ]:
-                    self.simulation.set_time_constant(cell_type, tau)
-                    self.simulation.set_gain(cell_type, gain)
-                
-                # Update simulation state with new alpha value
-                activities = self.simulation.update(alpha=alpha)
-                
-                # Update all figures with current activity
-                updated_figures = []
-                
-                # Update neural population figures
-                for layer in LAYERS:
-                    for cell_type in CELL_TYPES:
-                        fig = self.figures[f'graph-{layer}-{cell_type}']
-                        fig.data[0].z = activities[layer][cell_type]
-                        updated_figures.append(fig)
-                
-                # Update thalamus figure
-                thalamus_fig = self.figures['graph-thalamus']
-                thalamus_fig.data[0].z = activities['thalamus']
-                updated_figures.append(thalamus_fig)
-                
-                return updated_figures
+            # Update neuron parameters
+            self.simulation.set_time_constant('E', tau_e)
+            self.simulation.set_time_constant('SST', tau_sst)
+            self.simulation.set_time_constant('PV', tau_pv)
+            self.simulation.set_gain('E', gain_e)
+            self.simulation.set_gain('SST', gain_sst)
+            self.simulation.set_gain('PV', gain_pv)
             
-            except Exception as e:
-                print(f"Error updating graphs: {e}")
-                return list(self.figures.values())
+            # Update all connectivity widths
+            for layer in LAYERS:
+                # Update thalamic inputs
+                self.simulation.set_connection_sigma('thalamus', None, layer, 'E', sigma_thal_e)
+                self.simulation.set_connection_sigma('thalamus', None, layer, 'SST', sigma_thal_sst)
+                self.simulation.set_connection_sigma('thalamus', None, layer, 'PV', sigma_thal_pv)
+                
+                # Update outgoing connections for each source layer
+                for source_layer in LAYERS:
+                    for source_cell, sigma in [('E', sigma_e_out), ('SST', sigma_sst_out), ('PV', sigma_pv_out)]:
+                        for target_cell in CELL_TYPES:
+                            if (source_cell, target_cell) in CONNECTIONS:
+                                self.simulation.set_connection_sigma(
+                                    source_layer, source_cell, layer, target_cell, sigma
+                                )
+            
+            # Update simulation state
+            activities = self.simulation.update(alpha=alpha)
+            
+            # Update all figures
+            updated_figures = []
+            
+            # Update each layer-cell type figure
+            for layer in LAYERS:
+                for cell_type in CELL_TYPES:
+                    fig_id = f'graph-{layer}-{cell_type}'
+                    fig = self.figures[fig_id]
+                    
+                    # Update the figure data
+                    with fig.batch_update():
+                        # Get the layer's activity for this cell type
+                        data = activities[layer][cell_type].reshape(self.simulation.grid_size, self.simulation.grid_size)
+                        fig.data[0]['z'] = data
+                        
+                        # Update colorscale max for better contrast
+                        max_val = max(data.max(), 0.5)
+                        fig.update_traces(zmax=max_val)
+                        
+                    updated_figures.append(fig)
+            
+            # Update thalamus figure
+            thal_fig = self.figures['graph-thalamus']
+            with thal_fig.batch_update():
+                thal_data = activities['thalamus']
+                thal_fig.data[0]['z'] = thal_data
+                max_val = max(thal_data.max(), 0.5)
+                thal_fig.update_traces(zmax=max_val)
+            
+            updated_figures.append(thal_fig)
+            
+            return updated_figures
         
         # Toggle simulation pause state
         @self.app.callback(
@@ -1247,6 +1526,48 @@ class DashboardApp:
         )
         def toggle_simulation(n_clicks):
             return n_clicks is not None and n_clicks % 2 == 1
+        
+        # Add callback for updating strength scaling factors
+        @self.app.callback(
+            [Output('interval-component', 'n_intervals', allow_duplicate=True)],
+            [Input('strength-scaling-e-slider', 'value'),
+             Input('strength-scaling-sst-slider', 'value'),
+             Input('strength-scaling-pv-slider', 'value'),
+             Input('strength-scaling-thalamus-slider', 'value')],
+            [State('interval-component', 'n_intervals')],
+            prevent_initial_call=True
+        )
+        def update_strength_scaling_parameters(e_scaling, sst_scaling, pv_scaling, thalamus_scaling, n_intervals):
+            """Update all strength scaling parameters in the simulation."""
+            # Update strength scaling parameters
+            self.simulation.set_strength_scaling('E', e_scaling)
+            self.simulation.set_strength_scaling('SST', sst_scaling)
+            self.simulation.set_strength_scaling('PV', pv_scaling)
+            self.simulation.set_strength_scaling('thalamus', thalamus_scaling)
+            
+            # Return unchanged intervals to not disrupt the update loop
+            return [n_intervals]
+        
+        # Add callback for updating sparsity factors
+        @self.app.callback(
+            [Output('interval-component', 'n_intervals', allow_duplicate=True)],
+            [Input('sparsity-e-slider', 'value'),
+             Input('sparsity-sst-slider', 'value'),
+             Input('sparsity-pv-slider', 'value'),
+             Input('sparsity-thalamus-slider', 'value')],
+            [State('interval-component', 'n_intervals')],
+            prevent_initial_call=True
+        )
+        def update_sparsity_parameters(e_sparsity, sst_sparsity, pv_sparsity, thalamus_sparsity, n_intervals):
+            """Update all sparsity parameters in the simulation."""
+            # Update sparsity parameters
+            self.simulation.set_sparsity('E', e_sparsity)
+            self.simulation.set_sparsity('SST', sst_sparsity)
+            self.simulation.set_sparsity('PV', pv_sparsity)
+            self.simulation.set_sparsity('thalamus', thalamus_sparsity)
+            
+            # Return unchanged intervals to not disrupt the update loop
+            return [n_intervals]
     
     def create_parameter_sliders(self):
         """Create the neural parameter sliders section."""
@@ -1329,6 +1650,74 @@ class DashboardApp:
                 marks={i: f"{i}" for i in range(0, 11, 2)}
             ), width=5)
         ], className="mb-1")
+        
+    def create_strength_scaling_sliders(self):
+        """Create the connection strength scaling sliders section."""
+        return html.Div([
+            # Headers row
+            dbc.Row([
+                dbc.Col("", width=1),
+                dbc.Col(html.Div("Strength Scaling", className="text-center"), width=11),
+            ], className="mb-1"),
+            
+            # Strength scaling rows
+            *[self._create_strength_scaling_row(cell_type) for cell_type in CELL_TYPES],
+            
+            # Add thalamus strength scaling slider
+            self._create_strength_scaling_row('thalamus')
+        ])
+
+    def _create_strength_scaling_row(self, cell_type):
+        """Create a row for a cell type's strength scaling parameter."""
+        return dbc.Row([
+            # Cell type label
+            dbc.Col(html.Strong(cell_type if cell_type != 'thalamus' else 'TC'), 
+                   width=1, className="d-flex align-items-center", style={"paddingRight": "5px"}),
+            # Strength scaling slider
+            dbc.Col(self._create_slider(
+                id_prefix='strength-scaling',
+                cell_type=cell_type.lower(),
+                min_val=0.0,
+                max_val=5.0,
+                step=0.1,
+                initial_value=INITIAL_STRENGTH_SCALING[cell_type],
+                marks={i: f"{i}" for i in range(0, 6)}
+            ), width=11)
+        ], className="mb-1")
+        
+    def create_sparsity_sliders(self):
+        """Create the connection sparsity sliders section."""
+        return html.Div([
+            # Headers row
+            dbc.Row([
+                dbc.Col("", width=1),
+                dbc.Col(html.Div("Sparsity", className="text-center"), width=11),
+            ], className="mb-1"),
+            
+            # Sparsity rows
+            *[self._create_sparsity_row(cell_type) for cell_type in CELL_TYPES],
+            
+            # Add thalamus sparsity slider
+            self._create_sparsity_row('thalamus')
+        ])
+
+    def _create_sparsity_row(self, cell_type):
+        """Create a row for a cell type's sparsity parameter."""
+        return dbc.Row([
+            # Cell type label
+            dbc.Col(html.Strong(cell_type if cell_type != 'thalamus' else 'TC'), 
+                   width=1, className="d-flex align-items-center", style={"paddingRight": "5px"}),
+            # Sparsity slider
+            dbc.Col(self._create_slider(
+                id_prefix='sparsity',
+                cell_type=cell_type.lower(),
+                min_val=0.0,
+                max_val=1.0,
+                step=0.05,
+                initial_value=INITIAL_SPARSITY[cell_type],
+                marks={i/10: f"{i/10:.1f}" for i in range(0, 11, 2)}
+            ), width=11)
+        ], className="mb-1")
 
     def _create_slider(self, id_prefix, cell_type, min_val, max_val, step, initial_value, marks):
         """Create a slider with consistent styling."""
@@ -1364,6 +1753,45 @@ class DashboardApp:
                     className="custom-slider"
                 )
             ])
+        ])
+    
+    def create_control_panel(self):
+        """Create the control panel with all sliders and controls."""
+        return html.Div([
+            # Section: Presynaptic parameters
+            html.Div([
+                html.H5("Presynaptic Parameters"),
+                self.create_parameter_sliders()
+            ], className="mb-3"),
+            
+            # Section: Connectivity parameters
+            html.Div([
+                html.H5("Connectivity Parameters"),
+                self.create_connectivity_sliders(),
+                
+                # New sections for strength scaling and sparsity
+                html.Div([html.Hr()], className="my-3"),
+                self.create_strength_scaling_sliders(),
+                
+                html.Div([html.Hr()], className="my-3"),
+                self.create_sparsity_sliders()
+            ], className="mb-3"),
+            
+            # Section: Input controls
+            html.Div([
+                html.H5("Thalamic Input Balance"),
+                self.create_input_controls()
+            ], className="mb-3"),
+            
+            # Pause/Play control
+            html.Div([
+                dbc.Button(
+                    "Pause", 
+                    id="pause-button", 
+                    color="secondary", 
+                    className="me-md-2"
+                )
+            ], className="mt-4")
         ])
     
     def run(self, debug: bool = True, port: int = 8050):

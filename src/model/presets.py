@@ -27,12 +27,30 @@ P4_PRESET = {
         'PV': 2.0
     },
 
-    # Outgoing widths: how far each cell type’s lateral connections spread.
+    # Outgoing widths: how far each cell type's lateral connections spread.
     # E and SST can be relatively broad. PV is minimal at P4.
     'outgoing_widths': {
         'E': 7.0,
         'SST': 4.0,
         'PV': 2.0
+    },
+    
+    # Strength scaling factors: overall scaling of connection strengths.
+    # At P4, connections are generally weaker and more variable.
+    'strength_scaling': {
+        'E': 0.7,      # E cells have weak but present connections
+        'SST': 0.6,    # SST cells have weaker connections
+        'PV': 0.4,     # PV cells have very weak connections 
+        'thalamus': 0.8  # Thalamic input is present but not fully developed
+    },
+    
+    # Sparsity factors: fraction of connections present (1 = all, 0 = none).
+    # At P4, connectivity is quite sparse.
+    'sparsity': {
+        'E': 0.6,      # E cells have moderately sparse connectivity
+        'SST': 0.5,    # SST cells have sparser connectivity
+        'PV': 0.3,     # PV cells have very sparse connectivity
+        'thalamus': 0.7  # Thalamic connectivity is more complete but still developing
     },
 
     # Thalamic alpha: ratio between sensory-driven vs. intrinsic input.
@@ -173,6 +191,24 @@ P8_PRESET = {
         'SST': 5.0,
         'PV': 3.0
     },
+    
+    # Strength scaling factors: connections becoming stronger.
+    # At P8, connections are strengthening.
+    'strength_scaling': {
+        'E': 0.8,      # E cells have stronger connections
+        'SST': 0.7,    # SST cells have stronger connections
+        'PV': 0.5,     # PV cells have developing connections
+        'thalamus': 0.9  # Thalamic input is stronger
+    },
+    
+    # Sparsity factors: connectivity increasing.
+    # At P8, connectivity is becoming less sparse.
+    'sparsity': {
+        'E': 0.7,      # E cells have less sparse connectivity
+        'SST': 0.6,    # SST cells have less sparse connectivity
+        'PV': 0.5,     # PV cells have developing connectivity
+        'thalamus': 0.8  # Thalamic connectivity is more complete
+    },
 
     # Thalamic alpha. Sensory-driven input is more important by P8, but intrinsic still present.
     'thalamic_alpha': 0.3,
@@ -307,6 +343,24 @@ P12_PRESET = {
         'E': 5.0,    # still moderate horizontal connectivity
         'SST': 6.0,
         'PV': 4.0
+    },
+    
+    # Strength scaling factors: connections now close to mature strength.
+    # At P12, connections are significantly strengthened.
+    'strength_scaling': {
+        'E': 0.9,      # E cells have almost mature strength
+        'SST': 0.8,    # SST cells have strong connections
+        'PV': 0.7,     # PV cells now with significant connectivity
+        'thalamus': 0.95  # Thalamic input close to mature levels
+    },
+    
+    # Sparsity factors: connectivity more complete.
+    # At P12, connectivity is more complete.
+    'sparsity': {
+        'E': 0.8,      # E cells have more complete connectivity
+        'SST': 0.7,    # SST cells have more complete connectivity
+        'PV': 0.6,     # PV cells have developing but substantial connectivity
+        'thalamus': 0.9  # Thalamic connectivity almost complete
     },
 
     'thalamic_alpha': 0.5,  # more weighting on sensory input
@@ -443,6 +497,24 @@ P16_PRESET = {
         'E': 4.0,
         'SST': 7.0,  # Martinotti can be broad
         'PV': 5.0
+    },
+    
+    # Strength scaling factors: mature connection strength.
+    # At P16, connections are at mature strength.
+    'strength_scaling': {
+        'E': 1.0,      # E cells have mature strength
+        'SST': 1.0,    # SST cells have mature strength
+        'PV': 1.0,     # PV cells have mature strength
+        'thalamus': 1.0  # Thalamic input at mature levels
+    },
+    
+    # Sparsity factors: mature connectivity pattern.
+    # At P16, connectivity is mature.
+    'sparsity': {
+        'E': 1.0,      # E cells have mature connectivity
+        'SST': 0.9,    # SST cells have nearly complete connectivity
+        'PV': 0.8,     # PV cells have mature connectivity pattern
+        'thalamus': 1.0  # Thalamic connectivity complete
     },
 
     'thalamic_alpha': 0.7,  # mostly sensory-driven at P16

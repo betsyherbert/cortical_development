@@ -184,6 +184,22 @@ INITIAL_OUTGOING_WIDTHS = {
     'PV': 4.0    # Initial outgoing width for PV cells
 }
 
+# Initial values for connection strength scaling factors
+INITIAL_STRENGTH_SCALING = {
+    'E': 1.0,     # Initial strength scaling for E cells outgoing connections
+    'SST': 1.0,   # Initial strength scaling for SST cells outgoing connections
+    'PV': 1.0,    # Initial strength scaling for PV cells outgoing connections
+    'thalamus': 1.0  # Initial strength scaling for thalamic connections
+}
+
+# Initial values for connection sparsity factors (1 = all connections, 0 = no connections)
+INITIAL_SPARSITY = {
+    'E': 1.0,     # Initial sparsity factor for E cells outgoing connections
+    'SST': 1.0,   # Initial sparsity factor for SST cells outgoing connections
+    'PV': 1.0,    # Initial sparsity factor for PV cells outgoing connections
+    'thalamus': 1.0  # Initial sparsity factor for thalamic connections
+}
+
 # Initial values for time constants (ms)
 INITIAL_TIME_CONSTANTS = {
     'E': 80.0,   # Initial time constant for E cells

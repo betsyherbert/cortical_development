@@ -5,7 +5,8 @@ import numpy as np
 
 from .config import (
     GRID_SIZE, CELL_TYPES, CONNECTIONS,
-    LAYER_CONNECTIVITY_PARAMS, LAYER_CONNECTIONS, LAYERS
+    LAYER_CONNECTIVITY_PARAMS, LAYER_CONNECTIONS, LAYERS,
+    INITIAL_STRENGTH_SCALING, INITIAL_SPARSITY
 )
 
 
@@ -172,8 +173,47 @@ class LayerConnectivity:
         # Format: (source_layer, source_cell, target_layer, target_cell)
         self.W = {}
         
+        # Initialize strength scaling factors and sparsity factors
+        self.strength_scaling = INITIAL_STRENGTH_SCALING.copy()
+        self.sparsity = INITIAL_SPARSITY.copy()
+        
+        # Cache for sparsity masks to avoid regenerating them every time
+        self._sparsity_masks = {}
+        
+        # Create a fixed random number generator for consistency
+        self.rng = np.random.default_rng(42)
+        
         # Initialize weight matrices
         self.update_weights()
+    
+    def _get_sparsity_mask(self, shape, cell_type_for_scaling):
+        """
+        Get a cached sparsity mask or generate a new one if needed.
+        
+        Args:
+            shape: Shape of the weight matrix
+            cell_type_for_scaling: Cell type for which to create the mask
+            
+        Returns:
+            Binary mask for applying sparsity
+        """
+        sparsity_level = self.sparsity[cell_type_for_scaling]
+        cache_key = (shape, cell_type_for_scaling, sparsity_level)
+        
+        # Return cached mask if available
+        if cache_key in self._sparsity_masks:
+            return self._sparsity_masks[cache_key]
+        
+        # Generate a new mask if sparsity is less than 1.0
+        if sparsity_level < 1.0:
+            mask = self.rng.random(shape) < sparsity_level
+        else:
+            # For full connectivity, use a mask of all ones (more efficient)
+            mask = np.ones(shape, dtype=bool)
+            
+        # Cache the mask
+        self._sparsity_masks[cache_key] = mask
+        return mask
     
     def update_weights(self, layer_params: Optional[Dict[str, Dict[str, float]]] = None) -> None:
         """
@@ -211,14 +251,26 @@ class LayerConnectivity:
             # Handle thalamic connections
             if source_layer == 'thalamus':
                 source_cell = None
+                cell_type_for_scaling = 'thalamus'
+            else:
+                cell_type_for_scaling = source_cell
+            
+            # Apply strength scaling factor
+            scaled_amplitude = params['amplitude'] * self.strength_scaling[cell_type_for_scaling]
             
             # Create weight matrix
             weight_matrix = self.profile.compute_weight_matrix(
-                params['amplitude'],
+                scaled_amplitude,
                 params['sigma'],
                 (self.grid_size, self.grid_size),
                 (self.grid_size, self.grid_size)
             )
+            
+            # Apply sparsity factor
+            if self.sparsity[cell_type_for_scaling] < 1.0:
+                # Get or create sparsity mask for this connection
+                sparsity_mask = self._get_sparsity_mask(weight_matrix.shape, cell_type_for_scaling)
+                weight_matrix = weight_matrix * sparsity_mask
             
             # Store weight matrix
             self.W[(source_layer, source_cell, target_layer, target_cell)] = weight_matrix
@@ -292,8 +344,10 @@ class LayerConnectivity:
         # Generate the connection key
         if source_layer == 'thalamus':
             conn_key = f'thalamus_to_{target_layer}_{target_cell}'
+            cell_type_for_scaling = 'thalamus'
         else:
             conn_key = f'{source_layer}_{source_cell}_to_{target_layer}_{target_cell}'
+            cell_type_for_scaling = source_cell
         
         # Create connection parameter entry if it doesn't exist
         if conn_key not in self.layer_params:
@@ -313,17 +367,28 @@ class LayerConnectivity:
         # Update the parameter
         self.layer_params[conn_key]['amplitude'] = amplitude
             
-        # Update the weight matrix
-        size = (self.grid_size, self.grid_size)
+        # Get the sigma value
         sigma = self.layer_params[conn_key]['sigma']
+        
+        # Apply strength scaling factor
+        scaled_amplitude = amplitude * self.strength_scaling[cell_type_for_scaling]
             
         # Create the connection tuple key
         tuple_key = (source_layer, source_cell, target_layer, target_cell)
-            
-        # Update the weight matrix
-        self.W[tuple_key] = self.profile.compute_weight_matrix(
-            amplitude, sigma, size, size
+        
+        # Create the weight matrix with scaled amplitude
+        weight_matrix = self.profile.compute_weight_matrix(
+            scaled_amplitude, sigma, (self.grid_size, self.grid_size), (self.grid_size, self.grid_size)
         )
+        
+        # Apply sparsity factor
+        if self.sparsity[cell_type_for_scaling] < 1.0:
+            # Get or create sparsity mask for this connection
+            sparsity_mask = self._get_sparsity_mask(weight_matrix.shape, cell_type_for_scaling)
+            weight_matrix = weight_matrix * sparsity_mask
+            
+        # Store weight matrix
+        self.W[tuple_key] = weight_matrix
 
     def get_connection_sigma(self, source_layer: str, source_cell: str, 
                            target_layer: str, target_cell: str) -> float:
@@ -375,8 +440,10 @@ class LayerConnectivity:
         # Generate the connection key
         if source_layer == 'thalamus':
             conn_key = f'thalamus_to_{target_layer}_{target_cell}'
+            cell_type_for_scaling = 'thalamus'
         else:
             conn_key = f'{source_layer}_{source_cell}_to_{target_layer}_{target_cell}'
+            cell_type_for_scaling = source_cell
         
         # Create connection parameter entry if it doesn't exist
         if conn_key not in self.layer_params:
@@ -394,16 +461,81 @@ class LayerConnectivity:
             # Update the parameter
             self.layer_params[conn_key]['sigma'] = sigma
             
-        # Get current amplitude
+        # Get current raw amplitude
         amplitude = self.layer_params[conn_key]['amplitude']
-            
-        # Update the weight matrix
-        size = (self.grid_size, self.grid_size)
+        
+        # Apply strength scaling factor
+        scaled_amplitude = amplitude * self.strength_scaling[cell_type_for_scaling]
             
         # Create the connection tuple key
         tuple_key = (source_layer, source_cell, target_layer, target_cell)
+        
+        # Create the weight matrix with scaled amplitude
+        weight_matrix = self.profile.compute_weight_matrix(
+            scaled_amplitude, sigma, (self.grid_size, self.grid_size), (self.grid_size, self.grid_size)
+        )
+        
+        # Apply sparsity factor
+        if self.sparsity[cell_type_for_scaling] < 1.0:
+            # Get or create sparsity mask for this connection
+            sparsity_mask = self._get_sparsity_mask(weight_matrix.shape, cell_type_for_scaling)
+            weight_matrix = weight_matrix * sparsity_mask
             
-        # Update the weight matrix
-        self.W[tuple_key] = self.profile.compute_weight_matrix(
-            amplitude, sigma, size, size
-        ) 
+        # Store weight matrix
+        self.W[tuple_key] = weight_matrix
+
+    def get_strength_scaling(self, cell_type: str) -> float:
+        """
+        Get the current strength scaling factor for a cell type.
+        
+        Args:
+            cell_type: Cell type ('E', 'SST', 'PV', or 'thalamus')
+            
+        Returns:
+            Current strength scaling factor
+        """
+        return self.strength_scaling.get(cell_type, 1.0)
+    
+    def set_strength_scaling(self, cell_type: str, scaling: float) -> None:
+        """
+        Set the strength scaling factor for a cell type and update weights.
+        
+        Args:
+            cell_type: Cell type ('E', 'SST', 'PV', or 'thalamus')
+            scaling: New strength scaling factor
+        """
+        # Only update if the value actually changed
+        if self.strength_scaling.get(cell_type, 1.0) != scaling:
+            self.strength_scaling[cell_type] = scaling
+            self.update_weights()
+    
+    def get_sparsity(self, cell_type: str) -> float:
+        """
+        Get the current sparsity factor for a cell type.
+        
+        Args:
+            cell_type: Cell type ('E', 'SST', 'PV', or 'thalamus')
+            
+        Returns:
+            Current sparsity factor (1 = all connections, 0 = no connections)
+        """
+        return self.sparsity.get(cell_type, 1.0)
+    
+    def set_sparsity(self, cell_type: str, sparsity: float) -> None:
+        """
+        Set the sparsity factor for a cell type and update weights.
+        
+        Args:
+            cell_type: Cell type ('E', 'SST', 'PV', or 'thalamus')
+            sparsity: New sparsity factor (1 = all connections, 0 = no connections)
+        """
+        # Only update if the value actually changed
+        if self.sparsity.get(cell_type, 1.0) != sparsity:
+            self.sparsity[cell_type] = sparsity
+            
+            # Clear cached masks for this cell type when sparsity changes
+            keys_to_remove = [k for k in self._sparsity_masks if k[1] == cell_type]
+            for key in keys_to_remove:
+                del self._sparsity_masks[key]
+                
+            self.update_weights() 
