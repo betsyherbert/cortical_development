@@ -83,25 +83,25 @@ class DashboardApp:
                         border-color: white !important;
                         background-color: white !important;
                     }
-                    /* Make the control panel take less width */
-                    .control-panel-column {
-                        padding-left: 1rem !important;
-                        padding-right: 1rem !important;
-                        margin-left: -2rem !important; 
-                        max-width: 600px !important;
-                    }
-                    /* Reduce left margin in left column labels */
-                    .cell-type-label {
-                        padding-right: 1rem !important;
-                    }
-                    /* Remove rightmost and bottommost borders */
-                    .connection-matrix tr:last-child td, 
-                    .connection-matrix tr:last-child th {
-                        border-bottom: none !important;
-                    }
-                    .connection-matrix tr td:last-child, 
-                    .connection-matrix tr th:last-child {
-                        border-right: none !important;
+                    # /* Make the control panel take less width */
+                    # .control-panel-column {
+                    #     padding-left: 1rem !important;
+                    #     padding-right: 1rem !important;
+                    #     margin-left: -2rem !important; 
+                    #     max-width: 600px !important;
+                    # }
+                    # /* Reduce left margin in left column labels */
+                    # .cell-type-label {
+                    #     padding-right: 1rem !important;
+                    # }
+                    # /* Remove rightmost and bottommost borders */
+                    # .connection-matrix tr:last-child td, 
+                    # .connection-matrix tr:last-child th {
+                    #     border-bottom: none !important;
+                    # }
+                    # .connection-matrix tr td:last-child, 
+                    # .connection-matrix tr th:last-child {
+                    #     border-right: none !important;
                     }
                 </style>
             </head>
@@ -148,72 +148,45 @@ class DashboardApp:
             disabled=False
         )
         
+        # Store component for currently selected cell
+        selected_cell = dcc.Store(id='selected-cell', data=None)
+        
+        # Hidden button for resetting slider state
+        reset_btn = html.Button(
+            id='reset-slider-state-btn',
+            style={'display': 'none'},
+            n_clicks=0
+        )
+        
+        # Define column widths for the three-column layout
+        LEFT_COL_WIDTH = 4  # Activity heatmaps
+        MIDDLE_COL_WIDTH = 4  # Connectivity matrix
+        RIGHT_COL_WIDTH = 4  # Control sliders
+        
         self.app.layout = dbc.Container([
             # Interval component for updates
             interval,
             
             # Store component for currently selected cell
-            dcc.Store(id='selected-cell', data=None),
+            selected_cell,
             
             # Hidden button for resetting slider state
-            html.Button(
-                id='reset-slider-state-btn',
-                style={'display': 'none'},
-                n_clicks=0
-            ),
+            reset_btn,
             
-            # Main content: visualization and controls
+            # Main content: three columns
             dbc.Row([
                 # Left column: activity visualization
                 dbc.Col([
                     # Add more top padding to shift visualization down
-                    html.Div(style={"height": "40px"}),
+                    html.Div(style={"height": "20px"}),
                     
-                    # One row per layer (L2/3, L4, L5)
-                    *[self.create_layer_row(layer) for layer in LAYERS],
-                    
-                    # Thalamus visualization
-                    html.Div(
-                        dbc.Row([
-                            # Thalamus label
-                            dbc.Col([
-                                html.H4("Thalamus", 
-                                       style={"position": "relative", "top": "50%", "transform": "translateY(-50%)", 
-                                             "textAlign": "right", "paddingRight": "20px", "margin": "0"})
-                            ], width=2),
-                            
-                            # Container for centered thalamus
-                            dbc.Col([
-                                html.Div([
-                                    # Empty space to match SST position
-                                    html.Div(style={"width": "180px", "display": "inline-block"}),
-                                    # Thalamus heatmap (aligned with E)
-                                    html.Div(
-                                        dcc.Graph(
-                                            id='graph-thalamus',
-                                            figure=self.figures['graph-thalamus'],
-                                            config={'displayModeBar': False}
-                                        ),
-                                        style={"display": "inline-block"}
-                                    ),
-                                    # Empty space to match PV position
-                                    html.Div(style={"width": "180px", "display": "inline-block"})
-                                ], style={
-                                    "display": "flex",
-                                    "justifyContent": "center",
-                                    "gap": "20px",  # Match the gap from layer rows
-                                    "width": "100%"
-                                })
-                            ], width=10)
-                        ], style={"height": "180px"}),
-                        className="mt-5"  # Match vertical spacing with other layers
-                    )
-                ], width=7, style={"paddingLeft": "0rem", "paddingRight": "1rem"}),  # Adjust left column width and padding
-                
-                # Right column: control panel
-                dbc.Col([
-                    # Preset Buttons (moved here)
+                    # Preset Buttons - centered container
                     html.Div([
+                        dbc.Row([
+                            # Empty column to match heatmap label width
+                            dbc.Col(width=2),
+                            # Buttons container
+                            dbc.Col([
                         html.Div([
                             dbc.Button("P4", id="p4-preset-button", color="dark", 
                                     className="mx-2 px-3", 
@@ -228,19 +201,72 @@ class DashboardApp:
                                      className="mx-2 px-3", 
                                      style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"})
                         ], style={"display": "flex", "justifyContent": "center"})
+                            ], width=10)
+                        ])
                     ], className="mb-4"),
                     
+                    # One row per layer (L2/3, L4, L5)
+                    *[self.create_layer_row(layer) for layer in LAYERS],
+                    
+                    # Thalamus visualization - centered container
+                    html.Div([
+                        dbc.Row([
+                            # Thalamus label
+                            dbc.Col([
+                                html.Div([
+                                    html.H6("TC",
+                                           style={
+                                               "margin": "0",
+                                               "whiteSpace": "nowrap"  # Prevent text wrapping
+                                           })
+                                ], style={
+                                    "display": "flex",
+                                    "justifyContent": "flex-end",  # Align to the right
+                                    "paddingRight": "60px",  # Match the spacing of other layer labels
+                                    "height": "100%",
+                                    "alignItems": "center"
+                                })
+                            ], width=2),
+                            
+                            # Thalamus heatmap
+                            dbc.Col([
+                                html.Div([
+                                    dcc.Graph(
+                                        id='graph-thalamus',
+                                        figure=self.figures['graph-thalamus'],
+                                        config={'displayModeBar': False}
+                                    )
+                                ], style={"display": "flex", "justifyContent": "center"})
+                            ], width=10)
+                        ], className="align-items-center")
+                    ], className="mt-2")
+                ], width=LEFT_COL_WIDTH, className="px-4"),  # Increased padding
+                
+                # Middle column: connectivity matrix
+                dbc.Col([
                     # Connection Strength Matrix
                     html.Div([
                         html.H5("Connection Strengths", 
-                              className="mb-4 text-center",
-                              style={"textAlign": "center", "width": "100%"}),
+                              className="mb-3 text-center",  # Reduced from mb-4 to mb-3
+                              style={
+                                  "textAlign": "center",
+                                  "width": "85%",  # Match matrix container width
+                                  "margin": "0 auto",  # Center the title
+                                  "paddingLeft": "50px"  # Match matrix container padding
+                              }),
                         
-                        # Connection Matrix Container
+                        # Connection Matrix Container with reduced width
                         html.Div(
                             self.create_connection_matrix(),
                             id="connection-matrix-container",
-                            style={"position": "relative", "display": "flex", "justifyContent": "center"}
+                            style={
+                                "position": "relative", 
+                                "display": "flex", 
+                                "justifyContent": "center",
+                                "width": "85%",  # Further reduce width to prevent overlap
+                                "margin": "0 auto",  # Center the container
+                                "paddingLeft": "50px"  # Add left padding to shift matrix right
+                            }
                         ),
                         
                         # Hover Activated Slider Container (initially hidden)
@@ -258,312 +284,63 @@ class DashboardApp:
                             }
                         )
                     ], className="mb-3"),
+                ], width=MIDDLE_COL_WIDTH, className="px-5"),  # Increased padding further
                     
+                # Right column: control sliders
+                dbc.Col([
                     # Time constants and gains section
                     html.Div([
-                        html.Div([
-                            dbc.Row([
-                                # Empty header for label column
-                                dbc.Col("", width=2),
-                                # Header for time constants column
-                                dbc.Col("Time Constant (ms)", className="text-center", width=5),
-                                # Header for gains column
-                                dbc.Col("Gain", className="text-center", width=5),
-                            ], className="mb-2", style={"marginLeft": "0", "marginRight": "0"}),
-                            
-                            # E cells row
-                            dbc.Row([
-                                # Cell type label
-                                dbc.Col(html.Strong("E"), width=2, className="d-flex align-items-center justify-content-end"),
-                                # Time constant slider
-                                dbc.Col(
-                                    dcc.Slider(
-                                        id='tau-e-slider',
-                                        min=1.0,
-                                        max=100.0,
-                                        step=1.0,
-                                        value=INITIAL_TIME_CONSTANTS['E'],
-                                        marks={i: f"{i}" for i in range(20, 101, 20)},
-                                        tooltip={"placement": "bottom", "always_visible": False},
-                                        className="custom-slider"
-                                    ),
-                                    width=5,
-                                    style={"paddingRight": "15px"}
-                                ),
-                                # Gain slider
-                                dbc.Col(
-                                    dcc.Slider(
-                                        id='gain-e-slider',
-                                        min=0,
-                                        max=1.0,
-                                        step=0.1,
-                                        value=INITIAL_GAINS['E'],
-                                        marks={0: '0.0', 0.2: '0.2', 0.4: '0.4', 0.6: '0.6', 0.8: '0.8', 1.0: '1.0'},
-                                        tooltip={"placement": "bottom", "always_visible": False},
-                                        className="custom-slider"
-                                    ),
-                                    width=5,
-                                    style={"paddingLeft": "15px"}
-                                ),
-                            ], className="mb-3", style={"marginLeft": "0", "marginRight": "0"}),
-                            
-                            # SST cells row
-                            dbc.Row([
-                                # Cell type label
-                                dbc.Col(html.Strong("SST"), width=2, className="d-flex align-items-center justify-content-end"),
-                                # Time constant slider
-                                dbc.Col(
-                                    dcc.Slider(
-                                        id='tau-sst-slider',
-                                        min=1.0,
-                                        max=100.0,
-                                        step=1.0,
-                                        value=INITIAL_TIME_CONSTANTS['SST'],
-                                        marks={i: f"{i}" for i in range(20, 101, 20)},
-                                        tooltip={"placement": "bottom", "always_visible": False},
-                                        className="custom-slider"
-                                    ),
-                                    width=5,
-                                    style={"paddingRight": "15px"}
-                                ),
-                                # Gain slider
-                                dbc.Col(
-                                    dcc.Slider(
-                                        id='gain-sst-slider',
-                                        min=0,
-                                        max=1.0,
-                                        step=0.1,
-                                        value=INITIAL_GAINS['SST'],
-                                        marks={0: '0.0', 0.2: '0.2', 0.4: '0.4', 0.6: '0.6', 0.8: '0.8', 1.0: '1.0'},
-                                        tooltip={"placement": "bottom", "always_visible": False},
-                                        className="custom-slider"
-                                    ),
-                                    width=5,
-                                    style={"paddingLeft": "15px"}
-                                ),
-                            ], className="mb-3", style={"marginLeft": "0", "marginRight": "0"}),
-                            
-                            # PV cells row
-                            dbc.Row([
-                                # Cell type label
-                                dbc.Col(html.Strong("PV"), width=2, className="d-flex align-items-center justify-content-end"),
-                                # Time constant slider
-                                dbc.Col(
-                                    dcc.Slider(
-                                        id='tau-pv-slider',
-                                        min=1.0,
-                                        max=100.0,
-                                        step=1.0,
-                                        value=INITIAL_TIME_CONSTANTS['PV'],
-                                        marks={i: f"{i}" for i in range(20, 101, 20)},
-                                        tooltip={"placement": "bottom", "always_visible": False},
-                                        className="custom-slider"
-                                    ),
-                                    width=5,
-                                    style={"paddingRight": "15px"}
-                                ),
-                                # Gain slider
-                                dbc.Col(
-                                    dcc.Slider(
-                                        id='gain-pv-slider',
-                                        min=0,
-                                        max=1.0,
-                                        step=0.1,
-                                        value=INITIAL_GAINS['PV'],
-                                        marks={0: '0.0', 0.2: '0.2', 0.4: '0.4', 0.6: '0.6', 0.8: '0.8', 1.0: '1.0'},
-                                        tooltip={"placement": "bottom", "always_visible": False},
-                                        className="custom-slider"
-                                    ),
-                                    width=5, 
-                                    style={"paddingLeft": "15px"}
-                                ),
-                            ], style={"marginLeft": "0", "marginRight": "0"}),
-                        ]),
+                        html.H5("Neural Parameters", className="mb-2 text-center"),  # Reduced from mb-4 to mb-2
+                        self.create_parameter_sliders()
                     ], className="mb-4"),
                     
                     # Connectivity width section
                     html.Div([
-                        html.Div([
-                            dbc.Row([
-                                # Empty header for label column
-                                dbc.Col("", width=2),
-                                # Header for thalamic connections column
-                                dbc.Col("Thalamic Input Width", className="text-center", width=5),
-                                # Header for outgoing connections column
-                                dbc.Col("Outgoing Width", className="text-center", width=5),
-                            ], className="mb-2", style={"marginLeft": "0", "marginRight": "0"}),
-                            
-                            # E row
-                            dbc.Row([
-                                # Cell type label
-                                dbc.Col(html.Strong("E"), width=2, className="d-flex align-items-center justify-content-end"),
-                                # Thalamic input width slider
-                                dbc.Col(
-                                    dcc.Slider(
-                                        id='thalamic-width-e-slider',
-                                        min=0.1,
-                                        max=10.0,
-                                        step=0.1,
-                                        value=INITIAL_THALAMIC_WIDTHS['E'],
-                                        marks={i: f"{i}" for i in range(0, 11, 2)},
-                                        tooltip={"placement": "bottom", "always_visible": False},
-                                        className="custom-slider"
-                                    ),
-                                    width=5,
-                                    style={"paddingRight": "15px"}
-                                ),
-                                # Outgoing width slider
-                                dbc.Col(
-                                    dcc.Slider(
-                                        id='outgoing-width-e-slider',
-                                        min=0.1,
-                                        max=10.0,
-                                        step=0.1,
-                                        value=INITIAL_OUTGOING_WIDTHS['E'],
-                                        marks={i: f"{i}" for i in range(0, 11, 2)},
-                                        tooltip={"placement": "bottom", "always_visible": False},
-                                        className="custom-slider"
-                                    ),
-                                    width=5,
-                                    style={"paddingLeft": "15px"}
-                                ),
-                            ], className="mb-3", style={"marginLeft": "0", "marginRight": "0"}),
-                            
-                            # SST row
-                            dbc.Row([
-                                # Cell type label
-                                dbc.Col(html.Strong("SST"), width=2, className="d-flex align-items-center justify-content-end"),
-                                # Thalamic input width slider
-                                dbc.Col(
-                                    dcc.Slider(
-                                        id='thalamic-width-sst-slider',
-                                        min=0.1,
-                                        max=10.0,
-                                        step=0.1,
-                                        value=INITIAL_THALAMIC_WIDTHS['SST'],
-                                        marks={i: f"{i}" for i in range(0, 11, 2)},
-                                        tooltip={"placement": "bottom", "always_visible": False},
-                                        className="custom-slider"
-                                    ),
-                                    width=5,
-                                    style={"paddingRight": "15px"}
-                                ),
-                                # Outgoing width slider
-                                dbc.Col(
-                                    dcc.Slider(
-                                        id='outgoing-width-sst-slider',
-                                        min=0.1,
-                                        max=10.0,
-                                        step=0.1,
-                                        value=INITIAL_OUTGOING_WIDTHS['SST'],
-                                        marks={i: f"{i}" for i in range(0, 11, 2)},
-                                        tooltip={"placement": "bottom", "always_visible": False},
-                                        className="custom-slider"
-                                    ),
-                                    width=5,
-                                    style={"paddingLeft": "15px"}
-                                ),
-                            ], className="mb-3", style={"marginLeft": "0", "marginRight": "0"}),
-                            
-                            # PV row
-                            dbc.Row([
-                                # Cell type label
-                                dbc.Col(html.Strong("PV"), width=2, className="d-flex align-items-center justify-content-end"),
-                                # Thalamic input width slider
-                                dbc.Col(
-                                    dcc.Slider(
-                                        id='thalamic-width-pv-slider',
-                                        min=0.1,
-                                        max=10.0,
-                                        step=0.1,
-                                        value=INITIAL_THALAMIC_WIDTHS['PV'],
-                                        marks={i: f"{i}" for i in range(0, 11, 2)},
-                                        tooltip={"placement": "bottom", "always_visible": False},
-                                        className="custom-slider"
-                                    ),
-                                    width=5,
-                                    style={"paddingRight": "15px"}
-                                ),
-                                # Outgoing width slider
-                                dbc.Col(
-                                    dcc.Slider(
-                                        id='outgoing-width-pv-slider',
-                                        min=0.1,
-                                        max=10.0,
-                                        step=0.1,
-                                        value=INITIAL_OUTGOING_WIDTHS['PV'],
-                                        marks={i: f"{i}" for i in range(0, 11, 2)},
-                                        tooltip={"placement": "bottom", "always_visible": False},
-                                        className="custom-slider"
-                                    ),
-                                    width=5,
-                                    style={"paddingLeft": "15px"}
-                                ),
-                            ], style={"marginLeft": "0", "marginRight": "0"}),
-                        ]),
+                        html.H5("Connectivity Parameters", className="mb-2 text-center"),  # Reduced from mb-4 to mb-2
+                        self.create_connectivity_sliders()
                     ], className="mb-4"),
                     
                     # Thalamic input controls
                     html.Div([
-                        dbc.Row([
-                            # Empty header for label column
-                            dbc.Col("", width=2),
-                            # Header for thalamic input slider
-                            dbc.Col([
-                                dbc.Row([
-                                    dbc.Col("Intrinsic", className="text-start", width=6),
-                                    dbc.Col("Sensory", className="text-end", width=6),
-                                ], className="mb-1")
-                            ], width=10),
-                        ], className="mb-2", style={"marginLeft": "0", "marginRight": "0"}),
-                        
-                        dbc.Row([
-                            # Label
-                            dbc.Col(html.Strong("Input"), width=2, className="d-flex align-items-center justify-content-end"),
-                            # Alpha slider
-                            dbc.Col(
-                                dcc.Slider(
-                                    id='alpha-slider',
-                                    min=0, max=1, step=0.1, value=THALAMIC_ALPHA,
-                                    marks={i/10: f"{i/10:.1f}" for i in range(11)},
-                                    tooltip={"placement": "bottom", "always_visible": False},
-                                    className="custom-slider"
-                                ),
-                                width=10,
-                                style={"paddingLeft": "15px", "paddingRight": "15px"}
-                            )
-                        ], style={"marginLeft": "0", "marginRight": "0"}),
+                        html.H5("Input Control", className="mb-2 text-center"),  # Reduced from mb-4 to mb-2
+                        self.create_input_controls()
                     ], className="mb-4"),
                     
                     # Simulation controls
-                    html.Div([
-                        # Center the pause/resume button
                         html.Div([
                             dbc.Button(
                                 "Pause/Resume", id="pause-button",
-                                color="primary"
-                            )
-                        ], style={"display": "flex", "justifyContent": "center"})
+                            color="primary", className="w-100"
+                        )
                     ])
-                ], width=5, className="ps-4 control-panel-column")  # Adjust control panel column width
-            ], className="g-4 px-4"),  # Add horizontal padding to row
-        ], fluid=True, className="py-3 px-0")  # Added more padding to container
+                ], width=RIGHT_COL_WIDTH, className="px-3")
+            ], className="g-0"),  # Remove gutters from main row
+        ], fluid=True, className="py-3")
     
     def create_layer_row(self, layer: str) -> dbc.Row:
         """Create a row for a single cortical layer with cell types as columns."""
-        # Define the cell type order (SST, E, PV)
         ordered_cell_types = ['SST', 'E', 'PV']
         
         return html.Div(
             dbc.Row([
-                # Layer label
+                # Layer label - ensure it's properly positioned to the right
                 dbc.Col([
-                    html.H4(LAYER_NAMES[layer], 
-                           style={"position": "relative", "top": "50%", "transform": "translateY(-50%)", 
-                                 "textAlign": "right", "paddingRight": "20px", "margin": "0"})
+                    html.Div([
+                        html.H6(LAYER_NAMES[layer],
+                               style={
+                                   "margin": "0",
+                                   "whiteSpace": "nowrap"  # Prevent text wrapping
+                               })
+                    ], style={
+                        "display": "flex",
+                        "justifyContent": "flex-end",  # Align to the right
+                        "paddingRight": "60px",  # Large spacing from heatmaps
+                        "height": "100%",
+                        "alignItems": "center"
+                    })
                 ], width=2),
                 
-                # Cell type columns (SST, E, PV from left to right)
+                # Cell type columns
                 dbc.Col([
                     html.Div([
                         html.Div(
@@ -577,12 +354,12 @@ class DashboardApp:
                     ], style={
                         "display": "flex",
                         "justifyContent": "center",
-                        "gap": "20px",  # Small horizontal gap
+                        "gap": "15px",
                         "width": "100%"
                     })
                 ], width=10)
-            ], style={"height": "180px"}),
-            className="mb-5"  # Large vertical gap between layers
+            ], className="align-items-center", style={"height": "118px"}),
+            className="mb-5"
         )
 
     def create_heatmap(self, data: np.ndarray, cell_type: str) -> go.Figure:
@@ -608,8 +385,8 @@ class DashboardApp:
             )],
             layout=go.Layout(
                 margin=dict(l=0, r=0, t=0, b=0),
-                height=180,  # Reduced height
-                width=180,  # Reduced width
+                height=150,  # Reduced height
+                width=150,  # Reduced width
                 dragmode=False,
                 xaxis=dict(
                     showgrid=False,
@@ -658,7 +435,7 @@ class DashboardApp:
     def create_connection_matrix(self) -> html.Div:
         """Create a matrix visualization of all layer and cell type connections."""
         # Define consistent cell dimensions
-        CELL_SIZE = 50  # Size for data cells in pixels
+        CELL_SIZE = 40  # Size for data cells in pixels
         HEADER_HEIGHT = 40  # Height for headers in pixels
         HEADER_WIDTH = 40  # Width for all header columns
         
@@ -1494,6 +1271,121 @@ class DashboardApp:
         )
         def toggle_simulation(n_clicks):
             return n_clicks is not None and n_clicks % 2 == 1
+    
+    def create_parameter_sliders(self):
+        """Create the neural parameter sliders section."""
+        return html.Div([
+            dbc.Row([
+                # Empty header for label column
+                dbc.Col("", width=1),
+                # Header for time constants column
+                dbc.Col(html.Div("Time Constant", className="text-center"), width=5),
+                # Header for gains column
+                dbc.Col(html.Div("Gain", className="text-center"), width=5),
+            ], className="mb-1"),
+            
+            # Create sliders for each cell type
+            *[self.create_parameter_row(cell_type) for cell_type in CELL_TYPES]
+        ])
+
+    def create_parameter_row(self, cell_type):
+        """Create a row of sliders for a cell type."""
+        return dbc.Row([
+            # Cell type label
+            dbc.Col(html.Strong(cell_type), width=1, className="d-flex align-items-center", style={"paddingRight": "5px"}),
+            # Time constant slider
+            dbc.Col(
+                dcc.Slider(
+                    id=f'tau-{cell_type.lower()}-slider',
+                    min=1.0, max=100.0, step=1.0,
+                    value=INITIAL_TIME_CONSTANTS[cell_type],
+                    marks={i: f"{i}" for i in range(20, 101, 20)},
+                    tooltip={"placement": "bottom", "always_visible": False},
+                    className="custom-slider"
+                ),
+                width=5,
+                style={"paddingRight": "5px"}
+            ),
+            # Gain slider
+            dbc.Col(
+                dcc.Slider(
+                    id=f'gain-{cell_type.lower()}-slider',
+                    min=0, max=1.0, step=0.1,
+                    value=INITIAL_GAINS[cell_type],
+                    marks={i/10: f"{i/10:.1f}" for i in range(2, 11, 2)},  # Reduced number of marks
+                    tooltip={"placement": "bottom", "always_visible": False},
+                    className="custom-slider"
+                ),
+                width=5
+            ),
+        ], className="mb-1")
+
+    def create_connectivity_sliders(self):
+        """Create the connectivity width sliders section."""
+        return html.Div([
+            dbc.Row([
+                # Empty header for label column
+                dbc.Col("", width=1),
+                # Header for thalamic input width
+                dbc.Col(html.Div("Thalamic", className="text-center"), width=5),
+                # Header for outgoing width
+                dbc.Col(html.Div("Outgoing", className="text-center"), width=5),
+            ], className="mb-1"),
+            
+            # Create sliders for each cell type
+            *[self.create_connectivity_row(cell_type) for cell_type in CELL_TYPES]
+        ])
+
+    def create_connectivity_row(self, cell_type):
+        """Create a row of connectivity sliders for a cell type."""
+        return dbc.Row([
+            # Cell type label
+            dbc.Col(html.Strong(cell_type), width=1, className="d-flex align-items-center", style={"paddingRight": "5px"}),
+            # Thalamic width slider
+            dbc.Col(
+                dcc.Slider(
+                    id=f'thalamic-width-{cell_type.lower()}-slider',
+                    min=0.1, max=10.0, step=0.1,
+                    value=INITIAL_THALAMIC_WIDTHS[cell_type],
+                    marks={i: f"{i}" for i in range(0, 11, 2)},
+                    tooltip={"placement": "bottom", "always_visible": False},
+                    className="custom-slider"
+                ),
+                width=5,
+                style={"paddingRight": "5px"}
+            ),
+            # Outgoing width slider
+            dbc.Col(
+                dcc.Slider(
+                    id=f'outgoing-width-{cell_type.lower()}-slider',
+                    min=0.1, max=10.0, step=0.1,
+                    value=INITIAL_OUTGOING_WIDTHS[cell_type],
+                    marks={i: f"{i}" for i in range(0, 11, 2)},
+                    tooltip={"placement": "bottom", "always_visible": False},
+                    className="custom-slider"
+                ),
+                width=5
+            ),
+        ], className="mb-1")
+
+    def create_input_controls(self):
+        """Create the input control sliders section."""
+        return dbc.Row([
+            dbc.Col([
+                dbc.Row([
+                    dbc.Col("Intrinsic", className="text-start", width=6),
+                    dbc.Col("Sensory", className="text-end", width=6),
+                ], className="mb-2"),
+                dcc.Slider(
+                    id='alpha-slider',
+                    min=0, max=1, step=0.1,
+                    value=THALAMIC_ALPHA,
+                    marks={i/10: f"{i/10:.1f}" for i in range(11)},
+                    tooltip={"placement": "bottom", "always_visible": False},
+                    className="custom-slider"
+                )
+            ])
+        ])
     
     def run(self, debug: bool = True, port: int = 8050):
         """Run the dashboard application."""
