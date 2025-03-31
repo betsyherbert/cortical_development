@@ -19,6 +19,56 @@ from model.config import (
 from model.neurons import GAIN
 from model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
 
+# Constants for styling
+CELL_SIZE = 40  # Size for data cells in pixels
+HEADER_HEIGHT = 40  # Height for headers in pixels
+HEADER_WIDTH = 40  # Width for all header columns
+
+# Common styles
+HEADER_STYLE = {
+    "border": "none",
+    "width": f"{HEADER_WIDTH}px",
+    "height": f"{HEADER_HEIGHT}px",
+    "minWidth": f"{HEADER_WIDTH}px",
+    "maxWidth": f"{HEADER_WIDTH}px"
+}
+
+CELL_STYLE = {
+    "width": f"{CELL_SIZE}px",
+    "height": f"{CELL_SIZE}px",
+    "minWidth": f"{CELL_SIZE}px",
+    "maxWidth": f"{CELL_SIZE}px",
+    "minHeight": f"{CELL_SIZE}px",
+    "maxHeight": f"{CELL_SIZE}px"
+}
+
+# Colors
+LAYER_COLORS = {
+    "L4": "rgba(180, 180, 180, 0.3)",
+    "default": "rgba(180, 180, 180, 0.15)",
+    "transparent": "transparent"
+}
+
+CELL_TYPE_COLORS = {
+    "E": "#103a5b",
+    "SST": "#752f00",
+    "PV": "#661111"
+}
+
+CELL_ACTIVITY_COLORS = {
+    "excitatory": {
+        "bg": lambda i: f"rgba(0, 120, 215, {i})",
+        "hover": lambda i: f"rgba(0, 150, 255, {i + 0.2})"
+    },
+    "inhibitory": {
+        "bg": lambda i: f"rgba(215, 0, 0, {i})",
+        "hover": lambda i: f"rgba(255, 0, 0, {i + 0.2})"
+    },
+    "inactive": {
+        "bg": "rgba(80, 80, 80, 0.1)",
+        "hover": "rgba(100, 100, 100, 0.3)"
+    }
+}
 
 class DashboardApp:
     """
@@ -434,103 +484,50 @@ class DashboardApp:
 
     def create_connection_matrix(self) -> html.Div:
         """Create a matrix visualization of all layer and cell type connections."""
-        # Define consistent cell dimensions
-        CELL_SIZE = 40  # Size for data cells in pixels
-        HEADER_HEIGHT = 40  # Height for headers in pixels
-        HEADER_WIDTH = 40  # Width for all header columns
-        
         # Define the labels/indices for the matrix
         all_populations = [(layer, cell_type) for layer in LAYERS for cell_type in CELL_TYPES]
         all_populations.append(('Th', None))  # Add thalamus
         
-        # Create the main header row with layer spans (removed "To" text)
-        main_header_cells = [
-            # Empty cell for top-left corner (matches header width)
-            html.Th("", colSpan=2, style={
-                "border": "none", 
-                "width": f"{HEADER_WIDTH}px", 
-                "height": f"{HEADER_HEIGHT}px",
-                "minWidth": f"{HEADER_WIDTH}px",
-                "maxWidth": f"{HEADER_WIDTH}px"
-            })
-        ]
+        # Create the main header row with layer spans
+        main_header_cells = [html.Th("", colSpan=2, style=HEADER_STYLE)]
         
         # Add layer headers that span 3 columns each (for E, SST, PV)
         for layer in LAYERS:
-            # Different background colors based on layer
-            bg_color = "rgba(180, 180, 180, 0.3)" if layer == "L4" else "rgba(180, 180, 180, 0.15)"
-            
             main_header_cells.append(
                 html.Th(
                     LAYER_NAMES[layer], 
                     className="text-center fw-bold",
                     colSpan=3,  # Span all cell types
                     style={
-                        "backgroundColor": bg_color, 
-                        "color": "white",  # White text for layer headers
+                        **HEADER_STYLE,
+                        "backgroundColor": LAYER_COLORS["L4"] if layer == "L4" else LAYER_COLORS["default"],
+                        "color": "white",
                         "padding": "10px 5px",
-                        "fontSize": "0.9rem",  # Consistent font size
-                        "height": f"{HEADER_HEIGHT}px",  # Consistent height
-                        "minHeight": f"{HEADER_HEIGHT}px",
-                        "maxHeight": f"{HEADER_HEIGHT}px"
+                        "fontSize": "0.9rem"
                     }
                 )
             )
         
-        main_header_row = html.Tr(main_header_cells)
-        
-        # Create the cell type sub-header row
-        sub_header_cells = [
-            # Empty cell to align with the layer column (matches header width)
-            html.Th("", style={
-                "border": "none", 
-                "width": f"{HEADER_WIDTH}px", 
-                "height": f"{HEADER_HEIGHT}px",
-                "minWidth": f"{HEADER_WIDTH}px",
-                "maxWidth": f"{HEADER_WIDTH}px"
-            }),
-            # Empty cell to align with the cell type column (matches cell type header width)
-            html.Th("", style={
-                "border": "none", 
-                "width": f"{HEADER_WIDTH}px", 
-                "height": f"{HEADER_HEIGHT}px",
-                "minWidth": f"{HEADER_WIDTH}px",
-                "maxWidth": f"{HEADER_WIDTH}px"
-            })
-        ]
+        # Create sub-header row for cell types
+        sub_header_cells = [html.Th("", style=HEADER_STYLE) for _ in range(2)]
         
         # Add all cell types under their respective layers
         for layer in LAYERS:
             for cell_type in CELL_TYPES:
-                # Set background colors based on cell type (darker colors)
-                bg_color = "#103a5b" if cell_type == "E" else \
-                          "#752f00" if cell_type == "SST" else \
-                          "#661111"  # PV
-                
-                # Add right border to last cell in each layer
-                right_border = "1px solid #555" if cell_type == "PV" else "none"
-                
                 sub_header_cells.append(
                     html.Th(
                         cell_type,
                         className="text-center",
                         style={
-                            "backgroundColor": bg_color, 
+                            **HEADER_STYLE,
+                            "backgroundColor": CELL_TYPE_COLORS[cell_type],
                             "color": "white",
                             "padding": "8px 5px",
-                            "width": f"{HEADER_WIDTH}px",
-                            "height": f"{HEADER_HEIGHT}px",  # Consistent height
-                            "minWidth": f"{HEADER_WIDTH}px",
-                            "maxWidth": f"{HEADER_WIDTH}px",
-                            "minHeight": f"{HEADER_HEIGHT}px",
-                            "maxHeight": f"{HEADER_HEIGHT}px",
-                            "fontSize": "0.9rem",  # Consistent font size
-                            "borderRight": right_border
+                            "fontSize": "0.9rem",
+                            "borderRight": "1px solid #555" if cell_type == "PV" else "none"
                         }
                     )
                 )
-        
-        sub_header_row = html.Tr(sub_header_cells)
         
         # Generate matrix rows
         rows = []
@@ -548,52 +545,38 @@ class DashboardApp:
                 layer_name = "Thalamus" if source_layer == 'Th' else LAYER_NAMES[source_layer]
                 layer_cells_count = 1 if source_layer == 'Th' else len(CELL_TYPES)
                 
-                # Different background colors based on layer
-                bg_color = "rgba(180, 180, 180, 0.3)" if source_layer == "L4" else \
-                          "rgba(180, 180, 180, 0.15)" if source_layer != "Th" else \
-                          "transparent"  # Transparent for Thalamus
+                bg_color = (LAYER_COLORS["L4"] if source_layer == "L4" else 
+                           LAYER_COLORS["transparent"] if source_layer == "Th" else 
+                           LAYER_COLORS["default"])
                 
                 row_header = html.Th(
                     layer_name,
                     className="fw-bold",
                     rowSpan=layer_cells_count,
                     style={
-                        "backgroundColor": bg_color, 
-                        "color": "white",  # White text for all layer headers
+                        **HEADER_STYLE,
+                        "backgroundColor": bg_color,
+                        "color": "white",
                         "textAlign": "center",
                         "verticalAlign": "middle",
                         "padding": "10px 5px",
-                        "width": f"{HEADER_WIDTH}px",
-                        "minWidth": f"{HEADER_WIDTH}px",
-                        "maxWidth": f"{HEADER_WIDTH}px",
                         "height": "100%",
-                        "fontSize": "0.9rem"  # Consistent font size
+                        "fontSize": "0.9rem"
                     }
                 )
             else:
-                # No placeholder needed anymore due to structure change
                 row_header = None
             
-            # Create the cell type header for this row
-            cell_type_bg = "#103a5b" if source_cell == "E" else \
-                         "#752f00" if source_cell == "SST" else \
-                         "#661111" if source_cell == "PV" else \
-                         "transparent"  # Transparent for Thalamus
-            
+            # Create cell type header
             cell_type_header = html.Th(
                 source_cell or "",
                 className="text-center",
                 style={
-                    "backgroundColor": cell_type_bg,
+                    **HEADER_STYLE,
+                    "backgroundColor": CELL_TYPE_COLORS.get(source_cell, "transparent"),
                     "color": "white",
-                    "width": f"{HEADER_WIDTH}px",
-                    "height": f"{CELL_SIZE}px",  # Make cells more square
-                    "minWidth": f"{HEADER_WIDTH}px",
-                    "maxWidth": f"{HEADER_WIDTH}px",
-                    "minHeight": f"{CELL_SIZE}px", 
-                    "maxHeight": f"{CELL_SIZE}px",
                     "padding": "5px",
-                    "fontSize": "0.9rem"  # Consistent font size
+                    "fontSize": "0.9rem"
                 }
             )
             
@@ -601,41 +584,29 @@ class DashboardApp:
             cells = []
             for target_layer in LAYERS:
                 for target_cell in CELL_TYPES:
-                    # Skip certain connection types
-                    if (source_layer == 'Th' and target_layer == 'Th'):
-                        cells.append(html.Td(
-                            "",
-                            className="text-center",
-                            style={
-                                "backgroundColor": "#1a1a1a",
-                                "width": f"{CELL_SIZE}px",
-                                "height": f"{CELL_SIZE}px",  # Make cells more square
-                                "minWidth": f"{CELL_SIZE}px",
-                                "maxWidth": f"{CELL_SIZE}px",
-                                "minHeight": f"{CELL_SIZE}px",
-                                "maxHeight": f"{CELL_SIZE}px"
-                            }
-                        ))
+                    # Skip thalamus to thalamus connections
+                    if source_layer == 'Th' and target_layer == 'Th':
+                        cells.append(html.Td("", className="text-center", style={
+                            **CELL_STYLE,
+                            "backgroundColor": "#1a1a1a"
+                        }))
                         continue
                     
                     # Get connection strength
                     value = self.get_connection_value(source_layer, source_cell, target_layer, target_cell)
                     
-                    # Create cell with background color based on strength
+                    # Determine cell colors based on connection strength
                     if value > 0:
                         intensity = min(value / 1.0, 1.0) * 0.7
-                        bg_color = f"rgba(0, 120, 215, {intensity})"
-                        hover_color = f"rgba(0, 150, 255, {intensity + 0.2})"
+                        bg_color = CELL_ACTIVITY_COLORS["excitatory"]["bg"](intensity)
+                        hover_color = CELL_ACTIVITY_COLORS["excitatory"]["hover"](intensity)
                     elif value < 0:
                         intensity = min(abs(value) / 1.0, 1.0) * 0.7
-                        bg_color = f"rgba(215, 0, 0, {intensity})"
-                        hover_color = f"rgba(255, 0, 0, {intensity + 0.2})"
+                        bg_color = CELL_ACTIVITY_COLORS["inhibitory"]["bg"](intensity)
+                        hover_color = CELL_ACTIVITY_COLORS["inhibitory"]["hover"](intensity)
                     else:
-                        bg_color = "rgba(80, 80, 80, 0.1)"
-                        hover_color = "rgba(100, 100, 100, 0.3)"
-                    
-                    # Determine if this cell is at a layer boundary (add border to right side of last cell in layer)
-                    right_border = "1px solid #555" if target_cell == "PV" else "none"
+                        bg_color = CELL_ACTIVITY_COLORS["inactive"]["bg"]
+                        hover_color = CELL_ACTIVITY_COLORS["inactive"]["hover"]
                     
                     # Create cell with unique ID for callbacks
                     cell_id = f"{source_layer}-{source_cell or 'None'}-{target_layer}-{target_cell}"
@@ -644,62 +615,42 @@ class DashboardApp:
                         id={'type': 'connection-cell', 'id': cell_id},
                         className="connection-cell text-center",
                         style={
+                            **CELL_STYLE,
                             "backgroundColor": bg_color,
                             "cursor": "pointer",
                             "transition": "background-color 0.2s",
-                            "width": f"{CELL_SIZE}px",
-                            "height": f"{CELL_SIZE}px",
-                            "minWidth": f"{CELL_SIZE}px",
-                            "maxWidth": f"{CELL_SIZE}px",
-                            "minHeight": f"{CELL_SIZE}px",
-                            "maxHeight": f"{CELL_SIZE}px",
                             "padding": "5px",
-                            "fontSize": "0.8rem",  # Consistent font size for values
-                            "borderRight": right_border
+                            "fontSize": "0.8rem",
+                            "borderRight": "1px solid #555" if target_cell == "PV" else "none"
                         },
-                        **{
-                            'data-highlight-color': hover_color
-                        }
+                        **{'data-highlight-color': hover_color}
                     ))
             
             # Create row with header (if needed) and cells
-            # Add bottom border to rows at layer boundaries
-            is_last_in_layer = (source_layer != 'Th' and source_cell == 'PV') or \
-                             (source_layer == 'Th')
+            is_last_in_layer = (source_layer != 'Th' and source_cell == 'PV') or source_layer == 'Th'
+            row_style = {"marginLeft": "0", "marginRight": "0"}
+            if is_last_in_layer:
+                row_style["borderBottom"] = "1px solid #555"
             
-            bottom_border = {"borderBottom": "1px solid #555"} if is_last_in_layer else {}
-            
-            if row_header:
-                row_style = {"marginLeft": "0", "marginRight": "0", **bottom_border}
-                rows.append(html.Tr([row_header, cell_type_header] + cells, style=row_style))
-            else:
-                row_style = {"marginLeft": "0", "marginRight": "0", **bottom_border}
-                rows.append(html.Tr([cell_type_header] + cells, style=row_style))
+            row_cells = [cell for cell in [row_header, cell_type_header] + cells if cell is not None]
+            rows.append(html.Tr(row_cells, style=row_style))
         
         # Create table
         return html.Div([
             html.Table(
-                [main_header_row, sub_header_row] + rows,
+                [html.Tr(main_header_cells), html.Tr(sub_header_cells)] + rows,
                 className="table connection-matrix",
                 style={
-                    "tableLayout": "fixed", 
+                    "tableLayout": "fixed",
                     "fontSize": "0.8rem",
                     "borderCollapse": "collapse",
                     "width": "auto",
                     "margin": "0 auto",
                     "borderSpacing": "0",
-                    "border": "none"  # Remove outermost border
+                    "border": "none"
                 }
             )
-        ], style={
-            # Add custom CSS to override any remaining table borders
-            "& table tr:last-child td, & table tr:last-child th": {
-                "borderBottom": "none"
-            },
-            "& table tr td:last-child, & table tr th:last-child": {
-                "borderRight": "none"
-            }
-        })  # Removed the horizontal scrolling
+        ])
 
     def create_slider_for_cell(self, source_layer, source_cell, target_layer, target_cell, value):
         """Create a slider component for a connection cell."""
@@ -1025,15 +976,15 @@ class DashboardApp:
                 # Determine color based on connection value
                 if value > 0:
                     intensity = min(value / 1.0, 1.0) * 0.7
-                    bg_color = f"rgba(0, 120, 215, {intensity})"
-                    hover_color = f"rgba(0, 150, 255, {intensity + 0.2})"
+                    bg_color = CELL_ACTIVITY_COLORS["excitatory"]["bg"](intensity)
+                    hover_color = CELL_ACTIVITY_COLORS["excitatory"]["hover"](intensity)
                 elif value < 0:
                     intensity = min(abs(value) / 1.0, 1.0) * 0.7
-                    bg_color = f"rgba(215, 0, 0, {intensity})"
-                    hover_color = f"rgba(255, 0, 0, {intensity + 0.2})"
+                    bg_color = CELL_ACTIVITY_COLORS["inhibitory"]["bg"](intensity)
+                    hover_color = CELL_ACTIVITY_COLORS["inhibitory"]["hover"](intensity)
                 else:
-                    bg_color = "rgba(80, 80, 80, 0.1)"
-                    hover_color = "rgba(100, 100, 100, 0.3)"
+                    bg_color = CELL_ACTIVITY_COLORS["inactive"]["bg"]
+                    hover_color = CELL_ACTIVITY_COLORS["inactive"]["hover"]
                 
                 # Update style with new background color
                 updated_style = {**current_style, "backgroundColor": bg_color}
@@ -1153,41 +1104,32 @@ class DashboardApp:
         )
         def update_connectivity_parameters(sigma_thal_e, sigma_thal_sst, sigma_thal_pv, 
                                           sigma_e_out, sigma_sst_out, sigma_pv_out, n_intervals):
-            # Update thalamic connections for all layers
+            """Update all connectivity parameters in the simulation."""
+            # Update thalamic connections
+            thalamic_params = [
+                ('E', sigma_thal_e),
+                ('SST', sigma_thal_sst),
+                ('PV', sigma_thal_pv)
+            ]
             for layer in LAYERS:
-                # Set Thalamus -> E connections
-                self.simulation.set_connection_sigma('thalamus', None, layer, 'E', sigma_thal_e)
-                
-                # Set Thalamus -> SST connections
-                self.simulation.set_connection_sigma('thalamus', None, layer, 'SST', sigma_thal_sst)
-                
-                # Set Thalamus -> PV connections
-                self.simulation.set_connection_sigma('thalamus', None, layer, 'PV', sigma_thal_pv)
+                for cell_type, sigma in thalamic_params:
+                    self.simulation.set_connection_sigma('thalamus', None, layer, cell_type, sigma)
             
-            # Update all E outgoing connections
+            # Update cell type outgoing connections
+            outgoing_params = [
+                ('E', sigma_e_out, CELL_TYPES),  # E connects to all cell types
+                ('SST', sigma_sst_out, ['E', 'PV']),  # SST only connects to E and PV
+                ('PV', sigma_pv_out, CELL_TYPES)  # PV connects to all cell types
+            ]
+            
             for source_layer in LAYERS:
                 for target_layer in LAYERS:
-                    for target_cell in CELL_TYPES:
-                        # Check if this connection exists in the model
-                        if ('E', target_cell) in CONNECTIONS:
-                            self.simulation.set_connection_sigma(source_layer, 'E', target_layer, target_cell, sigma_e_out)
-                            
-            # Update all SST outgoing connections
-            for source_layer in LAYERS:
-                for target_layer in LAYERS:
-                    # SST connections only go to E and PV cells (not to SST)
-                    if ('SST', 'E') in CONNECTIONS:
-                        self.simulation.set_connection_sigma(source_layer, 'SST', target_layer, 'E', sigma_sst_out)
-                    if ('SST', 'PV') in CONNECTIONS:
-                        self.simulation.set_connection_sigma(source_layer, 'SST', target_layer, 'PV', sigma_sst_out)
-                
-            # Update all PV outgoing connections
-            for source_layer in LAYERS:
-                for target_layer in LAYERS:
-                    for target_cell in CELL_TYPES:
-                        # Check if this connection exists in the model
-                        if ('PV', target_cell) in CONNECTIONS:
-                            self.simulation.set_connection_sigma(source_layer, 'PV', target_layer, target_cell, sigma_pv_out)
+                    for source_cell, sigma, target_cells in outgoing_params:
+                        for target_cell in target_cells:
+                            if (source_cell, target_cell) in CONNECTIONS:
+                                self.simulation.set_connection_sigma(
+                                    source_layer, source_cell, target_layer, target_cell, sigma
+                                )
             
             # Return unchanged intervals to not disrupt the update loop
             return [n_intervals]
@@ -1222,34 +1164,31 @@ class DashboardApp:
         def update_graphs(n_intervals, alpha, tau_e, tau_sst, tau_pv, gain_e, gain_sst, gain_pv, 
                          sigma_thal_e, sigma_thal_sst, sigma_thal_pv, sigma_e_out, sigma_sst_out, sigma_pv_out, 
                          pause_clicks):
-            # Check if simulation is paused
+            """Update all neural activity visualizations."""
+            # Return current figures if simulation is paused
             if pause_clicks is not None and pause_clicks % 2 == 1:
-                # If paused, return current figures without updates
                 return list(self.figures.values())
             
-            # Update neural parameters
-            self.simulation.set_time_constant('E', tau_e)
-            self.simulation.set_time_constant('SST', tau_sst)
-            self.simulation.set_time_constant('PV', tau_pv)
-            
-            self.simulation.set_gain('E', gain_e)
-            self.simulation.set_gain('SST', gain_sst)
-            self.simulation.set_gain('PV', gain_pv)
-            
             try:
+                # Update neural parameters
+                for cell_type, tau, gain in [
+                    ('E', tau_e, gain_e),
+                    ('SST', tau_sst, gain_sst),
+                    ('PV', tau_pv, gain_pv)
+                ]:
+                    self.simulation.set_time_constant(cell_type, tau)
+                    self.simulation.set_gain(cell_type, gain)
+                
                 # Update simulation state with new alpha value
                 activities = self.simulation.update(alpha=alpha)
                 
                 # Update all figures with current activity
                 updated_figures = []
                 
-                # Update all neural population figures
+                # Update neural population figures
                 for layer in LAYERS:
                     for cell_type in CELL_TYPES:
-                        fig_id = f'graph-{layer}-{cell_type}'
-                        fig = self.figures[fig_id]
-                        
-                        # Update the heatmap data
+                        fig = self.figures[f'graph-{layer}-{cell_type}']
                         fig.data[0].z = activities[layer][cell_type]
                         updated_figures.append(fig)
                 
@@ -1259,9 +1198,9 @@ class DashboardApp:
                 updated_figures.append(thalamus_fig)
                 
                 return updated_figures
+            
             except Exception as e:
                 print(f"Error updating graphs: {e}")
-                # Return unchanged figures on error
                 return list(self.figures.values())
         
         # Toggle simulation pause state
@@ -1275,110 +1214,113 @@ class DashboardApp:
     def create_parameter_sliders(self):
         """Create the neural parameter sliders section."""
         return html.Div([
+            # Headers row
             dbc.Row([
-                # Empty header for label column
                 dbc.Col("", width=1),
-                # Header for time constants column
                 dbc.Col(html.Div("Time Constant", className="text-center"), width=5),
-                # Header for gains column
                 dbc.Col(html.Div("Gain", className="text-center"), width=5),
             ], className="mb-1"),
             
-            # Create sliders for each cell type
-            *[self.create_parameter_row(cell_type) for cell_type in CELL_TYPES]
+            # Parameter rows
+            *[self._create_parameter_row(cell_type) for cell_type in CELL_TYPES]
         ])
 
-    def create_parameter_row(self, cell_type):
-        """Create a row of sliders for a cell type."""
+    def _create_parameter_row(self, cell_type):
+        """Create a row of sliders for a cell type's parameters."""
         return dbc.Row([
             # Cell type label
             dbc.Col(html.Strong(cell_type), width=1, className="d-flex align-items-center", style={"paddingRight": "5px"}),
             # Time constant slider
-            dbc.Col(
-                dcc.Slider(
-                    id=f'tau-{cell_type.lower()}-slider',
-                    min=1.0, max=100.0, step=1.0,
-                    value=INITIAL_TIME_CONSTANTS[cell_type],
-                    marks={i: f"{i}" for i in range(20, 101, 20)},
-                    tooltip={"placement": "bottom", "always_visible": False},
-                    className="custom-slider"
-                ),
-                width=5,
-                style={"paddingRight": "5px"}
-            ),
+            dbc.Col(self._create_slider(
+                id_prefix='tau',
+                cell_type=cell_type,
+                min_val=1.0,
+                max_val=100.0,
+                step=1.0,
+                initial_value=INITIAL_TIME_CONSTANTS[cell_type],
+                marks={i: f"{i}" for i in range(20, 101, 20)}
+            ), width=5, style={"paddingRight": "5px"}),
             # Gain slider
-            dbc.Col(
-                dcc.Slider(
-                    id=f'gain-{cell_type.lower()}-slider',
-                    min=0, max=1.0, step=0.1,
-                    value=INITIAL_GAINS[cell_type],
-                    marks={i/10: f"{i/10:.1f}" for i in range(2, 11, 2)},  # Reduced number of marks
-                    tooltip={"placement": "bottom", "always_visible": False},
-                    className="custom-slider"
-                ),
-                width=5
-            ),
+            dbc.Col(self._create_slider(
+                id_prefix='gain',
+                cell_type=cell_type,
+                min_val=0,
+                max_val=1.0,
+                step=0.1,
+                initial_value=INITIAL_GAINS[cell_type],
+                marks={i/10: f"{i/10:.1f}" for i in range(2, 11, 2)}
+            ), width=5)
         ], className="mb-1")
 
     def create_connectivity_sliders(self):
         """Create the connectivity width sliders section."""
         return html.Div([
+            # Headers row
             dbc.Row([
-                # Empty header for label column
                 dbc.Col("", width=1),
-                # Header for thalamic input width
                 dbc.Col(html.Div("Thalamic", className="text-center"), width=5),
-                # Header for outgoing width
                 dbc.Col(html.Div("Outgoing", className="text-center"), width=5),
             ], className="mb-1"),
             
-            # Create sliders for each cell type
-            *[self.create_connectivity_row(cell_type) for cell_type in CELL_TYPES]
+            # Connectivity rows
+            *[self._create_connectivity_row(cell_type) for cell_type in CELL_TYPES]
         ])
 
-    def create_connectivity_row(self, cell_type):
-        """Create a row of connectivity sliders for a cell type."""
+    def _create_connectivity_row(self, cell_type):
+        """Create a row of sliders for a cell type's connectivity parameters."""
         return dbc.Row([
             # Cell type label
             dbc.Col(html.Strong(cell_type), width=1, className="d-flex align-items-center", style={"paddingRight": "5px"}),
             # Thalamic width slider
-            dbc.Col(
-                dcc.Slider(
-                    id=f'thalamic-width-{cell_type.lower()}-slider',
-                    min=0.1, max=10.0, step=0.1,
-                    value=INITIAL_THALAMIC_WIDTHS[cell_type],
-                    marks={i: f"{i}" for i in range(0, 11, 2)},
-                    tooltip={"placement": "bottom", "always_visible": False},
-                    className="custom-slider"
-                ),
-                width=5,
-                style={"paddingRight": "5px"}
-            ),
+            dbc.Col(self._create_slider(
+                id_prefix='thalamic-width',
+                cell_type=cell_type,
+                min_val=0.1,
+                max_val=10.0,
+                step=0.1,
+                initial_value=INITIAL_THALAMIC_WIDTHS[cell_type],
+                marks={i: f"{i}" for i in range(0, 11, 2)}
+            ), width=5, style={"paddingRight": "5px"}),
             # Outgoing width slider
-            dbc.Col(
-                dcc.Slider(
-                    id=f'outgoing-width-{cell_type.lower()}-slider',
-                    min=0.1, max=10.0, step=0.1,
-                    value=INITIAL_OUTGOING_WIDTHS[cell_type],
-                    marks={i: f"{i}" for i in range(0, 11, 2)},
-                    tooltip={"placement": "bottom", "always_visible": False},
-                    className="custom-slider"
-                ),
-                width=5
-            ),
+            dbc.Col(self._create_slider(
+                id_prefix='outgoing-width',
+                cell_type=cell_type,
+                min_val=0.1,
+                max_val=10.0,
+                step=0.1,
+                initial_value=INITIAL_OUTGOING_WIDTHS[cell_type],
+                marks={i: f"{i}" for i in range(0, 11, 2)}
+            ), width=5)
         ], className="mb-1")
 
+    def _create_slider(self, id_prefix, cell_type, min_val, max_val, step, initial_value, marks):
+        """Create a slider with consistent styling."""
+        return dcc.Slider(
+            id=f'{id_prefix}-{cell_type.lower()}-slider',
+            min=min_val,
+            max=max_val,
+            step=step,
+            value=initial_value,
+            marks=marks,
+            tooltip={"placement": "bottom", "always_visible": False},
+            className="custom-slider"
+        )
+
     def create_input_controls(self):
-        """Create the input control sliders section."""
+        """Create the input control sliders section for balancing intrinsic and sensory inputs."""
         return dbc.Row([
             dbc.Col([
+                # Balance labels
                 dbc.Row([
                     dbc.Col("Intrinsic", className="text-start", width=6),
                     dbc.Col("Sensory", className="text-end", width=6),
                 ], className="mb-2"),
+                # Alpha slider - use direct ID since it's not cell-type specific
                 dcc.Slider(
-                    id='alpha-slider',
-                    min=0, max=1, step=0.1,
+                    id='alpha-slider',  # Changed back to original ID
+                    min=0,
+                    max=1,
+                    step=0.1,
                     value=THALAMIC_ALPHA,
                     marks={i/10: f"{i/10:.1f}" for i in range(11)},
                     tooltip={"placement": "bottom", "always_visible": False},
