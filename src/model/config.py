@@ -215,11 +215,45 @@ LAYER_CONNECTIONS = [
     for cell_type in CELL_TYPES
 ]
 
-# Visualization settings
-UPDATE_INTERVAL = 60  # Time between visualization updates (ms) - DECREASE for more frequent visual updates
+# Color configuration for cell types
+CELL_COLORS = {
+    'E': '#17BFD8',    # Blue
+    'SST': '#FF630C',  # Orange
+    'PV': '#D91B12'    # Red
+}
+
+# Helper function to convert hex to RGB
+def hex_to_rgb(hex_color):
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+# Colormaps for heatmaps and connectivity visualization
 COLORMAPS = {
-    'E': [[0, 'black'], [1, 'blue']],
-    'SST': [[0, 'black'], [1, 'orange']],
-    'PV': [[0, 'black'], [1, 'red']],
+    'E': [[0, 'black'], [1, CELL_COLORS['E']]],
+    'SST': [[0, 'black'], [1, CELL_COLORS['SST']]],
+    'PV': [[0, 'black'], [1, CELL_COLORS['PV']]],
     'thalamus': [[0, 'black'], [1, 'white']]
-} 
+}
+
+# Cell activity colors for connectivity matrix
+CELL_ACTIVITY_COLORS = {
+    'E': {
+        'bg': lambda i: f"rgba{(*hex_to_rgb(CELL_COLORS['E']), i)}",
+        'hover': lambda i: f"rgba{(*hex_to_rgb(CELL_COLORS['E']), min(i + 0.2, 1.0))}"
+    },
+    'SST': {
+        'bg': lambda i: f"rgba{(*hex_to_rgb(CELL_COLORS['SST']), i)}",
+        'hover': lambda i: f"rgba{(*hex_to_rgb(CELL_COLORS['SST']), min(i + 0.2, 1.0))}"
+    },
+    'PV': {
+        'bg': lambda i: f"rgba{(*hex_to_rgb(CELL_COLORS['PV']), i)}",
+        'hover': lambda i: f"rgba{(*hex_to_rgb(CELL_COLORS['PV']), min(i + 0.2, 1.0))}"
+    },
+    'inactive': {
+        'bg': "rgba(80, 80, 80, 0.1)",
+        'hover': "rgba(100, 100, 100, 0.3)"
+    }
+}
+
+# Visualization settings
+UPDATE_INTERVAL = 60  # Time between visualization updates (ms) - DECREASE for more frequent visual updates 

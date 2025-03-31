@@ -3,7 +3,10 @@
 
 from model.neurons import CorticalCircuit
 from model.thalamus import ThalamicInput
-from model.config import GRID_SIZE, DT, CELL_TYPES, LAYERS, COLORMAPS, THALAMIC_ALPHA
+from model.config import (
+    GRID_SIZE, DT, CELL_TYPES, LAYERS, COLORMAPS, THALAMIC_ALPHA,
+    CELL_COLORS, CELL_ACTIVITY_COLORS
+)
 import plotly.graph_objects as go
 import numpy as np
 import time

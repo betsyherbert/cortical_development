@@ -14,7 +14,7 @@ from model.config import (
     THALAMIC_SCALING, LAYER_CONNECTIONS,
     LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, CONNECTIONS,
     GRID_SIZE, INITIAL_THALAMIC_WIDTHS, INITIAL_OUTGOING_WIDTHS,
-    INITIAL_TIME_CONSTANTS, INITIAL_GAINS
+    INITIAL_TIME_CONSTANTS, INITIAL_GAINS, CELL_COLORS, CELL_ACTIVITY_COLORS
 )
 from model.neurons import GAIN
 from model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
@@ -47,27 +47,6 @@ LAYER_COLORS = {
     "L4": "rgba(180, 180, 180, 0.3)",
     "default": "rgba(180, 180, 180, 0.15)",
     "transparent": "transparent"
-}
-
-CELL_TYPE_COLORS = {
-    "E": "#103a5b",
-    "SST": "#752f00",
-    "PV": "#661111"
-}
-
-CELL_ACTIVITY_COLORS = {
-    "excitatory": {
-        "bg": lambda i: f"rgba(0, 120, 215, {i})",
-        "hover": lambda i: f"rgba(0, 150, 255, {i + 0.2})"
-    },
-    "inhibitory": {
-        "bg": lambda i: f"rgba(215, 0, 0, {i})",
-        "hover": lambda i: f"rgba(255, 0, 0, {i + 0.2})"
-    },
-    "inactive": {
-        "bg": "rgba(80, 80, 80, 0.1)",
-        "hover": "rgba(100, 100, 100, 0.3)"
-    }
 }
 
 class DashboardApp:
@@ -514,13 +493,15 @@ class DashboardApp:
         # Add all cell types under their respective layers
         for layer in LAYERS:
             for cell_type in CELL_TYPES:
+                # Get base color from CELL_ACTIVITY_COLORS with 0.2 opacity
+                header_color = CELL_ACTIVITY_COLORS[cell_type]['bg'](0.2)
                 sub_header_cells.append(
                     html.Th(
                         cell_type,
                         className="text-center",
                         style={
                             **HEADER_STYLE,
-                            "backgroundColor": CELL_TYPE_COLORS[cell_type],
+                            "backgroundColor": header_color,
                             "color": "white",
                             "padding": "8px 5px",
                             "fontSize": "0.9rem",
@@ -567,13 +548,14 @@ class DashboardApp:
             else:
                 row_header = None
             
-            # Create cell type header
+            # Create cell type header with 0.2 opacity
+            header_color = CELL_ACTIVITY_COLORS.get(source_cell, {'bg': lambda x: "transparent"})['bg'](0.2) if source_cell else "transparent"
             cell_type_header = html.Th(
                 source_cell or "",
                 className="text-center",
                 style={
                     **HEADER_STYLE,
-                    "backgroundColor": CELL_TYPE_COLORS.get(source_cell, "transparent"),
+                    "backgroundColor": header_color,
                     "color": "white",
                     "padding": "5px",
                     "fontSize": "0.9rem"
@@ -595,18 +577,39 @@ class DashboardApp:
                     # Get connection strength
                     value = self.get_connection_value(source_layer, source_cell, target_layer, target_cell)
                     
-                    # Determine cell colors based on connection strength
-                    if value > 0:
-                        intensity = min(value / 1.0, 1.0) * 0.7
-                        bg_color = CELL_ACTIVITY_COLORS["excitatory"]["bg"](intensity)
-                        hover_color = CELL_ACTIVITY_COLORS["excitatory"]["hover"](intensity)
-                    elif value < 0:
-                        intensity = min(abs(value) / 1.0, 1.0) * 0.7
-                        bg_color = CELL_ACTIVITY_COLORS["inhibitory"]["bg"](intensity)
-                        hover_color = CELL_ACTIVITY_COLORS["inhibitory"]["hover"](intensity)
+                    # Determine cell colors based on connection strength and source cell type
+                    if source_layer == 'Th':
+                        # For thalamic connections, always use E color and only positive values
+                        if value > 0:
+                            intensity = min(value / 1.0, 1.0) * 0.7
+                            bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
+                            hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
+                        else:
+                            bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
+                            hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
                     else:
-                        bg_color = CELL_ACTIVITY_COLORS["inactive"]["bg"]
-                        hover_color = CELL_ACTIVITY_COLORS["inactive"]["hover"]
+                        # For cell-type specific connections
+                        if value != 0:
+                            intensity = min(abs(value) / 1.0, 1.0) * 0.7
+                            if source_cell in ['PV', 'SST']:
+                                # For inhibitory cells: use their color for negative values, E color for positive
+                                if value < 0:
+                                    bg_color = CELL_ACTIVITY_COLORS[source_cell]['bg'](intensity)
+                                    hover_color = CELL_ACTIVITY_COLORS[source_cell]['hover'](intensity)
+                                else:
+                                    bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
+                                    hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
+                            else:  # E cells
+                                # For E cells: only show color for positive values
+                                if value > 0:
+                                    bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
+                                    hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
+                                else:
+                                    bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
+                                    hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
+                        else:
+                            bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
+                            hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
                     
                     # Create cell with unique ID for callbacks
                     cell_id = f"{source_layer}-{source_cell or 'None'}-{target_layer}-{target_cell}"
@@ -656,8 +659,8 @@ class DashboardApp:
         """Create a slider component for a connection cell."""
         # Set slider range based on excitatory/inhibitory type
         is_excitatory = source_cell == 'E' or source_layer == 'Th'
-        slider_min = 0 if is_excitatory else -2.0
-        slider_max = 2.0
+        slider_min = 0 if is_excitatory else -1.0
+        slider_max = 1.0
         
         # Create unique ID for slider
         slider_id = f"{source_layer}-{source_cell or 'None'}-{target_layer}-{target_cell}"
@@ -973,21 +976,55 @@ class DashboardApp:
                 return dash.no_update, dash.no_update, dash.no_update
             
             try:
-                # Determine color based on connection value
-                if value > 0:
-                    intensity = min(value / 1.0, 1.0) * 0.7
-                    bg_color = CELL_ACTIVITY_COLORS["excitatory"]["bg"](intensity)
-                    hover_color = CELL_ACTIVITY_COLORS["excitatory"]["hover"](intensity)
-                elif value < 0:
-                    intensity = min(abs(value) / 1.0, 1.0) * 0.7
-                    bg_color = CELL_ACTIVITY_COLORS["inhibitory"]["bg"](intensity)
-                    hover_color = CELL_ACTIVITY_COLORS["inhibitory"]["hover"](intensity)
-                else:
-                    bg_color = CELL_ACTIVITY_COLORS["inactive"]["bg"]
-                    hover_color = CELL_ACTIVITY_COLORS["inactive"]["hover"]
+                # Parse cell ID from the dictionary
+                cell_id_str = cell_id['id']  # Extract the ID string from the dictionary
+                source_layer, source_cell, target_layer, target_cell = cell_id_str.split('-')
+                source_cell = None if source_cell == 'None' else source_cell
                 
-                # Update style with new background color
-                updated_style = {**current_style, "backgroundColor": bg_color}
+                # Determine cell colors based on connection strength and source cell type
+                if source_layer == 'Th':
+                    # For thalamic connections, always use E color and only positive values
+                    if value > 0:
+                        intensity = min(value / 1.0, 1.0) * 0.7
+                        bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
+                        hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
+                    else:
+                        bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
+                        hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
+                else:
+                    # For cell-type specific connections
+                    if value != 0:
+                        intensity = min(abs(value) / 1.0, 1.0) * 0.7
+                        if source_cell in ['PV', 'SST']:
+                            # For inhibitory cells: use their color for negative values, E color for positive
+                            if value < 0:
+                                bg_color = CELL_ACTIVITY_COLORS[source_cell]['bg'](intensity)
+                                hover_color = CELL_ACTIVITY_COLORS[source_cell]['hover'](intensity)
+                            else:
+                                bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
+                                hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
+                        else:  # E cells
+                            # For E cells: only show color for positive values
+                            if value > 0:
+                                bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
+                                hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
+                            else:
+                                bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
+                                hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
+                    else:
+                        bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
+                        hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
+                
+                # Update style with new background color while preserving other styles
+                updated_style = {
+                    **CELL_STYLE,
+                    "backgroundColor": bg_color,
+                    "cursor": "pointer",
+                    "transition": "background-color 0.2s",
+                    "padding": "5px",
+                    "fontSize": "0.8rem",
+                    "borderRight": "1px solid #555" if target_cell == "PV" else "none"
+                }
                 
                 # Return updated text, style, and hover color
                 return f"{value:.1f}", updated_style, hover_color
