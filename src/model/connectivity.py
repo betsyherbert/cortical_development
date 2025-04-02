@@ -14,35 +14,50 @@ class ConnectivityProfile:
     """
     Handles the computation and caching of spatial connectivity profiles.
     
-    This class efficiently computes 2D Gaussian profiles for neural connectivity
-    and caches results to avoid redundant calculations.
+    This class efficiently computes and caches 2D Gaussian profiles and weight matrices
+    for neural connectivity. It uses pre-computed coordinate grids and distance matrices
+    to optimize repeated calculations.
     """
     
     def __init__(self, grid_size: int = GRID_SIZE):
         """
-        Initialize connectivity profiles.
+        Initialize connectivity profiles with optimized caching.
         
         Args:
             grid_size: Size of the square grid
         """
         self.grid_size = grid_size
-        self._cache = {}  # Cache for computed Gaussian profiles
-        self._matrix_cache = {}  # Cache for computed weight matrices
+        self._profile_cache = {}  # Cache for Gaussian profiles
+        self._matrix_cache = {}  # Cache for weight matrices
         
-        # Pre-compute coordinate meshgrid once for efficiency
+        # Pre-compute coordinate meshgrid and center coordinates
         y, x = np.meshgrid(np.arange(grid_size), np.arange(grid_size))
         self.coords = np.stack([x, y])
+        self.center = (grid_size // 2, grid_size // 2)
         
-        # Pre-compute center coordinates
-        self.center = (self.grid_size // 2, self.grid_size // 2)
-        
-        # Pre-compute squared distances from center for common case
-        x, y = self.coords
+        # Pre-compute squared distances from center
         self.center_d_squared = (x - self.center[0])**2 + (y - self.center[1])**2
+        
+        # Pre-compute common grid sizes for weight matrices
+        self.common_size = (grid_size * grid_size, grid_size * grid_size)
+    
+    def _compute_gaussian(self, d_squared: np.ndarray, sigma: float) -> np.ndarray:
+        """
+        Compute Gaussian profile from squared distances.
+        
+        Args:
+            d_squared: Array of squared distances
+            sigma: Width of the Gaussian
+            
+        Returns:
+            Normalized Gaussian profile
+        """
+        profile = np.exp(-0.5 * d_squared / sigma**2)
+        return profile / profile.sum()
     
     def gaussian_profile(self, sigma: float, center: Optional[Tuple[int, int]] = None) -> np.ndarray:
         """
-        Compute a 2D Gaussian profile with efficient caching.
+        Get a cached 2D Gaussian profile or compute if not available.
         
         Args:
             sigma: Width of the Gaussian
@@ -53,8 +68,8 @@ class ConnectivityProfile:
         """
         # Use cached profile if available
         cache_key = (sigma, center if center else 'center')
-        if cache_key in self._cache:
-            return self._cache[cache_key]
+        if cache_key in self._profile_cache:
+            return self._profile_cache[cache_key]
         
         # Use pre-computed distance matrix for center case
         if center is None or center == self.center:
@@ -64,21 +79,16 @@ class ConnectivityProfile:
             x, y = self.coords
             d_squared = (x - center[0])**2 + (y - center[1])**2
         
-        # Compute Gaussian profile
-        profile = np.exp(-0.5 * d_squared / sigma**2)
-        
-        # Normalize to sum to 1
-        profile /= profile.sum()
-        
-        # Cache the result
-        self._cache[cache_key] = profile
+        # Compute and cache Gaussian profile
+        profile = self._compute_gaussian(d_squared, sigma)
+        self._profile_cache[cache_key] = profile
         return profile
 
     def compute_weight_matrix(self, amplitude: float, sigma: float,
                             source_size: Tuple[int, int],
                             target_size: Tuple[int, int]) -> np.ndarray:
         """
-        Compute weight matrix between two neural populations.
+        Get a cached weight matrix or compute if not available.
         
         Args:
             amplitude: Connection strength
@@ -97,54 +107,57 @@ class ConnectivityProfile:
         # Get Gaussian profile
         profile = self.gaussian_profile(sigma)
         
-        # Special case for same-size grids (most common case)
+        # Optimize for the common case of same-size grids
         if source_size == target_size == (self.grid_size, self.grid_size):
-            # Reshape to connection matrix
-            source_neurons = self.grid_size * self.grid_size
-            target_neurons = source_neurons
-            
-            # Create toeplitz-like connectivity matrix for 2D grid
-            W = np.zeros((target_neurons, source_neurons))
-            
-            for i in range(target_neurons):
-                # Calculate target neuron's position
-                y_tgt, x_tgt = i // self.grid_size, i % self.grid_size
-                
-                # Shift the profile to be centered at this target neuron
-                shifted_profile = np.roll(profile, (x_tgt - self.center[0], y_tgt - self.center[1]), axis=(0, 1))
-                
-                # Flatten and store in weight matrix
-                W[i, :] = shifted_profile.flatten()
-            
-            # Scale by amplitude
-            W *= amplitude
-            
+            W = self._compute_same_size_weights(profile, amplitude)
         else:
-            # For different sized grids, compute the full matrix (less common case)
-            source_neurons = source_size[0] * source_size[1]
-            target_neurons = target_size[0] * target_size[1]
-            
-            W = np.zeros((target_neurons, source_neurons))
-            
-            # Less optimized implementation for different grid sizes
-            for i in range(target_neurons):
-                for j in range(source_neurons):
-                    # Calculate positions
-                    y_tgt, x_tgt = i // target_size[0], i % target_size[0]
-                    y_src, x_src = j // source_size[0], j % source_size[0]
-                    
-                    # Calculate distance
-                    dist_sq = (x_tgt - x_src)**2 + (y_tgt - y_src)**2
-                    
-                    # Compute weight using Gaussian profile
-                    W[i, j] = amplitude * np.exp(-0.5 * dist_sq / sigma**2)
-            
-            # Normalize each row
-            row_sums = W.sum(axis=1, keepdims=True)
-            W = W / row_sums
+            W = self._compute_different_size_weights(profile, amplitude, source_size, target_size)
         
-        # Cache the computed matrix
+        # Cache and return the weight matrix
         self._matrix_cache[cache_key] = W
+        return W
+    
+    def _compute_same_size_weights(self, profile: np.ndarray, amplitude: float) -> np.ndarray:
+        """Compute weight matrix for same-size grids."""
+        W = np.zeros(self.common_size)
+        
+        for i in range(self.grid_size * self.grid_size):
+            # Calculate target neuron's position
+            y_tgt, x_tgt = i // self.grid_size, i % self.grid_size
+            
+            # Shift the profile to be centered at this target neuron
+            shifted_profile = np.roll(profile, 
+                                    (x_tgt - self.center[0], y_tgt - self.center[1]), 
+                                    axis=(0, 1))
+            
+            # Store in weight matrix
+            W[i, :] = shifted_profile.flatten()
+        
+        return W * amplitude
+    
+    def _compute_different_size_weights(self, profile: np.ndarray, amplitude: float,
+                                      source_size: Tuple[int, int],
+                                      target_size: Tuple[int, int]) -> np.ndarray:
+        """Compute weight matrix for different-size grids."""
+        source_neurons = source_size[0] * source_size[1]
+        target_neurons = target_size[0] * target_size[1]
+        
+        W = np.zeros((target_neurons, source_neurons))
+        
+        for i in range(target_neurons):
+            for j in range(source_neurons):
+                # Calculate positions
+                y_tgt, x_tgt = i // target_size[0], i % target_size[0]
+                y_src, x_src = j // source_size[0], j % source_size[0]
+                
+                # Calculate distance and weight
+                dist_sq = (x_tgt - x_src)**2 + (y_tgt - y_src)**2
+                W[i, j] = amplitude * np.exp(-0.5 * dist_sq / profile.shape[0]**2)
+        
+        # Normalize rows
+        row_sums = W.sum(axis=1, keepdims=True)
+        W = W / row_sums
+        
         return W
 
 

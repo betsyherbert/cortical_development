@@ -1,4 +1,9 @@
-"""Neural dynamics module for the cortical circuit simulation."""
+"""Neural dynamics module for the cortical circuit simulation.
+
+This module implements the core neural dynamics for the cortical circuit model.
+It provides classes for simulating individual neural layers and their interactions,
+with support for different cell types and their specific properties.
+"""
 
 import numpy as np
 from typing import Tuple, List, Optional, Dict, Any
@@ -16,11 +21,18 @@ class NeuralLayer:
     """
     Implements neural population dynamics for a single cortical layer.
     
-    Each layer contains three cell types: excitatory (E), somatostatin-expressing (SST),
-    and parvalbumin-expressing (PV) interneurons, each with their own dynamics.
+    Each layer contains three cell types:
+    - Excitatory (E): Regular spiking pyramidal neurons
+    - Somatostatin-expressing (SST): Inhibitory interneurons targeting dendrites
+    - Parvalbumin-expressing (PV): Fast-spiking inhibitory interneurons
+    
+    Each cell type has its own dynamics characterized by:
+    - Membrane time constant (tau)
+    - Input gain
+    - Firing rate nonlinearity (ReLU)
     """
     
-    def __init__(self, grid_size: int = GRID_SIZE, dt: float = DT, gain: float = GAIN):
+    def __init__(self, grid_size: int = GRID_SIZE, dt: float = DT, gain: float = 1.0):
         """
         Initialize a neural layer with specified grid size and time constant.
         
@@ -61,7 +73,7 @@ class NeuralLayer:
         # Noise amplitude for dynamics
         self.noise_amplitude = NOISE_AMPLITUDE
 
-    def relu(self, x: np.ndarray, gain: float = GAIN) -> np.ndarray:
+    def relu(self, x: np.ndarray, gain: float = 1.0) -> np.ndarray:
         """ReLU activation function with gain: max(0, gain * x)."""
         return np.maximum(0, gain * x)
 

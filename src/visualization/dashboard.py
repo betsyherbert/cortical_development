@@ -113,26 +113,6 @@ class DashboardApp:
                         border-color: white !important;
                         background-color: white !important;
                     }
-                    # /* Make the control panel take less width */
-                    # .control-panel-column {
-                    #     padding-left: 1rem !important;
-                    #     padding-right: 1rem !important;
-                    #     margin-left: -2rem !important; 
-                    #     max-width: 600px !important;
-                    # }
-                    # /* Reduce left margin in left column labels */
-                    # .cell-type-label {
-                    #     padding-right: 1rem !important;
-                    # }
-                    # /* Remove rightmost and bottommost borders */
-                    # .connection-matrix tr:last-child td, 
-                    # .connection-matrix tr:last-child th {
-                    #     border-bottom: none !important;
-                    # }
-                    # .connection-matrix tr td:last-child, 
-                    # .connection-matrix tr th:last-child {
-                    #     border-right: none !important;
-                    # }
                 </style>
             </head>
             <body>
