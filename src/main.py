@@ -1,7 +1,7 @@
 """Main module for running the cortical circuit simulation."""
 
 import argparse
-from model.neurons import CorticalCircuit, GAIN
+from model.neurons import CorticalCircuit
 from model.thalamus import ThalamicInput
 from visualization.dashboard import DashboardApp
 from model.config import (

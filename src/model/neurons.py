@@ -5,16 +5,13 @@ It provides classes for simulating individual neural layers and their interactio
 with support for different cell types and their specific properties.
 """
 
+from typing import Dict
 import numpy as np
-from typing import Tuple, List, Optional, Dict, Any
 from .connectivity import LayerConnectivity
 from .config import (
     GRID_SIZE, DT, NOISE_AMPLITUDE,
     INTEGRATION_STEPS, CELL_TYPES, LAYERS
 )
-
-# Default gain (1.0 for standard ReLU)
-GAIN = 1.0
 
 
 class NeuralLayer:

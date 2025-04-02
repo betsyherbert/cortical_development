@@ -4,11 +4,11 @@ from typing import Dict, Optional, Tuple
 import numpy as np
 
 from .config import (
-    GRID_SIZE, CELL_TYPES, CONNECTIONS,
-    LAYER_CONNECTIVITY_PARAMS, LAYER_CONNECTIONS, LAYERS,
+    GRID_SIZE, LAYER_CONNECTIVITY_PARAMS,
     INITIAL_STRENGTH_SCALING, INITIAL_SPARSITY
 )
 
+#CELL_TYPES, CONNECTIONS, LAYERS,
 
 class ConnectivityProfile:
     """

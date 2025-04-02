@@ -1,23 +1,20 @@
 """Dashboard module for visualizing the cortical circuit simulation."""
 
+import json
 import dash
 from dash import html, dcc
 from dash.dependencies import Input, Output, State, ALL, MATCH
 import plotly.graph_objects as go
 import numpy as np
 import dash_bootstrap_components as dbc
-from typing import Dict, List, Tuple
-import json
 
 from model.config import (
     COLORMAPS, UPDATE_INTERVAL, CELL_TYPES, LAYERS, LAYER_NAMES, 
-    THALAMIC_SCALING, LAYER_CONNECTIONS,
-    LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, CONNECTIONS,
-    GRID_SIZE, INITIAL_THALAMIC_WIDTHS, INITIAL_OUTGOING_WIDTHS,
-    INITIAL_TIME_CONSTANTS, INITIAL_GAINS, CELL_COLORS, CELL_ACTIVITY_COLORS,
-    INITIAL_STRENGTH_SCALING, INITIAL_SPARSITY
+    THALAMIC_SCALING, LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, CONNECTIONS,
+    INITIAL_THALAMIC_WIDTHS, INITIAL_OUTGOING_WIDTHS, 
+    INITIAL_TIME_CONSTANTS, INITIAL_GAINS, CELL_ACTIVITY_COLORS,
+    INITIAL_STRENGTH_SCALING, INITIAL_SPARSITY,
 )
-from model.neurons import GAIN
 from model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
 
 # Constants for styling
@@ -50,6 +47,84 @@ LAYER_COLORS = {
     "transparent": "transparent"
 }
 
+# Table header styles
+MAIN_HEADER_STYLE = {
+    **HEADER_STYLE,
+    "backgroundColor": LAYER_COLORS["default"],
+    "color": "white",
+    "padding": "10px 5px",
+    "fontSize": "0.9rem"
+}
+
+LAYER_HEADER_STYLE = {
+    **MAIN_HEADER_STYLE,
+    "backgroundColor": LAYER_COLORS["L4"]  # Will be overridden for non-L4 layers
+}
+
+CELL_TYPE_HEADER_STYLE = {
+    **HEADER_STYLE,
+    "color": "white",
+    "padding": "8px 5px",
+    "fontSize": "0.9rem"
+}
+
+ROW_HEADER_STYLE = {
+    **HEADER_STYLE,
+    "color": "white",
+    "textAlign": "center",
+    "verticalAlign": "middle",
+    "padding": "10px 5px",
+    "height": "100%",
+    "fontSize": "0.9rem"
+}
+
+# Common layout styles
+CONTROL_PANEL_STYLE = {
+    "backgroundColor": "#28323f",
+    "borderRadius": "10px",
+    "padding": "15px"
+}
+
+SLIDER_CONTAINER_STYLE = {
+    "backgroundColor": "rgba(50, 50, 50, 0.9)",
+    "padding": "10px",
+    "border": "1px solid #444",
+    "borderRadius": "5px",
+    "zIndex": "1000",
+    "width": "200px",
+    "position": "absolute"
+}
+
+# Graph configuration
+GRAPH_CONFIG = {'displayModeBar': False}
+
+GRAPH_LAYOUT = {
+    "margin": dict(l=0, r=0, t=0, b=0),
+    "height": 150,  # Reduced height
+    "width": 150,  # Reduced width
+    "dragmode": False,
+    "xaxis": dict(
+        showgrid=False,
+        showticklabels=False,
+        zeroline=False,
+        scaleanchor="y",  # Force square aspect ratio
+        scaleratio=1
+    ),
+    "yaxis": dict(
+        showgrid=False,
+        showticklabels=False,
+        zeroline=False
+    )
+}
+
+# Activity scaling parameters
+ACTIVITY_SCALING = {
+    'thalamus': {'zmax': THALAMIC_SCALING},
+    'E': {'zmax': 0.8},  # More sensitive to E cell activity
+    'SST': {'zmax': 0.8},  # More sensitive to inhibitory cell activity
+    'PV': {'zmax': 0.8}  # More sensitive to inhibitory cell activity
+}
+
 class DashboardApp:
     """
     Dashboard application for visualizing and controlling the neural simulation.
@@ -57,6 +132,47 @@ class DashboardApp:
     This class creates an interactive Dash application that displays real-time
     neural activity and provides controls for adjusting simulation parameters.
     """
+    
+    # Common slider styles and parameters
+    SLIDER_STYLE = {
+        "tooltip": {"placement": "bottom", "always_visible": False},
+        "className": "custom-slider"
+    }
+    
+    TIME_CONSTANT_PARAMS = {
+        "min_val": 1.0,
+        "max_val": 100.0,
+        "step": 1.0,
+        "marks": {i: f"{i}" for i in range(20, 101, 20)}
+    }
+    
+    GAIN_PARAMS = {
+        "min_val": 0.0,
+        "max_val": 1.0,
+        "step": 0.1,
+        "marks": {i/10: f"{i/10:.1f}" for i in range(2, 11, 2)}
+    }
+    
+    WIDTH_PARAMS = {
+        "min_val": 0.1,
+        "max_val": 10.0,
+        "step": 0.1,
+        "marks": {i: f"{i}" for i in range(0, 11, 2)}
+    }
+    
+    STRENGTH_SCALING_PARAMS = {
+        "min_val": 0.0,
+        "max_val": 5.0,
+        "step": 0.1,
+        "marks": {i: f"{i}" for i in range(0, 6)}
+    }
+    
+    SPARSITY_PARAMS = {
+        "min_val": 0.0,
+        "max_val": 1.0,
+        "step": 0.05,
+        "marks": {i/10: f"{i/10:.1f}" for i in range(0, 11, 2)}
+    }
     
     def __init__(self, simulation, update_interval: int = UPDATE_INTERVAL):
         """
@@ -130,6 +246,32 @@ class DashboardApp:
         self.figures = {}
         self._initialize_figures()
         
+        # Define common outputs for preset callbacks
+        self._PRESET_OUTPUTS = [
+            Output('tau-e-slider', 'value'),
+            Output('tau-sst-slider', 'value'),
+            Output('tau-pv-slider', 'value'),
+            Output('gain-e-slider', 'value'),
+            Output('gain-sst-slider', 'value'),
+            Output('gain-pv-slider', 'value'),
+            Output('thalamic-width-e-slider', 'value'),
+            Output('thalamic-width-sst-slider', 'value'),
+            Output('thalamic-width-pv-slider', 'value'),
+            Output('outgoing-width-e-slider', 'value'),
+            Output('outgoing-width-sst-slider', 'value'),
+            Output('outgoing-width-pv-slider', 'value'),
+            Output('strength-scaling-e-slider', 'value'),
+            Output('strength-scaling-sst-slider', 'value'),
+            Output('strength-scaling-pv-slider', 'value'),
+            Output('strength-scaling-thalamus-slider', 'value'),
+            Output('sparsity-e-slider', 'value'),
+            Output('sparsity-sst-slider', 'value'),
+            Output('sparsity-pv-slider', 'value'),
+            Output('sparsity-thalamus-slider', 'value'),
+            Output('alpha-slider', 'value'),
+            Output('connection-matrix-container', 'children')
+        ]
+        
         # Set up the layout and callbacks
         self.setup_layout()
         self.setup_callbacks()
@@ -148,6 +290,118 @@ class DashboardApp:
         # Create thalamus figure
         self.figures['graph-thalamus'] = self.create_heatmap(empty_data, 'thalamus')
     
+    def _create_preset_buttons(self):
+        """Create the preset buttons row."""
+        return html.Div([
+            dbc.Row([
+                # Empty column to match heatmap label width
+                dbc.Col(width=2),
+                # Buttons container
+                dbc.Col([
+                    html.Div([
+                        dbc.Button("P4", id="p4-preset-button", color="dark", 
+                                className="mx-2 px-3", 
+                                style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
+                        dbc.Button("P8", id="p8-preset-button", color="dark", 
+                                className="mx-2 px-3", 
+                                style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
+                        dbc.Button("P12", id="p12-preset-button", color="dark", 
+                                 className="mx-2 px-3", 
+                                 style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
+                        dbc.Button("P16", id="p16-preset-button", color="dark", 
+                                 className="mx-2 px-3", 
+                                 style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"})
+                    ], style={"display": "flex", "justifyContent": "center"})
+                ], width=10)
+            ])
+        ], className="mb-4")
+
+    def _create_thalamus_visualization(self):
+        """Create the thalamus visualization row."""
+        return html.Div([
+            dbc.Row([
+                # Thalamus label
+                dbc.Col([
+                    html.Div([
+                        html.H6("TC",
+                               style={
+                                   "margin": "0",
+                                   "whiteSpace": "nowrap"  # Prevent text wrapping
+                               })
+                    ], style={
+                        "display": "flex",
+                        "justifyContent": "flex-end",  # Align to the right
+                        "paddingRight": "60px",  # Match the spacing of other layer labels
+                        "height": "100%",
+                        "alignItems": "center"
+                    })
+                ], width=2),
+                
+                # Thalamus heatmap
+                dbc.Col([
+                    html.Div([
+                        dcc.Graph(
+                            id='graph-thalamus',
+                            figure=self.figures['graph-thalamus'],
+                            config=GRAPH_CONFIG
+                        )
+                    ], style={"display": "flex", "justifyContent": "center"})
+                ], width=10)
+            ], className="align-items-center")
+        ], className="mt-2")
+
+    def _create_activity_visualization(self):
+        """Create the activity visualization section."""
+        return dbc.Col([
+            # Add more top padding to shift visualization down
+            html.Div(style={"height": "20px"}),
+            
+            # Preset Buttons
+            self._create_preset_buttons(),
+            
+            # Layer visualizations
+            *[self.create_layer_row(layer) for layer in LAYERS],
+            
+            # Thalamus visualization
+            self._create_thalamus_visualization()
+        ], width=4, className="px-4")
+
+    def _create_connectivity_matrix(self):
+        """Create the connectivity matrix section."""
+        return dbc.Col([
+            # Connection Strength Matrix
+            html.Div([
+                html.H5("Connection Strengths", 
+                       className="mb-3 text-center",
+                       style={
+                           "textAlign": "center",
+                           "width": "85%",  # Match matrix container width
+                           "margin": "0 auto",  # Center the title
+                           "paddingLeft": "50px"  # Match matrix container padding
+                       }),
+                
+                # Connection Matrix Container
+                html.Div(
+                    self.create_connection_matrix(),
+                    id="connection-matrix-container",
+                    style={
+                        "position": "relative", 
+                        "display": "flex", 
+                        "justifyContent": "center",
+                        "width": "85%",  # Further reduce width to prevent overlap
+                        "margin": "0 auto",  # Center the container
+                        "paddingLeft": "50px"  # Add left padding to shift matrix right
+                    }
+                ),
+                
+                # Hover Activated Slider Container (initially hidden)
+                html.Div(
+                    id="slider-container",
+                    style={"display": "none", **SLIDER_CONTAINER_STYLE}
+                )
+            ], className="mb-3"),
+        ], width=4, className="px-5")
+
     def setup_layout(self):
         """Set up the dashboard layout."""
         # Add interval component for updates
@@ -168,133 +422,19 @@ class DashboardApp:
             n_clicks=0
         )
         
-        # Define column widths for the three-column layout
-        LEFT_COL_WIDTH = 4  # Activity heatmaps
-        MIDDLE_COL_WIDTH = 4  # Connectivity matrix
-        RIGHT_COL_WIDTH = 4  # Control sliders
-        
         self.app.layout = dbc.Container([
-            # Interval component for updates
+            # Utility components
             interval,
-            
-            # Store component for currently selected cell
             selected_cell,
-            
-            # Hidden button for resetting slider state
             reset_btn,
             
             # Main content: three columns
             dbc.Row([
                 # Left column: activity visualization
-                dbc.Col([
-                    # Add more top padding to shift visualization down
-                    html.Div(style={"height": "20px"}),
-                    
-                    # Preset Buttons - centered container
-                    html.Div([
-                        dbc.Row([
-                            # Empty column to match heatmap label width
-                            dbc.Col(width=2),
-                            # Buttons container
-                            dbc.Col([
-                        html.Div([
-                            dbc.Button("P4", id="p4-preset-button", color="dark", 
-                                    className="mx-2 px-3", 
-                                    style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
-                            dbc.Button("P8", id="p8-preset-button", color="dark", 
-                                    className="mx-2 px-3", 
-                                    style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
-                            dbc.Button("P12", id="p12-preset-button", color="dark", 
-                                     className="mx-2 px-3", 
-                                     style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
-                            dbc.Button("P16", id="p16-preset-button", color="dark", 
-                                     className="mx-2 px-3", 
-                                     style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"})
-                        ], style={"display": "flex", "justifyContent": "center"})
-                            ], width=10)
-                        ])
-                    ], className="mb-4"),
-                    
-                    # One row per layer (L2/3, L4, L5)
-                    *[self.create_layer_row(layer) for layer in LAYERS],
-                    
-                    # Thalamus visualization - centered container
-                    html.Div([
-                        dbc.Row([
-                            # Thalamus label
-                            dbc.Col([
-                                html.Div([
-                                    html.H6("TC",
-                                           style={
-                                               "margin": "0",
-                                               "whiteSpace": "nowrap"  # Prevent text wrapping
-                                           })
-                                ], style={
-                                    "display": "flex",
-                                    "justifyContent": "flex-end",  # Align to the right
-                                    "paddingRight": "60px",  # Match the spacing of other layer labels
-                                    "height": "100%",
-                                    "alignItems": "center"
-                                })
-                            ], width=2),
-                            
-                            # Thalamus heatmap
-                            dbc.Col([
-                                html.Div([
-                                    dcc.Graph(
-                                        id='graph-thalamus',
-                                        figure=self.figures['graph-thalamus'],
-                                        config={'displayModeBar': False}
-                                    )
-                                ], style={"display": "flex", "justifyContent": "center"})
-                            ], width=10)
-                        ], className="align-items-center")
-                    ], className="mt-2")
-                ], width=LEFT_COL_WIDTH, className="px-4"),  # Increased padding
+                self._create_activity_visualization(),
                 
                 # Middle column: connectivity matrix
-                dbc.Col([
-                    # Connection Strength Matrix
-                    html.Div([
-                        html.H5("Connection Strengths", 
-                              className="mb-3 text-center",  # Reduced from mb-4 to mb-3
-                              style={
-                                  "textAlign": "center",
-                                  "width": "85%",  # Match matrix container width
-                                  "margin": "0 auto",  # Center the title
-                                  "paddingLeft": "50px"  # Match matrix container padding
-                              }),
-                        
-                        # Connection Matrix Container with reduced width
-                        html.Div(
-                            self.create_connection_matrix(),
-                            id="connection-matrix-container",
-                            style={
-                                "position": "relative", 
-                                "display": "flex", 
-                                "justifyContent": "center",
-                                "width": "85%",  # Further reduce width to prevent overlap
-                                "margin": "0 auto",  # Center the container
-                                "paddingLeft": "50px"  # Add left padding to shift matrix right
-                            }
-                        ),
-                        
-                        # Hover Activated Slider Container (initially hidden)
-                        html.Div(
-                            id="slider-container",
-                            style={
-                                "position": "absolute", 
-                                "display": "none",
-                                "backgroundColor": "rgba(50, 50, 50, 0.9)",
-                                "padding": "10px",
-                                "border": "1px solid #444",
-                                "borderRadius": "5px",
-                                "zIndex": "1000",
-                                "width": "200px"
-                            }
-                        )
-                    ], className="mb-3"),
-                ], width=MIDDLE_COL_WIDTH, className="px-5"),  # Increased padding further
+                self._create_connectivity_matrix(),
                     
                 # Right column: Control panel
                 dbc.Col([
@@ -302,13 +442,9 @@ class DashboardApp:
                     html.Div(
                         self.create_control_panel(),
                         className="control-panel-column",
-                        style={
-                            "backgroundColor": "#28323f", 
-                            "borderRadius": "10px", 
-                            "padding": "15px"
-                        }
+                        style=CONTROL_PANEL_STYLE
                     )
-                ], width=RIGHT_COL_WIDTH, className="px-4")
+                ], width=4, className="px-4")
             ], className="g-0"),  # Remove gutters from main row
         ], fluid=True, className="py-3")
     
@@ -342,7 +478,7 @@ class DashboardApp:
                             dcc.Graph(
                                 id=f'graph-{layer}-{cell_type}',
                                 figure=self.figures[f'graph-{layer}-{cell_type}'],
-                                config={'displayModeBar': False}
+                                config=GRAPH_CONFIG
                             ),
                             style={"display": "inline-block"}
                         ) for cell_type in ordered_cell_types
@@ -360,14 +496,7 @@ class DashboardApp:
     def create_heatmap(self, data: np.ndarray, cell_type: str) -> go.Figure:
         """Create a heatmap figure for the given neural activity data."""
         colorscale = COLORMAPS.get(cell_type, [[0, 'black'], [1, 'gray']])
-        
-        # Set appropriate range for each cell type
-        if cell_type == 'thalamus':
-            zmax = THALAMIC_SCALING
-        elif cell_type == 'E':
-            zmax = 0.8  # More sensitive to E cell activity
-        else:  # SST and PV
-            zmax = 0.8  # More sensitive to inhibitory cell activity
+        zmax = ACTIVITY_SCALING[cell_type]['zmax']
         
         return go.Figure(
             data=[go.Heatmap(
@@ -378,54 +507,61 @@ class DashboardApp:
                 zmin=0,
                 zmax=zmax
             )],
-            layout=go.Layout(
-                margin=dict(l=0, r=0, t=0, b=0),
-                height=150,  # Reduced height
-                width=150,  # Reduced width
-                dragmode=False,
-                xaxis=dict(
-                    showgrid=False,
-                    showticklabels=False,
-                    zeroline=False,
-                    scaleanchor="y",  # Force square aspect ratio
-                    scaleratio=1
-                ),
-                yaxis=dict(
-                    showgrid=False,
-                    showticklabels=False,
-                    zeroline=False
-                )
-            )
+            layout=GRAPH_LAYOUT
         )
     
+    def _parse_connection_key(self, conn_key):
+        """Parse a connection key into source and target components.
+        
+        Args:
+            conn_key: String in format 'source_to_target' where source and target 
+                     can be either 'thalamus' or 'layer_celltype'
+                     
+        Returns:
+            Tuple of (source_layer, source_cell, target_layer, target_cell)
+        """
+        parts = conn_key.split('_to_')
+        source_parts = parts[0].split('_')
+        target_parts = parts[1].split('_')
+        
+        if source_parts[0] == 'thalamus':
+            source_layer = 'thalamus'
+            source_cell = None
+            target_layer = target_parts[0]
+            target_cell = target_parts[1]
+        else:
+            source_layer = source_parts[0]
+            source_cell = source_parts[1]
+            target_layer = target_parts[0]
+            target_cell = target_parts[1]
+            
+        return source_layer, source_cell, target_layer, target_cell
+
+    def _apply_preset(self, preset):
+        """Apply a preset configuration to the simulation."""
+        # Update all connection strengths
+        for conn_key, strength in preset['connection_strengths'].items():
+            # Parse the connection key and update strength
+            source_layer, source_cell, target_layer, target_cell = self._parse_connection_key(conn_key)
+            self.simulation.connectivity.set_connection_strength(
+                source_layer, source_cell, target_layer, target_cell, strength
+            )
+        
+        # Update strength scaling factors if present in the preset
+        if 'strength_scaling' in preset:
+            for cell_type, scaling in preset['strength_scaling'].items():
+                self.simulation.set_strength_scaling(cell_type, scaling)
+                
+        # Update sparsity factors if present in the preset
+        if 'sparsity' in preset:
+            for cell_type, sparsity in preset['sparsity'].items():
+                self.simulation.set_sparsity(cell_type, sparsity)
+
     def get_connection_key(self, source_layer, source_cell, target_layer, target_cell):
         """Generate a connection key based on source and target information."""
         if source_layer == 'Th':
-            return f'thalamus_to_{target_layer}_{target_cell}'
-        else:
-            return f'{source_layer}_{source_cell}_to_{target_layer}_{target_cell}'
-    
-    def get_connection_value(self, source_layer, source_cell, target_layer, target_cell):
-        """Get the current connection strength value."""
-        conn_key = self.get_connection_key(source_layer, source_cell, target_layer, target_cell)
-        
-        # First try to get the value from the simulation connectivity
-        if hasattr(self, 'simulation') and hasattr(self.simulation, 'connectivity'):
-            # Convert 'Th' to 'thalamus' for the simulation API
-            source_layer_sim = 'thalamus' if source_layer == 'Th' else source_layer
-            try:
-                return self.simulation.connectivity.get_connection_strength(
-                    source_layer_sim, source_cell, target_layer, target_cell
-                )
-            except Exception as e:
-                print(f"Error getting connection from simulation: {e}")
-                
-        # Fall back to config-based lookup
-        if conn_key in LAYER_CONNECTIVITY_PARAMS:
-            return LAYER_CONNECTIVITY_PARAMS[conn_key]['amplitude']
-            
-        # Default to 0 if not found
-        return 0.0
+            source_layer = 'thalamus'  # Normalize layer name
+        return f'{source_layer}_to_{target_layer}_{target_cell}' if source_layer == 'thalamus' else f'{source_layer}_{source_cell}_to_{target_layer}_{target_cell}'
 
     def create_connection_matrix(self) -> html.Div:
         """Create a matrix visualization of all layer and cell type connections."""
@@ -544,38 +680,7 @@ class DashboardApp:
                     value = self.get_connection_value(source_layer, source_cell, target_layer, target_cell)
                     
                     # Determine cell colors based on connection strength and source cell type
-                    if source_layer == 'Th':
-                        # For thalamic connections, always use E color and only positive values
-                        if value > 0:
-                            intensity = min(value / 1.0, 1.0) * 0.7
-                            bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
-                            hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
-                        else:
-                            bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
-                            hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
-                    else:
-                        # For cell-type specific connections
-                        if value != 0:
-                            intensity = min(abs(value) / 1.0, 1.0) * 0.7
-                            if source_cell in ['PV', 'SST']:
-                                # For inhibitory cells: use their color for negative values, E color for positive
-                                if value < 0:
-                                    bg_color = CELL_ACTIVITY_COLORS[source_cell]['bg'](intensity)
-                                    hover_color = CELL_ACTIVITY_COLORS[source_cell]['hover'](intensity)
-                                else:
-                                    bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
-                                    hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
-                            else:  # E cells
-                                # For E cells: only show color for positive values
-                                if value > 0:
-                                    bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
-                                    hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
-                                else:
-                                    bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
-                                    hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
-                        else:
-                            bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
-                            hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
+                    bg_color, hover_color = self._get_connection_colors(source_layer, source_cell, value)
                     
                     # Create cell with unique ID for callbacks
                     cell_id = f"{source_layer}-{source_cell or 'None'}-{target_layer}-{target_cell}"
@@ -621,6 +726,52 @@ class DashboardApp:
             )
         ])
 
+    def _get_connection_colors(self, source_layer, source_cell, value):
+        """Get background and hover colors for a connection based on source and value.
+        
+        Args:
+            source_layer: Source layer ('thalamus' or layer name)
+            source_cell: Source cell type (E, SST, PV, or None for thalamus)
+            value: Connection strength value
+            
+        Returns:
+            Tuple of (background_color, hover_color)
+        """
+        if source_layer == 'thalamus' or source_layer == 'Th':
+            # For thalamic connections, always use E color and only positive values
+            if value > 0:
+                intensity = min(value / 1.0, 1.0) * 0.7
+                bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
+                hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
+            else:
+                bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
+                hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
+        else:
+            # For cell-type specific connections
+            if value != 0:
+                intensity = min(abs(value) / 1.0, 1.0) * 0.7
+                if source_cell in ['PV', 'SST']:
+                    # For inhibitory cells: use their color for negative values, E color for positive
+                    if value < 0:
+                        bg_color = CELL_ACTIVITY_COLORS[source_cell]['bg'](intensity)
+                        hover_color = CELL_ACTIVITY_COLORS[source_cell]['hover'](intensity)
+                    else:
+                        bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
+                        hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
+                else:  # E cells
+                    # For E cells: only show color for positive values
+                    if value > 0:
+                        bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
+                        hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
+                    else:
+                        bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
+                        hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
+            else:
+                bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
+                hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
+                
+        return bg_color, hover_color
+
     def create_slider_for_cell(self, source_layer, source_cell, target_layer, target_cell, value):
         """Create a slider component for a connection cell."""
         # Set slider range based on excitatory/inhibitory type
@@ -654,428 +805,95 @@ class DashboardApp:
             )
         ])
 
+    def _get_preset_values(self, preset):
+        """Helper function to get values from a preset object or dictionary."""
+        values = {
+            'tau_e': preset['time_constants']['E'],
+            'tau_sst': preset['time_constants']['SST'],
+            'tau_pv': preset['time_constants']['PV'],
+            'gain_e': preset['gains']['E'],
+            'gain_sst': preset['gains']['SST'],
+            'gain_pv': preset['gains']['PV'],
+            'sigma_thal_e': preset['thalamic_widths']['E'],
+            'sigma_thal_sst': preset['thalamic_widths']['SST'],
+            'sigma_thal_pv': preset['thalamic_widths']['PV'],
+            'sigma_e_out': preset['outgoing_widths']['E'],
+            'sigma_sst_out': preset['outgoing_widths']['SST'],
+            'sigma_pv_out': preset['outgoing_widths']['PV'],
+            'strength_e': preset['strength_scaling']['E'],
+            'strength_sst': preset['strength_scaling']['SST'],
+            'strength_pv': preset['strength_scaling']['PV'],
+            'strength_thal': preset['strength_scaling']['thalamus'],
+            'sparsity_e': preset['sparsity']['E'],
+            'sparsity_sst': preset['sparsity']['SST'],
+            'sparsity_pv': preset['sparsity']['PV'],
+            'sparsity_thal': preset['sparsity']['thalamus'],
+            'alpha': preset['thalamic_alpha']
+        }
+        return values
+
+    def _create_preset_callback(self, preset_name, preset_obj, allow_duplicate=False):
+        """Helper function to create a preset callback."""
+        outputs = [
+            Output(id, prop, allow_duplicate=allow_duplicate) 
+            for id, prop in [(o.component_id, o.component_property) for o in self._PRESET_OUTPUTS]
+        ] if allow_duplicate else self._PRESET_OUTPUTS
+
+        @self.app.callback(
+            outputs,
+            Input(f'{preset_name}-preset-button', 'n_clicks'),
+            prevent_initial_call=True
+        )
+        def apply_preset_callback(n_clicks):
+            """Apply the preset configuration."""
+            # Apply the preset using the generic apply_preset function
+            self._apply_preset(preset_obj)
+            
+            # Get values from the preset
+            values = self._get_preset_values(preset_obj)
+            
+            # Return all values in the expected order
+            return (
+                values['tau_e'], values['tau_sst'], values['tau_pv'],
+                values['gain_e'], values['gain_sst'], values['gain_pv'],
+                values['sigma_thal_e'], values['sigma_thal_sst'], values['sigma_thal_pv'],
+                values['sigma_e_out'], values['sigma_sst_out'], values['sigma_pv_out'],
+                values['strength_e'], values['strength_sst'], values['strength_pv'], values['strength_thal'],
+                values['sparsity_e'], values['sparsity_sst'], values['sparsity_pv'], values['sparsity_thal'],
+                values['alpha'], self.create_connection_matrix()
+            )
+        
+        return apply_preset_callback
+
+    def get_connection_value(self, source_layer, source_cell, target_layer, target_cell):
+        """Get the current connection strength value."""
+        conn_key = self.get_connection_key(source_layer, source_cell, target_layer, target_cell)
+        
+        # First try to get the value from the simulation connectivity
+        if hasattr(self, 'simulation') and hasattr(self.simulation, 'connectivity'):
+            # Convert 'Th' to 'thalamus' for the simulation API
+            source_layer_sim = 'thalamus' if source_layer == 'Th' else source_layer
+            try:
+                return self.simulation.connectivity.get_connection_strength(
+                    source_layer_sim, source_cell, target_layer, target_cell
+                )
+            except Exception as e:
+                print(f"Error getting connection from simulation: {e}")
+                
+        # Fall back to config-based lookup
+        if conn_key in LAYER_CONNECTIVITY_PARAMS:
+            return LAYER_CONNECTIVITY_PARAMS[conn_key]['amplitude']
+            
+        # Default to 0 if not found
+        return 0.0
+
     def setup_callbacks(self):
         """Set up the dashboard callbacks for interactivity."""
-        # Create a generic preset application function to avoid code duplication
-        def apply_preset(preset):
-            # Update all connection strengths
-            for conn_key, strength in preset['connection_strengths'].items():
-                # Parse the connection key to get source and target info
-                parts = conn_key.split('_to_')
-                source_parts = parts[0].split('_')
-                target_parts = parts[1].split('_')
-                
-                if source_parts[0] == 'thalamus':
-                    source_layer = 'thalamus'
-                    source_cell = None
-                    target_layer = target_parts[0]
-                    target_cell = target_parts[1]
-                else:
-                    source_layer = source_parts[0]
-                    source_cell = source_parts[1]
-                    target_layer = target_parts[0]
-                    target_cell = target_parts[1]
-                
-                # Update the connection strength in the simulation
-                self.simulation.connectivity.set_connection_strength(
-                    source_layer, source_cell, target_layer, target_cell, strength
-                )
-            
-            # Update strength scaling factors if present in the preset
-            if 'strength_scaling' in preset:
-                for cell_type, scaling in preset['strength_scaling'].items():
-                    self.simulation.set_strength_scaling(cell_type, scaling)
-                    
-            # Update sparsity factors if present in the preset
-            if 'sparsity' in preset:
-                for cell_type, sparsity in preset['sparsity'].items():
-                    self.simulation.set_sparsity(cell_type, sparsity)
-            
-            # Regenerate the connection matrix to reflect the updated values
-            updated_matrix = self.create_connection_matrix()
-                
-            return [
-                # Time constants
-                preset['time_constants']['E'],
-                preset['time_constants']['SST'],
-                preset['time_constants']['PV'],
-                # Gains
-                preset['gains']['E'],
-                preset['gains']['SST'],
-                preset['gains']['PV'],
-                # Thalamic widths
-                preset['thalamic_widths']['E'],
-                preset['thalamic_widths']['SST'],
-                preset['thalamic_widths']['PV'],
-                # Outgoing widths
-                preset['outgoing_widths']['E'],
-                preset['outgoing_widths']['SST'],
-                preset['outgoing_widths']['PV'],
-                # Thalamic alpha
-                preset['thalamic_alpha'],
-                # Updated connection matrix
-                updated_matrix
-            ]
-        
-        # Add callback for P4 preset button
-        @self.app.callback(
-            [
-                Output('tau-e-slider', 'value'),
-                Output('tau-sst-slider', 'value'),
-                Output('tau-pv-slider', 'value'),
-                Output('gain-e-slider', 'value'),
-                Output('gain-sst-slider', 'value'),
-                Output('gain-pv-slider', 'value'),
-                Output('thalamic-width-e-slider', 'value'),
-                Output('thalamic-width-sst-slider', 'value'),
-                Output('thalamic-width-pv-slider', 'value'),
-                Output('outgoing-width-e-slider', 'value'),
-                Output('outgoing-width-sst-slider', 'value'),
-                Output('outgoing-width-pv-slider', 'value'),
-                Output('strength-scaling-e-slider', 'value'),
-                Output('strength-scaling-sst-slider', 'value'),
-                Output('strength-scaling-pv-slider', 'value'),
-                Output('strength-scaling-thalamus-slider', 'value'),
-                Output('sparsity-e-slider', 'value'),
-                Output('sparsity-sst-slider', 'value'),
-                Output('sparsity-pv-slider', 'value'),
-                Output('sparsity-thalamus-slider', 'value'),
-                Output('alpha-slider', 'value'),
-                Output('connection-matrix-container', 'children')
-            ],
-            Input('p4-preset-button', 'n_clicks'),
-            prevent_initial_call=True
-        )
-        def apply_p4_preset(n_clicks):
-            """Apply the P4 preset configuration."""
-            # Apply the preset
-            apply_preset(P4_PRESET)
-            
-            # Get values from the preset object
-            try:
-                tau_e = P4_PRESET.get_tau('E')
-                tau_sst = P4_PRESET.get_tau('SST')
-                tau_pv = P4_PRESET.get_tau('PV')
-                gain_e = P4_PRESET.get_gain('E')
-                gain_sst = P4_PRESET.get_gain('SST')
-                gain_pv = P4_PRESET.get_gain('PV')
-                sigma_thal_e = P4_PRESET.get_sigma('thalamus', 'E')
-                sigma_thal_sst = P4_PRESET.get_sigma('thalamus', 'SST')
-                sigma_thal_pv = P4_PRESET.get_sigma('thalamus', 'PV')
-                sigma_e_out = P4_PRESET.get_outgoing_sigma('E')
-                sigma_sst_out = P4_PRESET.get_outgoing_sigma('SST')
-                sigma_pv_out = P4_PRESET.get_outgoing_sigma('PV')
-                strength_e = P4_PRESET.get('strength_scaling', {}).get('E', 1.0)
-                strength_sst = P4_PRESET.get('strength_scaling', {}).get('SST', 1.0)
-                strength_pv = P4_PRESET.get('strength_scaling', {}).get('PV', 1.0)
-                strength_thal = P4_PRESET.get('strength_scaling', {}).get('thalamus', 1.0)
-                sparsity_e = P4_PRESET.get('sparsity', {}).get('E', 1.0)
-                sparsity_sst = P4_PRESET.get('sparsity', {}).get('SST', 1.0)
-                sparsity_pv = P4_PRESET.get('sparsity', {}).get('PV', 1.0)
-                sparsity_thal = P4_PRESET.get('sparsity', {}).get('thalamus', 1.0)
-                alpha = P4_PRESET.get_thalamic_alpha()
-            except (AttributeError, TypeError):
-                # If the preset is a dictionary, access values directly
-                tau_e = P4_PRESET['time_constants']['E']
-                tau_sst = P4_PRESET['time_constants']['SST']
-                tau_pv = P4_PRESET['time_constants']['PV']
-                gain_e = P4_PRESET['gains']['E']
-                gain_sst = P4_PRESET['gains']['SST']
-                gain_pv = P4_PRESET['gains']['PV']
-                sigma_thal_e = P4_PRESET['thalamic_widths']['E']
-                sigma_thal_sst = P4_PRESET['thalamic_widths']['SST']
-                sigma_thal_pv = P4_PRESET['thalamic_widths']['PV']
-                sigma_e_out = P4_PRESET['outgoing_widths']['E']
-                sigma_sst_out = P4_PRESET['outgoing_widths']['SST']
-                sigma_pv_out = P4_PRESET['outgoing_widths']['PV']
-                strength_e = P4_PRESET['strength_scaling']['E']
-                strength_sst = P4_PRESET['strength_scaling']['SST']
-                strength_pv = P4_PRESET['strength_scaling']['PV']
-                strength_thal = P4_PRESET['strength_scaling']['thalamus']
-                sparsity_e = P4_PRESET['sparsity']['E']
-                sparsity_sst = P4_PRESET['sparsity']['SST']
-                sparsity_pv = P4_PRESET['sparsity']['PV']
-                sparsity_thal = P4_PRESET['sparsity']['thalamus']
-                alpha = P4_PRESET['thalamic_alpha']
-                
-            # Return all values, including our new scaling and sparsity factors
-            return (tau_e, tau_sst, tau_pv,
-                   gain_e, gain_sst, gain_pv,
-                   sigma_thal_e, sigma_thal_sst, sigma_thal_pv,
-                   sigma_e_out, sigma_sst_out, sigma_pv_out,
-                   strength_e, strength_sst, strength_pv, strength_thal,
-                   sparsity_e, sparsity_sst, sparsity_pv, sparsity_thal,
-                   alpha, self.create_connection_matrix())
-        
-        # Add callback for P8 preset button
-        @self.app.callback(
-            [
-                Output('tau-e-slider', 'value', allow_duplicate=True),
-                Output('tau-sst-slider', 'value', allow_duplicate=True),
-                Output('tau-pv-slider', 'value', allow_duplicate=True),
-                Output('gain-e-slider', 'value', allow_duplicate=True),
-                Output('gain-sst-slider', 'value', allow_duplicate=True),
-                Output('gain-pv-slider', 'value', allow_duplicate=True),
-                Output('thalamic-width-e-slider', 'value', allow_duplicate=True),
-                Output('thalamic-width-sst-slider', 'value', allow_duplicate=True),
-                Output('thalamic-width-pv-slider', 'value', allow_duplicate=True),
-                Output('outgoing-width-e-slider', 'value', allow_duplicate=True),
-                Output('outgoing-width-sst-slider', 'value', allow_duplicate=True),
-                Output('outgoing-width-pv-slider', 'value', allow_duplicate=True),
-                Output('strength-scaling-e-slider', 'value', allow_duplicate=True),
-                Output('strength-scaling-sst-slider', 'value', allow_duplicate=True),
-                Output('strength-scaling-pv-slider', 'value', allow_duplicate=True),
-                Output('strength-scaling-thalamus-slider', 'value', allow_duplicate=True),
-                Output('sparsity-e-slider', 'value', allow_duplicate=True),
-                Output('sparsity-sst-slider', 'value', allow_duplicate=True),
-                Output('sparsity-pv-slider', 'value', allow_duplicate=True),
-                Output('sparsity-thalamus-slider', 'value', allow_duplicate=True),
-                Output('alpha-slider', 'value', allow_duplicate=True),
-                Output('connection-matrix-container', 'children', allow_duplicate=True)
-            ],
-            Input('p8-preset-button', 'n_clicks'),
-            prevent_initial_call=True
-        )
-        def apply_p8_preset(n_clicks):
-            """Apply the P8 preset configuration."""
-            # Apply the preset
-            apply_preset(P8_PRESET)
-            
-            # Get values from the preset object
-            try:
-                tau_e = P8_PRESET.get_tau('E')
-                tau_sst = P8_PRESET.get_tau('SST')
-                tau_pv = P8_PRESET.get_tau('PV')
-                gain_e = P8_PRESET.get_gain('E')
-                gain_sst = P8_PRESET.get_gain('SST')
-                gain_pv = P8_PRESET.get_gain('PV')
-                sigma_thal_e = P8_PRESET.get_sigma('thalamus', 'E')
-                sigma_thal_sst = P8_PRESET.get_sigma('thalamus', 'SST')
-                sigma_thal_pv = P8_PRESET.get_sigma('thalamus', 'PV')
-                sigma_e_out = P8_PRESET.get_outgoing_sigma('E')
-                sigma_sst_out = P8_PRESET.get_outgoing_sigma('SST')
-                sigma_pv_out = P8_PRESET.get_outgoing_sigma('PV')
-                strength_e = P8_PRESET.get('strength_scaling', {}).get('E', 1.0)
-                strength_sst = P8_PRESET.get('strength_scaling', {}).get('SST', 1.0)
-                strength_pv = P8_PRESET.get('strength_scaling', {}).get('PV', 1.0)
-                strength_thal = P8_PRESET.get('strength_scaling', {}).get('thalamus', 1.0)
-                sparsity_e = P8_PRESET.get('sparsity', {}).get('E', 1.0)
-                sparsity_sst = P8_PRESET.get('sparsity', {}).get('SST', 1.0)
-                sparsity_pv = P8_PRESET.get('sparsity', {}).get('PV', 1.0)
-                sparsity_thal = P8_PRESET.get('sparsity', {}).get('thalamus', 1.0)
-                alpha = P8_PRESET.get_thalamic_alpha()
-            except (AttributeError, TypeError):
-                # If the preset is a dictionary, access values directly
-                tau_e = P8_PRESET['time_constants']['E']
-                tau_sst = P8_PRESET['time_constants']['SST']
-                tau_pv = P8_PRESET['time_constants']['PV']
-                gain_e = P8_PRESET['gains']['E']
-                gain_sst = P8_PRESET['gains']['SST']
-                gain_pv = P8_PRESET['gains']['PV']
-                sigma_thal_e = P8_PRESET['thalamic_widths']['E']
-                sigma_thal_sst = P8_PRESET['thalamic_widths']['SST']
-                sigma_thal_pv = P8_PRESET['thalamic_widths']['PV']
-                sigma_e_out = P8_PRESET['outgoing_widths']['E']
-                sigma_sst_out = P8_PRESET['outgoing_widths']['SST']
-                sigma_pv_out = P8_PRESET['outgoing_widths']['PV']
-                strength_e = P8_PRESET['strength_scaling']['E']
-                strength_sst = P8_PRESET['strength_scaling']['SST']
-                strength_pv = P8_PRESET['strength_scaling']['PV']
-                strength_thal = P8_PRESET['strength_scaling']['thalamus']
-                sparsity_e = P8_PRESET['sparsity']['E']
-                sparsity_sst = P8_PRESET['sparsity']['SST']
-                sparsity_pv = P8_PRESET['sparsity']['PV']
-                sparsity_thal = P8_PRESET['sparsity']['thalamus']
-                alpha = P8_PRESET['thalamic_alpha']
-                
-            # Return all values, including our new scaling and sparsity factors
-            return (tau_e, tau_sst, tau_pv,
-                   gain_e, gain_sst, gain_pv,
-                   sigma_thal_e, sigma_thal_sst, sigma_thal_pv,
-                   sigma_e_out, sigma_sst_out, sigma_pv_out,
-                   strength_e, strength_sst, strength_pv, strength_thal,
-                   sparsity_e, sparsity_sst, sparsity_pv, sparsity_thal,
-                   alpha, self.create_connection_matrix())
-        
-        # Add callback for P12 preset button
-        @self.app.callback(
-            [
-                Output('tau-e-slider', 'value', allow_duplicate=True),
-                Output('tau-sst-slider', 'value', allow_duplicate=True),
-                Output('tau-pv-slider', 'value', allow_duplicate=True),
-                Output('gain-e-slider', 'value', allow_duplicate=True),
-                Output('gain-sst-slider', 'value', allow_duplicate=True),
-                Output('gain-pv-slider', 'value', allow_duplicate=True),
-                Output('thalamic-width-e-slider', 'value', allow_duplicate=True),
-                Output('thalamic-width-sst-slider', 'value', allow_duplicate=True),
-                Output('thalamic-width-pv-slider', 'value', allow_duplicate=True),
-                Output('outgoing-width-e-slider', 'value', allow_duplicate=True),
-                Output('outgoing-width-sst-slider', 'value', allow_duplicate=True),
-                Output('outgoing-width-pv-slider', 'value', allow_duplicate=True),
-                Output('strength-scaling-e-slider', 'value', allow_duplicate=True),
-                Output('strength-scaling-sst-slider', 'value', allow_duplicate=True),
-                Output('strength-scaling-pv-slider', 'value', allow_duplicate=True),
-                Output('strength-scaling-thalamus-slider', 'value', allow_duplicate=True),
-                Output('sparsity-e-slider', 'value', allow_duplicate=True),
-                Output('sparsity-sst-slider', 'value', allow_duplicate=True),
-                Output('sparsity-pv-slider', 'value', allow_duplicate=True),
-                Output('sparsity-thalamus-slider', 'value', allow_duplicate=True),
-                Output('alpha-slider', 'value', allow_duplicate=True),
-                Output('connection-matrix-container', 'children', allow_duplicate=True)
-            ],
-            Input('p12-preset-button', 'n_clicks'),
-            prevent_initial_call=True
-        )
-        def apply_p12_preset(n_clicks):
-            """Apply the P12 preset configuration."""
-            # Apply the preset
-            apply_preset(P12_PRESET)
-            
-            # Get values from the preset object
-            try:
-                tau_e = P12_PRESET.get_tau('E')
-                tau_sst = P12_PRESET.get_tau('SST')
-                tau_pv = P12_PRESET.get_tau('PV')
-                gain_e = P12_PRESET.get_gain('E')
-                gain_sst = P12_PRESET.get_gain('SST')
-                gain_pv = P12_PRESET.get_gain('PV')
-                sigma_thal_e = P12_PRESET.get_sigma('thalamus', 'E')
-                sigma_thal_sst = P12_PRESET.get_sigma('thalamus', 'SST')
-                sigma_thal_pv = P12_PRESET.get_sigma('thalamus', 'PV')
-                sigma_e_out = P12_PRESET.get_outgoing_sigma('E')
-                sigma_sst_out = P12_PRESET.get_outgoing_sigma('SST')
-                sigma_pv_out = P12_PRESET.get_outgoing_sigma('PV')
-                strength_e = P12_PRESET.get('strength_scaling', {}).get('E', 1.0)
-                strength_sst = P12_PRESET.get('strength_scaling', {}).get('SST', 1.0)
-                strength_pv = P12_PRESET.get('strength_scaling', {}).get('PV', 1.0)
-                strength_thal = P12_PRESET.get('strength_scaling', {}).get('thalamus', 1.0)
-                sparsity_e = P12_PRESET.get('sparsity', {}).get('E', 1.0)
-                sparsity_sst = P12_PRESET.get('sparsity', {}).get('SST', 1.0)
-                sparsity_pv = P12_PRESET.get('sparsity', {}).get('PV', 1.0)
-                sparsity_thal = P12_PRESET.get('sparsity', {}).get('thalamus', 1.0)
-                alpha = P12_PRESET.get_thalamic_alpha()
-            except (AttributeError, TypeError):
-                # If the preset is a dictionary, access values directly
-                tau_e = P12_PRESET['time_constants']['E']
-                tau_sst = P12_PRESET['time_constants']['SST']
-                tau_pv = P12_PRESET['time_constants']['PV']
-                gain_e = P12_PRESET['gains']['E']
-                gain_sst = P12_PRESET['gains']['SST']
-                gain_pv = P12_PRESET['gains']['PV']
-                sigma_thal_e = P12_PRESET['thalamic_widths']['E']
-                sigma_thal_sst = P12_PRESET['thalamic_widths']['SST']
-                sigma_thal_pv = P12_PRESET['thalamic_widths']['PV']
-                sigma_e_out = P12_PRESET['outgoing_widths']['E']
-                sigma_sst_out = P12_PRESET['outgoing_widths']['SST']
-                sigma_pv_out = P12_PRESET['outgoing_widths']['PV']
-                strength_e = P12_PRESET['strength_scaling']['E']
-                strength_sst = P12_PRESET['strength_scaling']['SST']
-                strength_pv = P12_PRESET['strength_scaling']['PV']
-                strength_thal = P12_PRESET['strength_scaling']['thalamus']
-                sparsity_e = P12_PRESET['sparsity']['E']
-                sparsity_sst = P12_PRESET['sparsity']['SST']
-                sparsity_pv = P12_PRESET['sparsity']['PV']
-                sparsity_thal = P12_PRESET['sparsity']['thalamus']
-                alpha = P12_PRESET['thalamic_alpha']
-                
-            # Return all values, including our new scaling and sparsity factors
-            return (tau_e, tau_sst, tau_pv,
-                   gain_e, gain_sst, gain_pv,
-                   sigma_thal_e, sigma_thal_sst, sigma_thal_pv,
-                   sigma_e_out, sigma_sst_out, sigma_pv_out,
-                   strength_e, strength_sst, strength_pv, strength_thal,
-                   sparsity_e, sparsity_sst, sparsity_pv, sparsity_thal,
-                   alpha, self.create_connection_matrix())
-        
-        # Add callback for P16 preset button
-        @self.app.callback(
-            [
-                Output('tau-e-slider', 'value', allow_duplicate=True),
-                Output('tau-sst-slider', 'value', allow_duplicate=True),
-                Output('tau-pv-slider', 'value', allow_duplicate=True),
-                Output('gain-e-slider', 'value', allow_duplicate=True),
-                Output('gain-sst-slider', 'value', allow_duplicate=True),
-                Output('gain-pv-slider', 'value', allow_duplicate=True),
-                Output('thalamic-width-e-slider', 'value', allow_duplicate=True),
-                Output('thalamic-width-sst-slider', 'value', allow_duplicate=True),
-                Output('thalamic-width-pv-slider', 'value', allow_duplicate=True),
-                Output('outgoing-width-e-slider', 'value', allow_duplicate=True),
-                Output('outgoing-width-sst-slider', 'value', allow_duplicate=True),
-                Output('outgoing-width-pv-slider', 'value', allow_duplicate=True),
-                Output('strength-scaling-e-slider', 'value', allow_duplicate=True),
-                Output('strength-scaling-sst-slider', 'value', allow_duplicate=True),
-                Output('strength-scaling-pv-slider', 'value', allow_duplicate=True),
-                Output('strength-scaling-thalamus-slider', 'value', allow_duplicate=True),
-                Output('sparsity-e-slider', 'value', allow_duplicate=True),
-                Output('sparsity-sst-slider', 'value', allow_duplicate=True),
-                Output('sparsity-pv-slider', 'value', allow_duplicate=True),
-                Output('sparsity-thalamus-slider', 'value', allow_duplicate=True),
-                Output('alpha-slider', 'value', allow_duplicate=True),
-                Output('connection-matrix-container', 'children', allow_duplicate=True)
-            ],
-            Input('p16-preset-button', 'n_clicks'),
-            prevent_initial_call=True
-        )
-        def apply_p16_preset(n_clicks):
-            """Apply the P16 preset configuration."""
-            # Apply the preset
-            apply_preset(P16_PRESET)
-            
-            # Get values from the preset object
-            try:
-                tau_e = P16_PRESET.get_tau('E')
-                tau_sst = P16_PRESET.get_tau('SST')
-                tau_pv = P16_PRESET.get_tau('PV')
-                gain_e = P16_PRESET.get_gain('E')
-                gain_sst = P16_PRESET.get_gain('SST')
-                gain_pv = P16_PRESET.get_gain('PV')
-                sigma_thal_e = P16_PRESET.get_sigma('thalamus', 'E')
-                sigma_thal_sst = P16_PRESET.get_sigma('thalamus', 'SST')
-                sigma_thal_pv = P16_PRESET.get_sigma('thalamus', 'PV')
-                sigma_e_out = P16_PRESET.get_outgoing_sigma('E')
-                sigma_sst_out = P16_PRESET.get_outgoing_sigma('SST')
-                sigma_pv_out = P16_PRESET.get_outgoing_sigma('PV')
-                strength_e = P16_PRESET.get('strength_scaling', {}).get('E', 1.0)
-                strength_sst = P16_PRESET.get('strength_scaling', {}).get('SST', 1.0)
-                strength_pv = P16_PRESET.get('strength_scaling', {}).get('PV', 1.0)
-                strength_thal = P16_PRESET.get('strength_scaling', {}).get('thalamus', 1.0)
-                sparsity_e = P16_PRESET.get('sparsity', {}).get('E', 1.0)
-                sparsity_sst = P16_PRESET.get('sparsity', {}).get('SST', 1.0)
-                sparsity_pv = P16_PRESET.get('sparsity', {}).get('PV', 1.0)
-                sparsity_thal = P16_PRESET.get('sparsity', {}).get('thalamus', 1.0)
-                alpha = P16_PRESET.get_thalamic_alpha()
-            except (AttributeError, TypeError):
-                # If the preset is a dictionary, access values directly
-                tau_e = P16_PRESET['time_constants']['E']
-                tau_sst = P16_PRESET['time_constants']['SST']
-                tau_pv = P16_PRESET['time_constants']['PV']
-                gain_e = P16_PRESET['gains']['E']
-                gain_sst = P16_PRESET['gains']['SST']
-                gain_pv = P16_PRESET['gains']['PV']
-                sigma_thal_e = P16_PRESET['thalamic_widths']['E']
-                sigma_thal_sst = P16_PRESET['thalamic_widths']['SST']
-                sigma_thal_pv = P16_PRESET['thalamic_widths']['PV']
-                sigma_e_out = P16_PRESET['outgoing_widths']['E']
-                sigma_sst_out = P16_PRESET['outgoing_widths']['SST']
-                sigma_pv_out = P16_PRESET['outgoing_widths']['PV']
-                strength_e = P16_PRESET['strength_scaling']['E']
-                strength_sst = P16_PRESET['strength_scaling']['SST']
-                strength_pv = P16_PRESET['strength_scaling']['PV']
-                strength_thal = P16_PRESET['strength_scaling']['thalamus']
-                sparsity_e = P16_PRESET['sparsity']['E']
-                sparsity_sst = P16_PRESET['sparsity']['SST']
-                sparsity_pv = P16_PRESET['sparsity']['PV']
-                sparsity_thal = P16_PRESET['sparsity']['thalamus']
-                alpha = P16_PRESET['thalamic_alpha']
-                
-            # Return all values, including our new scaling and sparsity factors
-            return (tau_e, tau_sst, tau_pv,
-                   gain_e, gain_sst, gain_pv,
-                   sigma_thal_e, sigma_thal_sst, sigma_thal_pv,
-                   sigma_e_out, sigma_sst_out, sigma_pv_out,
-                   strength_e, strength_sst, strength_pv, strength_thal,
-                   sparsity_e, sparsity_sst, sparsity_pv, sparsity_thal,
-                   alpha, self.create_connection_matrix())
+        # Add callbacks for preset buttons
+        self._create_preset_callback('p4', P4_PRESET)
+        self._create_preset_callback('p8', P8_PRESET, allow_duplicate=True)
+        self._create_preset_callback('p12', P12_PRESET, allow_duplicate=True)
+        self._create_preset_callback('p16', P16_PRESET, allow_duplicate=True)
         
         # Initialize slider container (hidden)
         @self.app.callback(
@@ -1210,38 +1028,7 @@ class DashboardApp:
                 source_cell = None if source_cell == 'None' else source_cell
                 
                 # Determine cell colors based on connection strength and source cell type
-                if source_layer == 'Th':
-                    # For thalamic connections, always use E color and only positive values
-                    if value > 0:
-                        intensity = min(value / 1.0, 1.0) * 0.7
-                        bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
-                        hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
-                    else:
-                        bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
-                        hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
-                else:
-                    # For cell-type specific connections
-                    if value != 0:
-                        intensity = min(abs(value) / 1.0, 1.0) * 0.7
-                        if source_cell in ['PV', 'SST']:
-                            # For inhibitory cells: use their color for negative values, E color for positive
-                            if value < 0:
-                                bg_color = CELL_ACTIVITY_COLORS[source_cell]['bg'](intensity)
-                                hover_color = CELL_ACTIVITY_COLORS[source_cell]['hover'](intensity)
-                            else:
-                                bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
-                                hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
-                        else:  # E cells
-                            # For E cells: only show color for positive values
-                            if value > 0:
-                                bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
-                                hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
-                            else:
-                                bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
-                                hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
-                    else:
-                        bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
-                        hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
+                bg_color, hover_color = self._get_connection_colors(source_layer, source_cell, value)
                 
                 # Update style with new background color while preserving other styles
                 updated_style = {
@@ -1572,21 +1359,15 @@ class DashboardApp:
             dbc.Col(self._create_slider(
                 id_prefix='tau',
                 cell_type=cell_type,
-                min_val=1.0,
-                max_val=100.0,
-                step=1.0,
                 initial_value=INITIAL_TIME_CONSTANTS[cell_type],
-                marks={i: f"{i}" for i in range(20, 101, 20)}
+                **self.TIME_CONSTANT_PARAMS
             ), width=5, style={"paddingRight": "5px"}),
             # Gain slider
             dbc.Col(self._create_slider(
                 id_prefix='gain',
                 cell_type=cell_type,
-                min_val=0,
-                max_val=1.0,
-                step=0.1,
                 initial_value=INITIAL_GAINS[cell_type],
-                marks={i/10: f"{i/10:.1f}" for i in range(2, 11, 2)}
+                **self.GAIN_PARAMS
             ), width=5)
         ], className="mb-1")
 
@@ -1613,21 +1394,15 @@ class DashboardApp:
             dbc.Col(self._create_slider(
                 id_prefix='thalamic-width',
                 cell_type=cell_type,
-                min_val=0.1,
-                max_val=10.0,
-                step=0.1,
                 initial_value=INITIAL_THALAMIC_WIDTHS[cell_type],
-                marks={i: f"{i}" for i in range(0, 11, 2)}
+                **self.WIDTH_PARAMS
             ), width=5, style={"paddingRight": "5px"}),
             # Outgoing width slider
             dbc.Col(self._create_slider(
                 id_prefix='outgoing-width',
                 cell_type=cell_type,
-                min_val=0.1,
-                max_val=10.0,
-                step=0.1,
                 initial_value=INITIAL_OUTGOING_WIDTHS[cell_type],
-                marks={i: f"{i}" for i in range(0, 11, 2)}
+                **self.WIDTH_PARAMS
             ), width=5)
         ], className="mb-1")
         
@@ -1657,11 +1432,8 @@ class DashboardApp:
             dbc.Col(self._create_slider(
                 id_prefix='strength-scaling',
                 cell_type=cell_type.lower(),
-                min_val=0.0,
-                max_val=5.0,
-                step=0.1,
                 initial_value=INITIAL_STRENGTH_SCALING[cell_type],
-                marks={i: f"{i}" for i in range(0, 6)}
+                **self.STRENGTH_SCALING_PARAMS
             ), width=11)
         ], className="mb-1")
         
@@ -1691,11 +1463,8 @@ class DashboardApp:
             dbc.Col(self._create_slider(
                 id_prefix='sparsity',
                 cell_type=cell_type.lower(),
-                min_val=0.0,
-                max_val=1.0,
-                step=0.05,
                 initial_value=INITIAL_SPARSITY[cell_type],
-                marks={i/10: f"{i/10:.1f}" for i in range(0, 11, 2)}
+                **self.SPARSITY_PARAMS
             ), width=11)
         ], className="mb-1")
 
@@ -1708,8 +1477,7 @@ class DashboardApp:
             step=step,
             value=initial_value,
             marks=marks,
-            tooltip={"placement": "bottom", "always_visible": False},
-            className="custom-slider"
+            **self.SLIDER_STYLE
         )
 
     def create_input_controls(self):
@@ -1738,15 +1506,15 @@ class DashboardApp:
     def create_control_panel(self):
         """Create the control panel with all sliders and controls."""
         return html.Div([
-            # Section: Presynaptic parameters
+            # Section: Neuron parameters
             html.Div([
-                html.H5("Presynaptic Parameters"),
+                html.H5("Neuron Parameters", className="text-center"),
                 self.create_parameter_sliders()
             ], className="mb-3"),
             
-            # Section: Connectivity parameters
+            # Section: Connectivity widths
             html.Div([
-                html.H5("Connectivity Parameters"),
+                html.H5("Connectivity Widths", className="text-center"),
                 self.create_connectivity_sliders(),
                 
                 # New sections for strength scaling and sparsity
