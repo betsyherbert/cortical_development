@@ -9,7 +9,7 @@ from typing import Dict
 import numpy as np
 from .connectivity import LayerConnectivity
 from .config import (
-    GRID_SIZE, DT, NOISE_AMPLITUDE,
+    GRID_SIZE, DT,
     INTEGRATION_STEPS, CELL_TYPES, LAYERS
 )
 
@@ -66,9 +66,7 @@ class NeuralLayer:
             'SST': np.zeros((grid_size, grid_size)),
             'PV': np.zeros((grid_size, grid_size))
         }
-        
-        # Noise amplitude for dynamics
-        self.noise_amplitude = NOISE_AMPLITUDE
+    
 
     def relu(self, x: np.ndarray, gain: float = 1.0) -> np.ndarray:
         """ReLU activation function with gain: max(0, gain * x)."""
@@ -84,18 +82,12 @@ class NeuralLayer:
         Returns:
             Dictionary of updated firing rates for each cell type
         """
-        # Add noise to all inputs
-        noise = {
-            cell_type: self.noise_amplitude * np.random.randn(*input_curr.shape)
-            for cell_type, input_curr in inputs.items()
-        }
         
         # Update membrane potentials using Euler method (vectorized)
         for cell_type in CELL_TYPES:
             if cell_type in inputs:
-                # Calculate voltage change: dV = (-V + I + noise) * dt/tau
                 # Using cell-type specific time constant
-                dV = (-self.V[cell_type] + inputs[cell_type] + noise[cell_type]) * (self.dt / self.tau[cell_type])
+                dV = (-self.V[cell_type] + inputs[cell_type]) * (self.dt / self.tau[cell_type])
                 self.V[cell_type] += dV
                 
                 # Update firing rates with ReLU activation and cell-type specific gain
