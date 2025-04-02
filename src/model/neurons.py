@@ -5,13 +5,142 @@ It provides classes for simulating individual neural layers and their interactio
 with support for different cell types and their specific properties.
 """
 
-from typing import Dict
+from typing import Dict, Tuple
 import numpy as np
 from .connectivity import LayerConnectivity
 from .config import (
-    GRID_SIZE, DT,
-    INTEGRATION_STEPS, CELL_TYPES, LAYERS
+    GRID_SIZE, DT, NOISE_TAU,
+    INTEGRATION_STEPS, CELL_TYPES, LAYERS,
+    INITIAL_NOISE_PARAMS
 )
+
+
+class NoiseGenerator:
+    """
+    Implements Ornstein-Uhlenbeck process for generating temporally correlated noise.
+    
+    This class generates both private (independent) and shared noise components
+    for each cell type, with configurable mean, standard deviation, and correlation.
+    The noise follows the OU process:
+    dx = -(x - mean) * dt/tau + std * sqrt(2*dt/tau) * dW
+    
+    where dW is a Wiener process increment (Gaussian white noise).
+    """
+    
+    def __init__(self, grid_size: int, dt: float = DT, tau: float = NOISE_TAU):
+        """
+        Initialize the noise generator.
+        
+        Args:
+            grid_size: Size of the square grid
+            dt: Time step in milliseconds
+            tau: Time constant for the OU process in milliseconds
+        """
+        self.grid_size = grid_size
+        self.dt = dt
+        self.tau = tau
+        
+        # Initialize noise states for each component
+        shape = (grid_size, grid_size)
+        self.private_noise = {
+            'E': np.zeros(shape),
+            'SST': np.zeros(shape),
+            'PV': np.zeros(shape)
+        }
+        self.shared_noise = np.zeros(shape)  # One shared noise source for all cell types
+        
+        # Initialize noise parameters
+        self.mean = {cell_type: INITIAL_NOISE_PARAMS[cell_type]['mean'] for cell_type in CELL_TYPES}
+        self.std = {cell_type: INITIAL_NOISE_PARAMS[cell_type]['std'] for cell_type in CELL_TYPES}
+        self.correlation = {cell_type: INITIAL_NOISE_PARAMS[cell_type]['c'] for cell_type in CELL_TYPES}
+        
+        # Precompute some constants for efficiency
+        self.sqrt_dt_tau = np.sqrt(2.0 * dt / tau)
+        self.dt_tau = dt / tau
+
+    def update_ou_process(self, current: np.ndarray, mean: float, std: float) -> np.ndarray:
+        """
+        Update an Ornstein-Uhlenbeck process for one time step.
+        
+        Args:
+            current: Current state of the process
+            mean: Mean (steady-state) value
+            std: Standard deviation of the process
+            
+        Returns:
+            Updated state of the process
+        """
+        dx = -(current - mean) * self.dt_tau + std * self.sqrt_dt_tau * np.random.randn(*current.shape)
+        return current + dx
+
+    def update(self) -> Dict[str, np.ndarray]:
+        """
+        Generate noise for all cell types for one time step.
+        
+        Returns:
+            Dictionary mapping cell types to their noise values
+        """
+        # Update shared noise component
+        self.shared_noise = self.update_ou_process(self.shared_noise, 0.0, 1.0)
+        
+        # Update private noise components and combine with shared noise for each cell type
+        noise = {}
+        for cell_type in CELL_TYPES:
+            # Update private noise
+            self.private_noise[cell_type] = self.update_ou_process(
+                self.private_noise[cell_type], 0.0, 1.0
+            )
+            
+            # Combine private and shared noise according to correlation
+            c = self.correlation[cell_type]
+            noise[cell_type] = (
+                self.mean[cell_type] + 
+                self.std[cell_type] * (
+                    np.sqrt(1 - c) * self.private_noise[cell_type] + 
+                    np.sqrt(c) * self.shared_noise
+                )
+            )
+            
+        return noise
+
+    def reset(self) -> None:
+        """Reset all noise states to zero."""
+        for cell_type in CELL_TYPES:
+            self.private_noise[cell_type].fill(0)
+        self.shared_noise.fill(0)
+
+    def set_parameters(self, cell_type: str, mean: float = None, 
+                      std: float = None, correlation: float = None) -> None:
+        """
+        Set noise parameters for a specific cell type.
+        
+        Args:
+            cell_type: The cell type to update ('E', 'SST', or 'PV')
+            mean: New mean value (optional)
+            std: New standard deviation value (optional)
+            correlation: New correlation coefficient (optional)
+        """
+        if cell_type in CELL_TYPES:
+            if mean is not None:
+                self.mean[cell_type] = mean
+            if std is not None:
+                self.std[cell_type] = std
+            if correlation is not None:
+                self.correlation[cell_type] = correlation
+
+    def get_parameters(self, cell_type: str) -> Tuple[float, float, float]:
+        """
+        Get current noise parameters for a specific cell type.
+        
+        Args:
+            cell_type: The cell type to query ('E', 'SST', or 'PV')
+            
+        Returns:
+            Tuple of (mean, std, correlation) values
+        """
+        if cell_type in CELL_TYPES:
+            return (self.mean[cell_type], self.std[cell_type], self.correlation[cell_type])
+        return None
 
 
 class NeuralLayer:
@@ -27,6 +156,7 @@ class NeuralLayer:
     - Membrane time constant (tau)
     - Input gain
     - Firing rate nonlinearity (ReLU)
+    - Input noise (Ornstein-Uhlenbeck process)
     """
     
     def __init__(self, grid_size: int = GRID_SIZE, dt: float = DT, gain: float = 1.0):
@@ -66,7 +196,9 @@ class NeuralLayer:
             'SST': np.zeros((grid_size, grid_size)),
             'PV': np.zeros((grid_size, grid_size))
         }
-    
+        
+        # Initialize noise generator
+        self.noise_generator = NoiseGenerator(grid_size, dt)
 
     def relu(self, x: np.ndarray, gain: float = 1.0) -> np.ndarray:
         """ReLU activation function with gain: max(0, gain * x)."""
@@ -82,12 +214,17 @@ class NeuralLayer:
         Returns:
             Dictionary of updated firing rates for each cell type
         """
+        # Generate noise for this time step
+        noise = self.noise_generator.update()
         
         # Update membrane potentials using Euler method (vectorized)
         for cell_type in CELL_TYPES:
             if cell_type in inputs:
+                # Add noise to the input current
+                total_input = inputs[cell_type] + noise[cell_type]
+                
                 # Using cell-type specific time constant
-                dV = (-self.V[cell_type] + inputs[cell_type]) * (self.dt / self.tau[cell_type])
+                dV = (-self.V[cell_type] + total_input) * (self.dt / self.tau[cell_type])
                 self.V[cell_type] += dV
                 
                 # Update firing rates with ReLU activation and cell-type specific gain
@@ -98,10 +235,12 @@ class NeuralLayer:
 
     def reset(self) -> None:
         """Reset neural state variables to initial state, while preserving parameters."""
-        # Only reset state variables (V and r), not parameters (tau and gain)
+        # Reset state variables (V and r)
         for cell_type in CELL_TYPES:
             self.V[cell_type].fill(0)
             self.r[cell_type].fill(0)
+        # Reset noise generator
+        self.noise_generator.reset()
 
     def set_time_constant(self, cell_type: str, tau: float) -> None:
         """
@@ -142,6 +281,31 @@ class NeuralLayer:
             Dictionary mapping cell types to their gains
         """
         return self.gain.copy()
+        
+    def set_noise_parameters(self, cell_type: str, mean: float = None, 
+                           std: float = None, correlation: float = None) -> None:
+        """
+        Set noise parameters for a specific cell type.
+        
+        Args:
+            cell_type: The cell type to update ('E', 'SST', or 'PV')
+            mean: New mean value (optional)
+            std: New standard deviation value (optional)
+            correlation: New correlation coefficient (optional)
+        """
+        self.noise_generator.set_parameters(cell_type, mean, std, correlation)
+            
+    def get_noise_parameters(self, cell_type: str) -> Tuple[float, float, float]:
+        """
+        Get current noise parameters for a specific cell type.
+        
+        Args:
+            cell_type: The cell type to query ('E', 'SST', or 'PV')
+            
+        Returns:
+            Tuple of (mean, std, correlation) values
+        """
+        return self.noise_generator.get_parameters(cell_type)
 
 
 class CorticalCircuit:
@@ -262,13 +426,12 @@ class CorticalCircuit:
             
     def get_time_constants(self) -> Dict[str, float]:
         """
-        Get current time constant values for all cell types (from L23 layer).
+        Get current time constant values for all cell types (from L4 layer).
         
         Returns:
             Dictionary mapping cell types to their time constants
         """
-        # Return values from L23 layer as they're synced across all layers
-        return self.layers['L23'].get_time_constants()
+        return self.layers['L4'].get_time_constants()
         
     def set_gain(self, cell_type: str, gain: float) -> None:
         """
@@ -283,10 +446,35 @@ class CorticalCircuit:
             
     def get_gains(self) -> Dict[str, float]:
         """
-        Get current gain values for all cell types (from L23 layer).
+        Get current gain values for all cell types (from L4 layer).
         
         Returns:
             Dictionary mapping cell types to their gains
         """
-        # Return values from L23 layer as they're synced across all layers
-        return self.layers['L23'].get_gains() 
+        return self.layers['L4'].get_gains()
+        
+    def set_noise_parameters(self, cell_type: str, mean: float = None, 
+                           std: float = None, correlation: float = None) -> None:
+        """
+        Set noise parameters for a specific cell type across all layers.
+        
+        Args:
+            cell_type: The cell type to update ('E', 'SST', or 'PV')
+            mean: New mean value (optional)
+            std: New standard deviation value (optional)
+            correlation: New correlation coefficient (optional)
+        """
+        for layer in self.layers.values():
+            layer.set_noise_parameters(cell_type, mean, std, correlation)
+            
+    def get_noise_parameters(self, cell_type: str) -> Tuple[float, float, float]:
+        """
+        Get current noise parameters for a specific cell type (from L4 layer).
+        
+        Args:
+            cell_type: The cell type to query ('E', 'SST', or 'PV')
+            
+        Returns:
+            Tuple of (mean, std, correlation) values
+        """
+        return self.layers['L4'].get_noise_parameters(cell_type) 

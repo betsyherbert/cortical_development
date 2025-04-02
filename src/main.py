@@ -182,6 +182,18 @@ class CorticalSimulation:
             Current sparsity factor
         """
         return self.circuit.connectivity.get_sparsity(cell_type)
+        
+    def set_noise_params(self, cell_type: str, mean: float, std: float, c: float) -> None:
+        """
+        Set the noise parameters for a specific cell type.
+        
+        Args:
+            cell_type: The cell type to update ('E', 'SST', or 'PV')
+            mean: Mean of the noise
+            std: Standard deviation of the noise
+            c: Correlation coefficient
+        """
+        self.circuit.set_noise_parameters(cell_type, mean, std, c)
 
 
 def parse_arguments():

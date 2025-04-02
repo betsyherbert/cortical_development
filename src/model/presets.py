@@ -18,6 +18,26 @@ P4_PRESET = {
         'SST': 1.0,
         'PV': 1.0
     },
+    
+    # Input noise parameters for each cell type.
+    # At P4, noise is relatively high and more correlated due to immature network.
+    'noise_params': {
+        'E': {
+            'mean': 0.0,   # Balanced around zero
+            'std': 0.2,    # Higher variability in immature network
+            'c': 0.4       # Higher correlation in immature network
+        },
+        'SST': {
+            'mean': 0.0,   # Balanced around zero
+            'std': 0.2,    # Similar variability to E cells
+            'c': 0.4       # Similar correlation to E cells
+        },
+        'PV': {
+            'mean': 0.0,   # Balanced around zero
+            'std': 0.1,    # Lower variability as PV cells are less active
+            'c': 0.3       # Lower correlation as PV cells are less integrated
+        }
+    },
 
     # Thalamic input widths: how broadly thalamic input is spatially spread. 
     # For P4, still fairly diffuse. 
@@ -176,6 +196,26 @@ P8_PRESET = {
         'E': 0.7,
         'SST': 0.6,
         'PV': 0.6
+    },
+    
+    # Input noise parameters for each cell type.
+    # At P8, noise decreases and becomes less correlated as network matures.
+    'noise_params': {
+        'E': {
+            'mean': 0.0,   # Still balanced around zero
+            'std': 0.15,   # Lower variability as network matures
+            'c': 0.3       # Lower correlation as network refines
+        },
+        'SST': {
+            'mean': 0.0,   # Still balanced around zero
+            'std': 0.15,   # Similar reduction to E cells
+            'c': 0.3       # Similar reduction to E cells
+        },
+        'PV': {
+            'mean': 0.0,   # Still balanced around zero
+            'std': 0.15,   # Increased variability as PV cells become more active
+            'c': 0.25      # Still lower correlation than other cell types
+        }
     },
 
     # Thalamic input widths shrink slightly as barrels refine; still moderate at P8.
@@ -364,7 +404,27 @@ P12_PRESET = {
     },
 
     'thalamic_alpha': 0.5,  # more weighting on sensory input
-        
+    
+    # Input noise parameters for each cell type.
+    # At P12, noise continues to decrease and decorrelate as circuit matures.
+    'noise_params': {
+        'E': {
+            'mean': 0.0,   # Balanced around zero
+            'std': 0.12,   # Further reduced variability
+            'c': 0.2       # Further reduced correlation
+        },
+        'SST': {
+            'mean': 0.0,   # Balanced around zero
+            'std': 0.12,   # Similar to E cells
+            'c': 0.2       # Similar to E cells
+        },
+        'PV': {
+            'mean': 0.0,   # Balanced around zero
+            'std': 0.15,   # Maintained variability as PV cells fully active
+            'c': 0.2       # Similar correlation to other cell types now
+        }
+    },
+
     'connection_strengths': {
 
             # ---------- L2/3 (within L2/3) ----------
@@ -519,6 +579,26 @@ P16_PRESET = {
 
     'thalamic_alpha': 0.7,  # mostly sensory-driven at P16
     
+    # Input noise parameters for each cell type.
+    # At P16, noise reaches mature levels with low correlation.
+    'noise_params': {
+        'E': {
+            'mean': 0.0,   # Balanced around zero
+            'std': 0.1,    # Mature level of variability
+            'c': 0.15      # Low correlation in mature network
+        },
+        'SST': {
+            'mean': 0.0,   # Balanced around zero
+            'std': 0.1,    # Similar to E cells
+            'c': 0.15      # Similar to E cells
+        },
+        'PV': {
+            'mean': 0.0,   # Balanced around zero
+            'std': 0.15,   # Maintained variability for fast response
+            'c': 0.15      # Similar correlation to other cell types
+        }
+    },
+
     'connection_strengths': {
 
             # ---------- L2/3 (within L2/3) ----------

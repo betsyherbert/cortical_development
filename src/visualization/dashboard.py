@@ -13,7 +13,7 @@ from model.config import (
     THALAMIC_SCALING, LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, CONNECTIONS,
     INITIAL_THALAMIC_WIDTHS, INITIAL_OUTGOING_WIDTHS, 
     INITIAL_TIME_CONSTANTS, INITIAL_GAINS, CELL_ACTIVITY_COLORS,
-    INITIAL_STRENGTH_SCALING, INITIAL_SPARSITY,
+    INITIAL_STRENGTH_SCALING, INITIAL_SPARSITY, INITIAL_NOISE_PARAMS
 )
 from model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
 
@@ -174,6 +174,38 @@ class DashboardApp:
         "marks": {i/10: f"{i/10:.1f}" for i in range(0, 11, 2)}
     }
     
+    NOISE_MEAN_PARAMS = {
+        "min_val": 0.0,
+        "max_val": 0.4,
+        "step": 0.05,
+        "marks": {
+            0: "0",
+            0.2: "0.2",
+            0.4: "0.4"
+        }
+    }
+    
+    NOISE_STD_PARAMS = {
+        "min_val": 0.0,
+        "max_val": 0.4,
+        "step": 0.05,
+        "marks": {
+            0: "0",
+            0.2: "0.2",
+            0.4: "0.4"
+        }
+    }
+    
+    NOISE_CORR_PARAMS = {
+        "min_val": 0.0,
+        "max_val": 1.0,
+        "step": 0.05,
+        "marks": {
+            0: "0",
+            1.0: "1"
+        }
+    }
+    
     def __init__(self, simulation, update_interval: int = UPDATE_INTERVAL):
         """
         Initialize the dashboard application.
@@ -229,6 +261,15 @@ class DashboardApp:
                         border-color: white !important;
                         background-color: white !important;
                     }
+                    .custom-slider .rc-slider-mark {
+                        width: 100% !important;
+                    }
+                    .custom-slider .rc-slider-mark-text {
+                        color: white !important;
+                    }
+                    .custom-slider .rc-slider-mark-text:last-child {
+                        transform: translateX(-100%) !important;
+                    }
                 </style>
             </head>
             <body>
@@ -269,6 +310,15 @@ class DashboardApp:
             Output('sparsity-pv-slider', 'value'),
             Output('sparsity-thalamus-slider', 'value'),
             Output('alpha-slider', 'value'),
+            Output('noise-mean-e-slider', 'value'),
+            Output('noise-mean-sst-slider', 'value'),
+            Output('noise-mean-pv-slider', 'value'),
+            Output('noise-std-e-slider', 'value'),
+            Output('noise-std-sst-slider', 'value'),
+            Output('noise-std-pv-slider', 'value'),
+            Output('noise-corr-e-slider', 'value'),
+            Output('noise-corr-sst-slider', 'value'),
+            Output('noise-corr-pv-slider', 'value'),
             Output('connection-matrix-container', 'children')
         ]
         
@@ -828,7 +878,16 @@ class DashboardApp:
             'sparsity_sst': preset['sparsity']['SST'],
             'sparsity_pv': preset['sparsity']['PV'],
             'sparsity_thal': preset['sparsity']['thalamus'],
-            'alpha': preset['thalamic_alpha']
+            'alpha': preset['thalamic_alpha'],
+            'noise_mean_e': preset['noise_params']['E']['mean'],
+            'noise_mean_sst': preset['noise_params']['SST']['mean'],
+            'noise_mean_pv': preset['noise_params']['PV']['mean'],
+            'noise_std_e': preset['noise_params']['E']['std'],
+            'noise_std_sst': preset['noise_params']['SST']['std'],
+            'noise_std_pv': preset['noise_params']['PV']['std'],
+            'noise_corr_e': preset['noise_params']['E']['c'],
+            'noise_corr_sst': preset['noise_params']['SST']['c'],
+            'noise_corr_pv': preset['noise_params']['PV']['c']
         }
         return values
 
@@ -860,7 +919,9 @@ class DashboardApp:
                 values['sigma_e_out'], values['sigma_sst_out'], values['sigma_pv_out'],
                 values['strength_e'], values['strength_sst'], values['strength_pv'], values['strength_thal'],
                 values['sparsity_e'], values['sparsity_sst'], values['sparsity_pv'], values['sparsity_thal'],
-                values['alpha'], self.create_connection_matrix()
+                values['alpha'], values['noise_mean_e'], values['noise_mean_sst'], values['noise_mean_pv'],
+                values['noise_std_e'], values['noise_std_sst'], values['noise_std_pv'], values['noise_corr_e'],
+                values['noise_corr_sst'], values['noise_corr_pv'], self.create_connection_matrix()
             )
         
         return apply_preset_callback
@@ -1335,6 +1396,32 @@ class DashboardApp:
             
             # Return unchanged intervals to not disrupt the update loop
             return [n_intervals]
+        
+        # Add callback for updating noise parameters
+        @self.app.callback(
+            [Output('interval-component', 'n_intervals', allow_duplicate=True)],
+            [Input('noise-mean-e-slider', 'value'),
+             Input('noise-mean-sst-slider', 'value'),
+             Input('noise-mean-pv-slider', 'value'),
+             Input('noise-std-e-slider', 'value'),
+             Input('noise-std-sst-slider', 'value'),
+             Input('noise-std-pv-slider', 'value'),
+             Input('noise-corr-e-slider', 'value'),
+             Input('noise-corr-sst-slider', 'value'),
+             Input('noise-corr-pv-slider', 'value')],
+            [State('interval-component', 'n_intervals')],
+            prevent_initial_call=True
+        )
+        def update_noise_parameters(mean_e, mean_sst, mean_pv, std_e, std_sst, std_pv, 
+                                  corr_e, corr_sst, corr_pv, n_intervals):
+            """Update all noise parameters in the simulation."""
+            # Update noise parameters for each cell type
+            self.simulation.set_noise_params('E', mean_e, std_e, corr_e)
+            self.simulation.set_noise_params('SST', mean_sst, std_sst, corr_sst)
+            self.simulation.set_noise_params('PV', mean_pv, std_pv, corr_pv)
+            
+            # Return unchanged intervals to not disrupt the update loop
+            return [n_intervals]
     
     def create_parameter_sliders(self):
         """Create the neural parameter sliders section."""
@@ -1503,6 +1590,49 @@ class DashboardApp:
             ])
         ])
     
+    def create_noise_sliders(self):
+        """Create the noise parameter sliders section."""
+        return html.Div([
+            # Headers row
+            dbc.Row([
+                dbc.Col("", width=1),  # Reduced label width
+                dbc.Col(html.Div("Mean", className="text-center"), width=4),
+                dbc.Col(html.Div("Std", className="text-center"), width=4),
+                dbc.Col(html.Div("Correlation", className="text-center"), width=3),
+            ], className="mb-1 g-0"),  # g-0 removes gutters
+            
+            # Noise parameter rows
+            *[self._create_noise_row(cell_type) for cell_type in CELL_TYPES]
+        ], style={"width": "103%", "marginLeft": "0%"})  # Make container wider
+
+    def _create_noise_row(self, cell_type):
+        """Create a row of sliders for a cell type's noise parameters."""
+        return dbc.Row([
+            # Cell type label
+            dbc.Col(html.Strong(cell_type), width=1, className="d-flex align-items-center"),
+            # Mean slider
+            dbc.Col(self._create_slider(
+                id_prefix='noise-mean',
+                cell_type=cell_type,
+                initial_value=INITIAL_NOISE_PARAMS[cell_type]['mean'],
+                **self.NOISE_MEAN_PARAMS
+            ), width=4),
+            # Std slider
+            dbc.Col(self._create_slider(
+                id_prefix='noise-std',
+                cell_type=cell_type,
+                initial_value=INITIAL_NOISE_PARAMS[cell_type]['std'],
+                **self.NOISE_STD_PARAMS
+            ), width=4),
+            # Correlation slider
+            dbc.Col(self._create_slider(
+                id_prefix='noise-corr',
+                cell_type=cell_type,
+                initial_value=INITIAL_NOISE_PARAMS[cell_type]['c'],
+                **self.NOISE_CORR_PARAMS
+            ), width=3)
+        ], className="mb-1 g-0", style={"marginBottom": "10px"})
+
     def create_control_panel(self):
         """Create the control panel with all sliders and controls."""
         return html.Div([
@@ -1517,10 +1647,16 @@ class DashboardApp:
                 html.H5("Connectivity Widths", className="text-center"),
                 self.create_connectivity_sliders(),
                 
-                # New sections for strength scaling and sparsity
+                # Section for strength scaling
                 html.Div([html.Hr()], className="my-3"),
                 self.create_strength_scaling_sliders(),
                 
+                # Section for noise parameters
+                html.Div([html.Hr()], className="my-3"),
+                html.H5("Noise Parameters", className="text-center"),
+                self.create_noise_sliders(),
+                
+                # Section for sparsity
                 html.Div([html.Hr()], className="my-3"),
                 self.create_sparsity_sliders()
             ], className="mb-3"),

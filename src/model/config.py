@@ -19,6 +19,12 @@ VISUALIZATION_STEPS = 3  # Number of simulation steps per visualization update -
 UPDATE_INTERVAL = 60  # Time between visualization updates (ms) - DECREASE for more frequent visual updates
 
 #------------------------------------------------------------------------------
+# Neural Noise Parameters
+#------------------------------------------------------------------------------
+NOISE_TAU = 5.0  # Time constant for Ornstein-Uhlenbeck process (ms)
+INITIAL_NOISE_PARAMS = P4_PRESET['noise_params']  # Inherit initial noise parameters from P4
+
+#------------------------------------------------------------------------------
 # Network Structure
 #------------------------------------------------------------------------------
 CELL_TYPES = ['E', 'SST', 'PV']  # Available cell types
