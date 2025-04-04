@@ -2,17 +2,14 @@
 
 # ----------------- P4 PRESET (Early 1st Week) -----------------
 P4_PRESET = {
-    # Approximate time constants (ms). Neonatal neurons have relatively large tau.
-    # PV is quite immature; many PV cells are essentially silent.
+    # Approximate time constants (ms). 
     'time_constants': {
-        'E': 40.0,    # excitatory cells slower than adult
-        'SST': 30.0,  # SST cells already somewhat active, but still slower
-        'PV': 15.0    # prospective PV cells, minimal functional synapses
+        'E': 20.0,    # excitatory cells slower than adult
+        'SST': 20.0,  # SST cells already somewhat active, but still slower
+        'PV': 20.0    # prospective PV cells, minimal functional synapses
     },
 
-    # Gains: relative excitability within [0..1]. 
-    # E is fairly excitable early on, SST also active (gets strong early thalamic drive). 
-    # PV has low functional gain at P4.
+    # Gains: relative excitability within [0,1]. 
     'gains': {
         'E': 1.0,
         'SST': 1.0,
@@ -20,52 +17,47 @@ P4_PRESET = {
     },
     
     # Input noise parameters for each cell type.
-    # At P4, noise is relatively high and more correlated due to immature network.
     'noise_params': {
         'E': {
-            'mean': 0.0,   # Balanced around zero
-            'std': 0.2,    # Higher variability in immature network
-            'c': 0.4       # Higher correlation in immature network
+            'mean': 0.0,
+            'std': 0.2,  
+            'c': 0.4     
         },
         'SST': {
-            'mean': 0.0,   # Balanced around zero
-            'std': 0.2,    # Similar variability to E cells
-            'c': 0.4       # Similar correlation to E cells
+            'mean': 0.0, 
+            'std': 0.2,  
+            'c': 0.4     
         },
         'PV': {
-            'mean': 0.0,   # Balanced around zero
-            'std': 0.1,    # Lower variability as PV cells are less active
-            'c': 0.3       # Lower correlation as PV cells are less integrated
+            'mean': 0.0,   
+            'std': 0.2,    
+            'c': 0.4     
         }
     },
 
     # Thalamic input widths: how broadly thalamic input is spatially spread. 
-    # For P4, still fairly diffuse. 
     'thalamic_widths': {
         'E': 4.0,
         'SST': 4.0,
-        'PV': 2.0
+        'PV': 4.0
     },
 
     # Outgoing widths: how far each cell type's lateral connections spread.
-    # E and SST can be relatively broad. PV is minimal at P4.
     'outgoing_widths': {
-        'E': 7.0,
+        'E': 3.0,
         'SST': 4.0,
-        'PV': 2.0
+        'PV': 4.0
     },
     
     # Strength scaling factors: overall scaling of connection strengths.
-    # At P4, connections are generally weaker and more variable.
     'strength_scaling': {
         'E': 1.0,      # E cells have weak but present connections
         'SST': 1.0,    # SST cells have weaker connections
         'PV': 1.0,     # PV cells have very weak connections 
-        'thalamus': 1.0  # Thalamic input is present but not fully developed
+        'thalamus': 0.0  # Thalamic input is present but not fully developed
     },
     
     # Sparsity factors: fraction of connections present (1 = all, 0 = none).
-    # At P4, connectivity is quite sparse.
     'sparsity': {
         'E': 1.0,      # E cells have moderately sparse connectivity
         'SST': 1.0,    # SST cells have sparser connectivity
@@ -74,7 +66,6 @@ P4_PRESET = {
     },
 
     # Thalamic alpha: ratio between sensory-driven vs. intrinsic input.
-    # In neonates, spontaneous (intrinsic) drive is still dominant, so alpha is small.
     'thalamic_alpha': 0.2,
     
     'connection_strengths': {
@@ -184,75 +175,63 @@ P4_PRESET = {
 
 # ----------------- P8 PRESET (Late 1st Week) -----------------
 P8_PRESET = {
-    # Time constants reduce somewhat. PV is still not fully FS, but more active than P4.
     'time_constants': {
-        'E': 30.0,
+        'E': 10.0,
         'SST': 20.0,
-        'PV': 12.0
+        'PV': 20.0
     },
-
-    # Gains: E and SST remain fairly high, PV is rising now.
     'gains': {
-        'E': 0.7,
-        'SST': 0.6,
-        'PV': 0.6
+        'E': 1.0,
+        'SST': 1.0,
+        'PV': 1.0
     },
     
     # Input noise parameters for each cell type.
-    # At P8, noise decreases and becomes less correlated as network matures.
     'noise_params': {
         'E': {
-            'mean': 0.0,   # Still balanced around zero
-            'std': 0.15,   # Lower variability as network matures
-            'c': 0.3       # Lower correlation as network refines
+            'mean': 0.0,
+            'std': 0.2,  
+            'c': 0.4     
         },
         'SST': {
-            'mean': 0.0,   # Still balanced around zero
-            'std': 0.15,   # Similar reduction to E cells
-            'c': 0.3       # Similar reduction to E cells
+            'mean': 0.0, 
+            'std': 0.2,  
+            'c': 0.4     
         },
         'PV': {
-            'mean': 0.0,   # Still balanced around zero
-            'std': 0.15,   # Increased variability as PV cells become more active
-            'c': 0.25      # Still lower correlation than other cell types
+            'mean': 0.0,   
+            'std': 0.2,    
+            'c': 0.4     
         }
     },
 
-    # Thalamic input widths shrink slightly as barrels refine; still moderate at P8.
     'thalamic_widths': {
         'E': 3.0,
         'SST': 3.0,
-        'PV': 2.0
-    },
-
-    # Outgoing widths: L2/3 & L4 excitatory still fairly broad, but narrower than at P4. 
-    'outgoing_widths': {
-        'E': 6.0,
-        'SST': 5.0,
         'PV': 3.0
     },
-    
-    # Strength scaling factors: connections becoming stronger.
-    # At P8, connections are strengthening.
+
+    'outgoing_widths': {
+        'E': 2.0,
+        'SST': 4.0,
+        'PV': 4.0
+    },
+
     'strength_scaling': {
-        'E': 2.0,      # E cells have stronger connections
-        'SST': 2.0,    # SST cells have stronger connections
-        'PV': 3.0,     # PV cells have developing connections
-        'thalamus': 2.0  # Thalamic input is stronger
+        'E': 1.0,    
+        'SST': 1.0,  
+        'PV': 1.0,   
+        'thalamus': 0.0
     },
     
-    # Sparsity factors: connectivity increasing.
-    # At P8, connectivity is becoming less sparse.
     'sparsity': {
-        'E': 1.0,      # E cells have less sparse connectivity
-        'SST': 0.2,    # SST cells have less sparse connectivity
-        'PV': 1.0,     # PV cells have developing connectivity
-        'thalamus': 1.0  # Thalamic connectivity is more complete
+        'E': 1.0,      
+        'SST': 1.0,    
+        'PV': 1.0,     
+        'thalamus': 1.0 
     },
 
-    # Thalamic alpha. Sensory-driven input is more important by P8, but intrinsic still present.
     'thalamic_alpha': 0.3,
-
         
     'connection_strengths': {
 
@@ -332,7 +311,7 @@ P8_PRESET = {
             'L5_E_to_L23_PV': 0.1,
             'L5_SST_to_L23_E': -0.1,
             'L5_SST_to_L23_PV': 0.0,
-            'L5_PV_to_L23_E': -0.3,
+            'L5_PV_to_L23_E': 0.0,
             'L5_PV_to_L23_SST': 0.0,
             'L5_PV_to_L23_PV': 0.0,
 
@@ -362,15 +341,15 @@ P8_PRESET = {
 # ----------------- P12 PRESET (Mid 2nd Week) -----------------
 P12_PRESET = {
     'time_constants': {
-        'E': 20.0,   # faster now
-        'SST': 12.0,
-        'PV': 8.0
+        'E': 10.0,  
+        'SST': 15.0,
+        'PV': 15.0
     },
 
     'gains': {
-        'E': 0.5,    # excitability lower than at P8
-        'SST': 0.6,  # moderate
-        'PV': 0.8    # PV is more fully active
+        'E': 1.0,    
+        'SST': 1.0,  
+        'PV': 1.0    
     },
 
     'thalamic_widths': {
@@ -380,48 +359,42 @@ P12_PRESET = {
     },
 
     'outgoing_widths': {
-        'E': 4.0,    # still moderate horizontal connectivity
-        'SST': 6.0,
-        'PV': 4.0
+        'E': 2.0,   
+        'SST': 3.0,
+        'PV': 3.0
     },
     
-    # Strength scaling factors: connections now close to mature strength.
-    # At P12, connections are significantly strengthened.
     'strength_scaling': {
-        'E': 3.0,      # E cells have almost mature strength
-        'SST': 2.0,    # SST cells have strong connections
-        'PV': 4.0,     # PV cells now with significant connectivity
-        'thalamus': 2.0  # Thalamic input close to mature levels
+        'E': 1.0,      
+        'SST': 1.0,    
+        'PV': 1.0,     
+        'thalamus': 0.0
     },
     
-    # Sparsity factors: connectivity more complete.
-    # At P12, connectivity is more complete.
     'sparsity': {
-        'E': 1.0,      # E cells have more complete connectivity
-        'SST': 1.0,    # SST cells have more complete connectivity
-        'PV': 1.0,     # PV cells have developing but substantial connectivity
-        'thalamus': 1.0  # Thalamic connectivity almost complete
+        'E': 1.0,     
+        'SST': 1.0,   
+        'PV': 1.0,    
+        'thalamus': 1.0 
     },
 
-    'thalamic_alpha': 0.5,  # more weighting on sensory input
+    'thalamic_alpha': 0.5, 
     
-    # Input noise parameters for each cell type.
-    # At P12, noise continues to decrease and decorrelate as circuit matures.
     'noise_params': {
         'E': {
-            'mean': 0.0,   # Balanced around zero
-            'std': 0.12,   # Further reduced variability
-            'c': 0.2       # Further reduced correlation
+            'mean': 0.0,
+            'std': 0.2,  
+            'c': 0.4     
         },
         'SST': {
-            'mean': 0.0,   # Balanced around zero
-            'std': 0.12,   # Similar to E cells
-            'c': 0.2       # Similar to E cells
+            'mean': 0.0, 
+            'std': 0.2,  
+            'c': 0.4     
         },
         'PV': {
-            'mean': 0.0,   # Balanced around zero
-            'std': 0.15,   # Maintained variability as PV cells fully active
-            'c': 0.2       # Similar correlation to other cell types now
+            'mean': 0.0,   
+            'std': 0.2,    
+            'c': 0.4     
         }
     },
 
@@ -534,68 +507,60 @@ P12_PRESET = {
 # ----------------- P16 PRESET (Late 2nd Week) -----------------
 P16_PRESET = {
     'time_constants': {
-        'E': 15.0,  # near adult
+        'E': 10.0,  
         'SST': 10.0,
-        'PV': 6.0
+        'PV': 10.0
     },
 
     'gains': {
-        'E': 0.4,   # lowered excitability
-        'SST': 0.6,
-        'PV': 0.8   # PV is quite potent now
+        'E': 1.0,   
+        'SST': 1.0,
+        'PV': 1.0   
     },
 
-    # Thalamic input narrower, strongly columnar
     'thalamic_widths': {
-        'E': 2.0,
+        'E': 1.0,
         'SST': 1.0,
         'PV': 1.0
     },
 
-    # Outgoing widths: more local for E, though L2/3 horizontal can remain moderate
     'outgoing_widths': {
-        'E': 2.0,
-        'SST': 7.0,  # Martinotti can be broad
-        'PV': 5.0
+        'E': 1.0,
+        'SST': 2.0,  
+        'PV': 2.0
     },
     
-    # Strength scaling factors: mature connection strength.
-    # At P16, connections are at mature strength.
     'strength_scaling': {
-        'E': 4.0,      # E cells have mature strength
-        'SST': 2.0,    # SST cells have mature strength
-        'PV': 5.0,     # PV cells have mature strength
-        'thalamus': 2.0  # Thalamic input at mature levels
+        'E': 1.0,      
+        'SST': 1.0,    
+        'PV': 1.0,     
+        'thalamus': 0.0
     },
     
-    # Sparsity factors: mature connectivity pattern.
-    # At P16, connectivity is mature.
     'sparsity': {
-        'E': 1.0,      # E cells have mature connectivity
-        'SST': 1.0,    # SST cells have nearly complete connectivity
-        'PV': 1.0,     # PV cells have mature connectivity pattern
-        'thalamus': 1.0  # Thalamic connectivity complete
+        'E': 1.0,      
+        'SST': 1.0,    
+        'PV': 1.0,     
+        'thalamus': 1.0  
     },
 
-    'thalamic_alpha': 0.7,  # mostly sensory-driven at P16
+    'thalamic_alpha': 0.7,
     
-    # Input noise parameters for each cell type.
-    # At P16, noise reaches mature levels with low correlation.
     'noise_params': {
         'E': {
-            'mean': 0.0,   # Balanced around zero
-            'std': 0.1,    # Mature level of variability
-            'c': 0.15      # Low correlation in mature network
+            'mean': 0.0,
+            'std': 0.2,  
+            'c': 0.4     
         },
         'SST': {
-            'mean': 0.0,   # Balanced around zero
-            'std': 0.1,    # Similar to E cells
-            'c': 0.15      # Similar to E cells
+            'mean': 0.0, 
+            'std': 0.2,  
+            'c': 0.4     
         },
         'PV': {
-            'mean': 0.0,   # Balanced around zero
-            'std': 0.15,   # Maintained variability for fast response
-            'c': 0.15      # Similar correlation to other cell types
+            'mean': 0.0,   
+            'std': 0.2,    
+            'c': 0.4     
         }
     },
 

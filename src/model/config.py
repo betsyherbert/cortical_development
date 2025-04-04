@@ -17,12 +17,8 @@ DT = 1.5  # Time step in milliseconds - INCREASE to speed up simulation
 INTEGRATION_STEPS = 5  # Number of steps per update cycle - INCREASE for faster visual changes
 VISUALIZATION_STEPS = 3  # Number of simulation steps per visualization update - DECREASE for more frequent visual updates
 UPDATE_INTERVAL = 60  # Time between visualization updates (ms) - DECREASE for more frequent visual updates
+NOISE_TAU = 20.0  # Time constant for Ornstein-Uhlenbeck process (ms)
 
-#------------------------------------------------------------------------------
-# Neural Noise Parameters
-#------------------------------------------------------------------------------
-NOISE_TAU = 5.0  # Time constant for Ornstein-Uhlenbeck process (ms)
-INITIAL_NOISE_PARAMS = P4_PRESET['noise_params']  # Inherit initial noise parameters from P4
 
 #------------------------------------------------------------------------------
 # Network Structure
@@ -43,7 +39,6 @@ CONNECTIONS = [
 #------------------------------------------------------------------------------
 # Thalamic Input Parameters
 #------------------------------------------------------------------------------
-THALAMIC_SCALING = 1.0  # Overall scaling factor for thalamic input
 THALAMIC_ALPHA = P4_PRESET['thalamic_alpha']  # Balance between intrinsic (0) and sensory (1) thalamic activity
 
 # Intrinsic burst parameters
@@ -67,6 +62,7 @@ INITIAL_STRENGTH_SCALING = P4_PRESET['strength_scaling']
 INITIAL_SPARSITY = P4_PRESET['sparsity']
 INITIAL_TIME_CONSTANTS = P4_PRESET['time_constants']
 INITIAL_GAINS = P4_PRESET['gains']
+INITIAL_NOISE_PARAMS = P4_PRESET['noise_params']  
 
 #------------------------------------------------------------------------------
 # Visualization Settings

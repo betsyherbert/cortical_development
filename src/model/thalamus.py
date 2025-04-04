@@ -13,7 +13,7 @@ from .config import (
     THALAMIC_INTRINSIC_INTERVAL, THALAMIC_INTRINSIC_AMP,
     THALAMIC_SENSORY_SIGMA, THALAMIC_SENSORY_DURATION,
     THALAMIC_SENSORY_INTERVAL, THALAMIC_SENSORY_AMP,
-    THALAMIC_SCALING, THALAMIC_ALPHA
+    THALAMIC_ALPHA
 )
 
 
@@ -189,7 +189,7 @@ class ThalamicInput:
         sensory = self.generate_sensory()
         combined = (1 - alpha) * intrinsic + alpha * sensory
         
-        return combined * THALAMIC_SCALING
+        return combined
     
     def reset(self) -> None:
         """Reset the generator to initial state."""

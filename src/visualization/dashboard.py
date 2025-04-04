@@ -9,8 +9,8 @@ import numpy as np
 import dash_bootstrap_components as dbc
 
 from model.config import (
-    COLORMAPS, UPDATE_INTERVAL, CELL_TYPES, LAYERS, LAYER_NAMES, 
-    THALAMIC_SCALING, LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, CONNECTIONS,
+    COLORMAPS, UPDATE_INTERVAL, CELL_TYPES, LAYERS, LAYER_NAMES,
+    LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, CONNECTIONS,
     INITIAL_THALAMIC_WIDTHS, INITIAL_OUTGOING_WIDTHS, 
     INITIAL_TIME_CONSTANTS, INITIAL_GAINS, CELL_ACTIVITY_COLORS,
     INITIAL_STRENGTH_SCALING, INITIAL_SPARSITY, INITIAL_NOISE_PARAMS
@@ -117,14 +117,6 @@ GRAPH_LAYOUT = {
     )
 }
 
-# Activity scaling parameters
-ACTIVITY_SCALING = {
-    'thalamus': {'zmax': THALAMIC_SCALING},
-    'E': {'zmax': 0.8},  # More sensitive to E cell activity
-    'SST': {'zmax': 0.8},  # More sensitive to inhibitory cell activity
-    'PV': {'zmax': 0.8}  # More sensitive to inhibitory cell activity
-}
-
 class DashboardApp:
     """
     Dashboard application for visualizing and controlling the neural simulation.
@@ -141,23 +133,23 @@ class DashboardApp:
     
     TIME_CONSTANT_PARAMS = {
         "min_val": 1.0,
-        "max_val": 100.0,
+        "max_val": 40.0,
         "step": 1.0,
-        "marks": {i: f"{i}" for i in range(20, 101, 20)}
+        "marks": {1: "1", 10: "10", 20: "20", 30: "30", 40: "40"}
     }
     
     GAIN_PARAMS = {
-        "min_val": 0.0,
+        "min_val": 0.4,
         "max_val": 1.0,
         "step": 0.1,
-        "marks": {i/10: f"{i/10:.1f}" for i in range(2, 11, 2)}
+        "marks": {0.4: "0.4", 0.6: "0.6", 0.8: "0.8", 1.0: "1"}
     }
     
     WIDTH_PARAMS = {
         "min_val": 0.1,
-        "max_val": 10.0,
+        "max_val": 8.0,
         "step": 0.1,
-        "marks": {i: f"{i}" for i in range(0, 11, 2)}
+        "marks": {i: f"{i}" for i in range(0, 9, 2)}
     }
     
     STRENGTH_SCALING_PARAMS = {
@@ -175,20 +167,20 @@ class DashboardApp:
     }
     
     NOISE_MEAN_PARAMS = {
-        "min_val": 0.0,
-        "max_val": 0.4,
+        "min_val": -0.2,
+        "max_val": 0.2,
         "step": 0.05,
         "marks": {
-            0: "0",
-            0.2: "0.2",
-            0.4: "0.4"
+            -0.2: "-0.2",
+            0.0: "0",
+            0.2: "0.2"
         }
     }
     
     NOISE_STD_PARAMS = {
         "min_val": 0.0,
         "max_val": 0.4,
-        "step": 0.05,
+        "step": 0.02,
         "marks": {
             0: "0",
             0.2: "0.2",
@@ -546,7 +538,7 @@ class DashboardApp:
     def create_heatmap(self, data: np.ndarray, cell_type: str) -> go.Figure:
         """Create a heatmap figure for the given neural activity data."""
         colorscale = COLORMAPS.get(cell_type, [[0, 'black'], [1, 'gray']])
-        zmax = ACTIVITY_SCALING[cell_type]['zmax']
+        zmax = 1 # ACTIVITY_SCALING[cell_type]['zmax']
         
         return go.Figure(
             data=[go.Heatmap(
