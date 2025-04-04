@@ -903,7 +903,7 @@ class DashboardApp:
             Input(f'{preset_name}-preset-button', 'n_clicks'),
             prevent_initial_call=True
         )
-        def apply_preset_callback(n_clicks):
+        def apply_preset_callback(n_clicks):  # pylint: disable=unused-argument
             """Apply the preset configuration."""
             # Apply the preset using the generic apply_preset function
             self._apply_preset(preset_obj)
@@ -928,25 +928,27 @@ class DashboardApp:
 
     def get_connection_value(self, source_layer, source_cell, target_layer, target_cell):
         """Get the current connection strength value."""
-        conn_key = self.get_connection_key(source_layer, source_cell, target_layer, target_cell)
-        
-        # First try to get the value from the simulation connectivity
-        if hasattr(self, 'simulation') and hasattr(self.simulation, 'connectivity'):
-            # Convert 'Th' to 'thalamus' for the simulation API
-            source_layer_sim = 'thalamus' if source_layer == 'Th' else source_layer
-            try:
+        try:
+            # Get connection strength
+            conn_key = self.get_connection_key(source_layer, source_cell, target_layer, target_cell)
+            
+            # First try to get the value from the simulation connectivity
+            if hasattr(self, 'simulation') and hasattr(self.simulation, 'connectivity'):
+                # Convert 'Th' to 'thalamus' for the simulation API
+                source_layer_sim = 'thalamus' if source_layer == 'Th' else source_layer
                 return self.simulation.connectivity.get_connection_strength(
                     source_layer_sim, source_cell, target_layer, target_cell
                 )
-            except Exception as e:
-                print(f"Error getting connection from simulation: {e}")
                 
-        # Fall back to config-based lookup
-        if conn_key in LAYER_CONNECTIVITY_PARAMS:
-            return LAYER_CONNECTIVITY_PARAMS[conn_key]['amplitude']
-            
-        # Default to 0 if not found
-        return 0.0
+            # Fall back to config-based lookup
+            if conn_key in LAYER_CONNECTIVITY_PARAMS:
+                return LAYER_CONNECTIVITY_PARAMS[conn_key]['amplitude']
+                
+            # Default to 0 if not found
+            return 0.0
+        except (AttributeError, KeyError) as e:
+            print(f"Error getting connection from simulation: {str(e)}")
+            return 0.0
 
     def setup_callbacks(self):
         """Set up the dashboard callbacks for interactivity."""
@@ -964,7 +966,7 @@ class DashboardApp:
             [Input('connection-matrix-container', 'children')],
             [State('selected-cell', 'data')]
         )
-        def initialize_slider_container(_, current_data):
+        def initialize_slider_container(_, current_data):  # pylint: disable=unused-argument
             """Initialize the slider container as hidden when the dashboard loads."""
             return {'display': 'none', 'position': 'absolute'}, [], None
             
@@ -977,7 +979,7 @@ class DashboardApp:
             [State('selected-cell', 'data')],
             prevent_initial_call=True
         )
-        def handle_cell_click(clicks, current_data):
+        def handle_cell_click(clicks, current_data):  # pylint: disable=unused-argument
             """Show the connection strength slider when a matrix cell is clicked."""
             try:
                 # Get the context that triggered the callback
@@ -1031,8 +1033,8 @@ class DashboardApp:
                     'top': '0px',
                     'left': '0px'
                 }, slider, connection_data
-            except Exception as e:
-                print(f"Error handling cell click: {e}")
+            except (json.JSONDecodeError, KeyError, IndexError) as e:
+                print(f"Error handling cell click: {str(e)}")
                 return {'display': 'none', 'position': 'absolute'}, [], None
         
         # Update connection strength when slider changes
@@ -1063,8 +1065,8 @@ class DashboardApp:
                 )
                 
                 return f"Value: {value:.1f}"
-            except Exception as e:
-                print(f"Error updating connection value: {e}")
+            except (KeyError, AttributeError, ValueError) as e:
+                print(f"Error updating connection value: {str(e)}")
                 return f"Error: {str(e)}"
         
         # Update connection cell in matrix when slider changes
@@ -1076,7 +1078,7 @@ class DashboardApp:
             [State({'type': 'connection-cell', 'id': MATCH}, 'style'),
              State({'type': 'connection-cell', 'id': MATCH}, 'id')]
         )
-        def update_matrix_cell(value, current_style, cell_id):
+        def update_matrix_cell(value, current_style, cell_id):  # pylint: disable=unused-argument
             """Update the matrix cell appearance and value when the slider changes."""
             if value is None:
                 # No change if value is None
@@ -1085,7 +1087,7 @@ class DashboardApp:
             try:
                 # Parse cell ID from the dictionary
                 cell_id_str = cell_id['id']  # Extract the ID string from the dictionary
-                source_layer, source_cell, target_layer, target_cell = cell_id_str.split('-')
+                source_layer, source_cell, _, target_cell = cell_id_str.split('-')
                 source_cell = None if source_cell == 'None' else source_cell
                 
                 # Determine cell colors based on connection strength and source cell type
@@ -1104,8 +1106,8 @@ class DashboardApp:
                 
                 # Return updated text, style, and hover color
                 return f"{value:.1f}", updated_style, hover_color
-            except Exception as e:
-                print(f"Error updating matrix cell: {e}")
+            except (KeyError, ValueError) as e:
+                print(f"Error updating matrix cell: {str(e)}")
                 return dash.no_update, dash.no_update, dash.no_update
         
         # Reset the slider when clicking the reset button
@@ -1116,7 +1118,7 @@ class DashboardApp:
             Input('reset-slider-state-btn', 'n_clicks'),
             prevent_initial_call=True
         )
-        def reset_slider_state(n_clicks):
+        def reset_slider_state(n_clicks):  # pylint: disable=unused-argument
             """Reset the slider state when clicking outside the slider or matrix."""
             return {'display': 'none', 'position': 'absolute'}, [], None
         
@@ -1195,13 +1197,13 @@ class DashboardApp:
              Input('gain-pv-slider', 'value')],
             [State('interval-component', 'n_intervals')]
         )
-        def update_neuron_parameters(tau_e, tau_sst, tau_pv, gain_e, gain_sst, gain_pv, n_intervals):
-            # No need to update parameters here since it's already handled in update_graphs
-            # This callback is kept just to maintain the slider interactivity and force a refresh
-            # when the sliders are moved
+        # def update_neuron_parameters(tau_e, tau_sst, tau_pv, gain_e, gain_sst, gain_pv, n_intervals):
+        #     # No need to update parameters here since it's already handled in update_graphs
+        #     # This callback is kept just to maintain the slider interactivity and force a refresh
+        #     # when the sliders are moved
             
-            # Return unchanged intervals to not disrupt the update loop
-            return [n_intervals]
+        #     # Return unchanged intervals to not disrupt the update loop
+        #     return [n_intervals]
         
         # Add callback for updating connectivity widths in simulation
         @self.app.callback(
@@ -1275,9 +1277,9 @@ class DashboardApp:
             # States: pause button state
             [State('pause-button', 'n_clicks')]
         )
-        def update_graphs(n_intervals, alpha, tau_e, tau_sst, tau_pv, gain_e, gain_sst, gain_pv, 
+        def update_graphs(n_intervals, alpha, tau_e, tau_sst, tau_pv, gain_e, gain_sst, gain_pv, # pylint: disable=unused-argument
                          sigma_thal_e, sigma_thal_sst, sigma_thal_pv, sigma_e_out, sigma_sst_out, sigma_pv_out,
-                         pause_clicks):
+                         pause_clicks):  
             """Update all graphs based on current slider values."""
             # Check if simulation is paused
             is_paused = pause_clicks is not None and pause_clicks % 2 == 1
