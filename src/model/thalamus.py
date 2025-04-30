@@ -138,7 +138,7 @@ class ThalamicInput:
         """Create a new burst with appropriate parameters."""
         burst = {
             'center': center,
-            'sigma': sigma * np.random.uniform(0.5, 1.5),
+            'sigma': sigma * np.random.uniform(0.3, 1.7),
             'duration': duration * np.random.uniform(0.5, 1.5),
             'amplitude': amplitude * np.random.uniform(0.5, 1.5),
             'start_time': self.t

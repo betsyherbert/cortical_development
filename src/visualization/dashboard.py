@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 import numpy as np
 import dash_bootstrap_components as dbc
 
+
 from model.config import (
     COLORMAPS, UPDATE_INTERVAL, CELL_TYPES, LAYERS, LAYER_NAMES,
     LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, CONNECTIONS,
@@ -341,16 +342,16 @@ class DashboardApp:
                 # Buttons container
                 dbc.Col([
                     html.Div([
-                        dbc.Button("P4", id="p4-preset-button", color="dark", 
+                        dbc.Button("P3", id="p4-preset-button", color="dark", 
                                 className="mx-2 px-3", 
                                 style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
-                        dbc.Button("P8", id="p8-preset-button", color="dark", 
+                        dbc.Button("P7", id="p8-preset-button", color="dark", 
                                 className="mx-2 px-3", 
                                 style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
-                        dbc.Button("P12", id="p12-preset-button", color="dark", 
+                        dbc.Button("P11", id="p12-preset-button", color="dark", 
                                  className="mx-2 px-3", 
                                  style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
-                        dbc.Button("P16", id="p16-preset-button", color="dark", 
+                        dbc.Button("P15", id="p16-preset-button", color="dark", 
                                  className="mx-2 px-3", 
                                  style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"})
                     ], style={"display": "flex", "justifyContent": "center"})
@@ -365,7 +366,7 @@ class DashboardApp:
                 # Thalamus label
                 dbc.Col([
                     html.Div([
-                        html.H6("TC",
+                        html.H6("Th",
                                style={
                                    "margin": "0",
                                    "whiteSpace": "nowrap"  # Prevent text wrapping
@@ -1638,27 +1639,28 @@ class DashboardApp:
             
             # Section: Connectivity widths
             html.Div([
-                html.H5("Connectivity Widths", className="text-center"),
+                html.H5("Connection Widths", className="text-center"),
                 self.create_connectivity_sliders(),
                 
                 # Section for strength scaling
                 html.Div([html.Hr()], className="my-3"),
+                html.H5("Strength Scaling", className="text-center"),
                 self.create_strength_scaling_sliders(),
+                
+                # Section for thalamic input balance
+                html.Div([html.Hr()], className="my-3"),
+                html.H5("Thalamic Input", className="text-center"),
+                self.create_input_controls(),
                 
                 # Section for noise parameters
                 html.Div([html.Hr()], className="my-3"),
-                html.H5("Noise Parameters", className="text-center"),
+                html.H5("External Input", className="text-center"),
                 self.create_noise_sliders(),
                 
                 # Section for sparsity
                 html.Div([html.Hr()], className="my-3"),
+                html.H5("Sparsity", className="text-center"),
                 self.create_sparsity_sliders()
-            ], className="mb-3"),
-            
-            # Section: Input controls
-            html.Div([
-                html.H5("Thalamic Input Balance"),
-                self.create_input_controls()
             ], className="mb-3"),
             
             # Pause/Play control

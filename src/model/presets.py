@@ -4,9 +4,9 @@
 P4_PRESET = {
     # Approximate time constants (ms). 
     'time_constants': {
-        'E': 20.0,    # excitatory cells slower than adult
-        'SST': 20.0,  # SST cells already somewhat active, but still slower
-        'PV': 20.0    # prospective PV cells, minimal functional synapses
+        'E': 15.0,    # excitatory cells slower than adult
+        'SST': 25.0,  # SST cells already somewhat active, but still slower
+        'PV': 25.0    # prospective PV cells, minimal functional synapses
     },
 
     # Gains: relative excitability within [0,1]. 
@@ -19,42 +19,42 @@ P4_PRESET = {
     # Input noise parameters for each cell type.
     'noise_params': {
         'E': {
-            'mean': 0.0,
-            'std': 0.2,  
+            'mean': -0.05,
+            'std': 0.04,  
             'c': 0.4     
         },
         'SST': {
             'mean': 0.0, 
-            'std': 0.2,  
+            'std': 0.04,  
             'c': 0.4     
         },
         'PV': {
             'mean': 0.0,   
-            'std': 0.2,    
+            'std': 0.04,    
             'c': 0.4     
         }
     },
 
     # Thalamic input widths: how broadly thalamic input is spatially spread. 
     'thalamic_widths': {
-        'E': 4.0,
-        'SST': 4.0,
-        'PV': 4.0
+        'E': 2.0,
+        'SST': 2.0,
+        'PV': 2.0
     },
 
     # Outgoing widths: how far each cell type's lateral connections spread.
     'outgoing_widths': {
-        'E': 3.0,
-        'SST': 4.0,
-        'PV': 4.0
+        'E': 6.0,
+        'SST': 6.0,
+        'PV': 6.0
     },
     
     # Strength scaling factors: overall scaling of connection strengths.
     'strength_scaling': {
-        'E': 1.0,      # E cells have weak but present connections
+        'E': 1.5,      # E cells have weak but present connections
         'SST': 1.0,    # SST cells have weaker connections
         'PV': 1.0,     # PV cells have very weak connections 
-        'thalamus': 0.0  # Thalamic input is present but not fully developed
+        'thalamus': 1.0  # Thalamic input is present but not fully developed
     },
     
     # Sparsity factors: fraction of connections present (1 = all, 0 = none).
@@ -66,7 +66,7 @@ P4_PRESET = {
     },
 
     # Thalamic alpha: ratio between sensory-driven vs. intrinsic input.
-    'thalamic_alpha': 0.2,
+    'thalamic_alpha': 0.1,
     
     'connection_strengths': {
 
@@ -75,7 +75,7 @@ P4_PRESET = {
             'L23_E_to_L23_SST': 0.1,
             'L23_E_to_L23_PV': 0.2,
             'L23_SST_to_L23_E': 0.0,   
-            'L23_SST_to_L23_PV': 0.0,
+            'L23_SST_to_L23_PV': 0.2,
             'L23_PV_to_L23_E': 0.0,    
             'L23_PV_to_L23_SST': 0.0,  
             'L23_PV_to_L23_PV': 0.0,   
@@ -101,7 +101,7 @@ P4_PRESET = {
             'L23_PV_to_L5_PV': 0.0,
 
             # ---------- L4 (within L4) ----------
-            'L4_E_to_L4_E': 0.1,
+            'L4_E_to_L4_E': 0.0,
             'L4_E_to_L4_SST': 0.0,
             'L4_E_to_L4_PV': 0.1,
             'L4_SST_to_L4_E': 0.0,
@@ -125,7 +125,7 @@ P4_PRESET = {
             'L4_E_to_L5_SST': 0.4,
             'L4_E_to_L5_PV': 0.0,
             'L4_SST_to_L5_E': 0.0,
-            'L4_SST_to_L5_PV': 0.3,
+            'L4_SST_to_L5_PV': 0.0,
             'L4_PV_to_L5_E': 0.0,
             'L4_PV_to_L5_SST': 0.0,
             'L4_PV_to_L5_PV': 0.0,
@@ -141,7 +141,7 @@ P4_PRESET = {
             'L5_PV_to_L5_PV': 0.0,
 
             # ---------- L5 to L2/3 ----------
-            'L5_E_to_L23_E': 1.0,  
+            'L5_E_to_L23_E': 0.5,  
             'L5_E_to_L23_SST': 0.1,
             'L5_E_to_L23_PV': 0.0,
             'L5_SST_to_L23_E': 0.0,
@@ -155,7 +155,7 @@ P4_PRESET = {
             'L5_E_to_L4_SST': 0.1,
             'L5_E_to_L4_PV': 0.0,
             'L5_SST_to_L4_E': 0.5,
-            'L5_SST_to_L4_PV': 0.5,
+            'L5_SST_to_L4_PV': 0.2,
             'L5_PV_to_L4_E': 0.0,
             'L5_PV_to_L4_SST': 0.0,
             'L5_PV_to_L4_PV': 0.0,
@@ -164,10 +164,10 @@ P4_PRESET = {
             'thalamus_to_L23_E': 0.0,
             'thalamus_to_L23_SST': 0.2,
             'thalamus_to_L23_PV': 0.0,
-            'thalamus_to_L4_E': 0.2,
-            'thalamus_to_L4_SST': 0.5,
+            'thalamus_to_L4_E': 0.1,
+            'thalamus_to_L4_SST': 0.3,
             'thalamus_to_L4_PV': 0.0,
-            'thalamus_to_L5_E': 0.2,
+            'thalamus_to_L5_E': 0.1,
             'thalamus_to_L5_SST': 1.0,
             'thalamus_to_L5_PV': 0.1
         }
@@ -176,7 +176,7 @@ P4_PRESET = {
 # ----------------- P8 PRESET (Late 1st Week) -----------------
 P8_PRESET = {
     'time_constants': {
-        'E': 10.0,
+        'E': 14.0,
         'SST': 20.0,
         'PV': 20.0
     },
@@ -190,38 +190,38 @@ P8_PRESET = {
     'noise_params': {
         'E': {
             'mean': 0.0,
-            'std': 0.2,  
+            'std': 0.04,  
             'c': 0.4     
         },
         'SST': {
             'mean': 0.0, 
-            'std': 0.2,  
+            'std': 0.04,  
             'c': 0.4     
         },
         'PV': {
             'mean': 0.0,   
-            'std': 0.2,    
+            'std': 0.04,    
             'c': 0.4     
         }
     },
 
     'thalamic_widths': {
-        'E': 3.0,
-        'SST': 3.0,
-        'PV': 3.0
+        'E': 1.4,
+        'SST': 2.0,
+        'PV': 2.0
     },
 
     'outgoing_widths': {
-        'E': 2.0,
-        'SST': 4.0,
-        'PV': 4.0
+        'E': 2.7,
+        'SST': 6.0,
+        'PV': 6.0
     },
 
     'strength_scaling': {
-        'E': 1.0,    
-        'SST': 1.0,  
-        'PV': 1.0,   
-        'thalamus': 0.0
+        'E': 3.0,    
+        'SST': 2.0,  
+        'PV': 2.0,   
+        'thalamus': 2.0
     },
     
     'sparsity': {
@@ -231,7 +231,7 @@ P8_PRESET = {
         'thalamus': 1.0 
     },
 
-    'thalamic_alpha': 0.3,
+    'thalamic_alpha': 0.4,
         
     'connection_strengths': {
 
@@ -240,7 +240,7 @@ P8_PRESET = {
             'L23_E_to_L23_SST': 0.3,
             'L23_E_to_L23_PV': 0.3,
             'L23_SST_to_L23_E': -0.3,   
-            'L23_SST_to_L23_PV': -0.7,
+            'L23_SST_to_L23_PV': -0.5,
             'L23_PV_to_L23_E': -0.3,    
             'L23_PV_to_L23_SST': -0.1,  
             'L23_PV_to_L23_PV': -0.2,   
@@ -266,7 +266,7 @@ P8_PRESET = {
             'L23_PV_to_L5_PV': 0.0,
 
             # ---------- L4 (within L4) ----------
-            'L4_E_to_L4_E': 0.3,
+            'L4_E_to_L4_E': 0.4,
             'L4_E_to_L4_SST': 0.2,
             'L4_E_to_L4_PV': 0.4,
             'L4_SST_to_L4_E': -0.2,
@@ -290,7 +290,7 @@ P8_PRESET = {
             'L4_E_to_L5_SST': 0.6,
             'L4_E_to_L5_PV': 0.0,
             'L4_SST_to_L5_E': 0.0,
-            'L4_SST_to_L5_PV': -0.5,
+            'L4_SST_to_L5_PV': -0.2,
             'L4_PV_to_L5_E': -0.1,
             'L4_PV_to_L5_SST': 0.0,
             'L4_PV_to_L5_PV': -0.1,
@@ -298,15 +298,15 @@ P8_PRESET = {
             # ---------- L5 (within L5) ----------
             'L5_E_to_L5_E': 0.3,
             'L5_E_to_L5_SST': 0.3,
-            'L5_E_to_L5_PV': 0.2,
+            'L5_E_to_L5_PV': 0.5,
             'L5_SST_to_L5_E': -0.3,
-            'L5_SST_to_L5_PV': -0.7,
+            'L5_SST_to_L5_PV': -0.5,
             'L5_PV_to_L5_E': -0.3,
             'L5_PV_to_L5_SST': -0.1,
             'L5_PV_to_L5_PV': -0.3,
 
             # ---------- L5 to L2/3 ----------
-            'L5_E_to_L23_E': 0.7,  
+            'L5_E_to_L23_E': 0.4,  
             'L5_E_to_L23_SST': 0.2,
             'L5_E_to_L23_PV': 0.1,
             'L5_SST_to_L23_E': -0.1,
@@ -330,7 +330,7 @@ P8_PRESET = {
             'thalamus_to_L23_SST': 0.1,
             'thalamus_to_L23_PV': 0.0,
             'thalamus_to_L4_E': 0.4,
-            'thalamus_to_L4_SST': 0.4,
+            'thalamus_to_L4_SST': 0.2,
             'thalamus_to_L4_PV': 0.3,
             'thalamus_to_L5_E': 0.2,
             'thalamus_to_L5_SST': 0.5,
@@ -342,8 +342,8 @@ P8_PRESET = {
 P12_PRESET = {
     'time_constants': {
         'E': 10.0,  
-        'SST': 15.0,
-        'PV': 15.0
+        'SST': 20.0,
+        'PV': 20.0
     },
 
     'gains': {
@@ -353,22 +353,22 @@ P12_PRESET = {
     },
 
     'thalamic_widths': {
-        'E': 2.0,
-        'SST': 2.0,
-        'PV': 2.0
+        'E': 1.0,
+        'SST': 1.5,
+        'PV': 1.5
     },
 
     'outgoing_widths': {
         'E': 2.0,   
-        'SST': 3.0,
-        'PV': 3.0
+        'SST': 2.0,
+        'PV': 2.0
     },
     
     'strength_scaling': {
-        'E': 1.0,      
-        'SST': 1.0,    
-        'PV': 1.0,     
-        'thalamus': 0.0
+        'E': 3.4,      
+        'SST': 2.0,    
+        'PV': 2.0,     
+        'thalamus': 1.0
     },
     
     'sparsity': {
@@ -378,22 +378,22 @@ P12_PRESET = {
         'thalamus': 1.0 
     },
 
-    'thalamic_alpha': 0.5, 
+    'thalamic_alpha': 0.8, 
     
     'noise_params': {
         'E': {
-            'mean': 0.0,
-            'std': 0.2,  
+            'mean': 0.05,
+            'std': 0.02,  
             'c': 0.4     
         },
         'SST': {
             'mean': 0.0, 
-            'std': 0.2,  
+            'std': 0.02,  
             'c': 0.4     
         },
         'PV': {
-            'mean': 0.0,   
-            'std': 0.2,    
+            'mean': 0.05,   
+            'std': 0.02,    
             'c': 0.4     
         }
     },
@@ -405,7 +405,7 @@ P12_PRESET = {
             'L23_E_to_L23_SST': 0.5,
             'L23_E_to_L23_PV': 0.5,
             'L23_SST_to_L23_E': -0.7,   
-            'L23_SST_to_L23_PV': -0.5,
+            'L23_SST_to_L23_PV': -0.4,
             'L23_PV_to_L23_E': -0.7,    
             'L23_PV_to_L23_SST': -0.2,  
             'L23_PV_to_L23_PV': -0.4,   
@@ -431,7 +431,7 @@ P12_PRESET = {
             'L23_PV_to_L5_PV': 0.0,
 
             # ---------- L4 (within L4) ----------
-            'L4_E_to_L4_E': 0.4,
+            'L4_E_to_L4_E': 0.5,
             'L4_E_to_L4_SST': 0.6,
             'L4_E_to_L4_PV': 0.8,
             'L4_SST_to_L4_E': -0.5,
@@ -455,7 +455,7 @@ P12_PRESET = {
             'L4_E_to_L5_SST': 0.4,
             'L4_E_to_L5_PV': 0.1,
             'L4_SST_to_L5_E': -0.1,
-            'L4_SST_to_L5_PV': -0.3,
+            'L4_SST_to_L5_PV': -0.1,
             'L4_PV_to_L5_E': -0.2,
             'L4_PV_to_L5_SST': 0.0,
             'L4_PV_to_L5_PV': -0.2,
@@ -463,20 +463,20 @@ P12_PRESET = {
             # ---------- L5 (within L5) ----------
             'L5_E_to_L5_E': 0.6,
             'L5_E_to_L5_SST': 0.6,
-            'L5_E_to_L5_PV': 0.6,
+            'L5_E_to_L5_PV': 0.8,
             'L5_SST_to_L5_E': -0.6,
-            'L5_SST_to_L5_PV': -0.3,
+            'L5_SST_to_L5_PV': -0.2,
             'L5_PV_to_L5_E': -0.8,
             'L5_PV_to_L5_SST': -0.2,
             'L5_PV_to_L5_PV': -0.5,
 
             # ---------- L5 to L2/3 ----------
-            'L5_E_to_L23_E': 0.4,  
+            'L5_E_to_L23_E': 0.3,  
             'L5_E_to_L23_SST': 0.3,
             'L5_E_to_L23_PV': 0.2,
             'L5_SST_to_L23_E': -0.2,
             'L5_SST_to_L23_PV': 0.0,
-            'L5_PV_to_L23_E': -0.3,
+            'L5_PV_to_L23_E': 0.0,
             'L5_PV_to_L23_SST': 0.0,
             'L5_PV_to_L23_PV': -0.2,
 
@@ -495,10 +495,10 @@ P12_PRESET = {
             'thalamus_to_L23_SST': 0.0,
             'thalamus_to_L23_PV': 0.0,
             'thalamus_to_L4_E': 0.8,
-            'thalamus_to_L4_SST': 0.2,
+            'thalamus_to_L4_SST': 0.1,
             'thalamus_to_L4_PV': 0.5,
             'thalamus_to_L5_E': 0.2,
-            'thalamus_to_L5_SST': 0.3,
+            'thalamus_to_L5_SST': 0.2,
             'thalamus_to_L5_PV': 0.2
         }
 
@@ -507,9 +507,9 @@ P12_PRESET = {
 # ----------------- P16 PRESET (Late 2nd Week) -----------------
 P16_PRESET = {
     'time_constants': {
-        'E': 10.0,  
+        'E': 5.0,  
         'SST': 10.0,
-        'PV': 10.0
+        'PV': 4.0
     },
 
     'gains': {
@@ -519,22 +519,22 @@ P16_PRESET = {
     },
 
     'thalamic_widths': {
-        'E': 1.0,
-        'SST': 1.0,
-        'PV': 1.0
+        'E': 0.5,
+        'SST': 0.5,
+        'PV': 0.5
     },
 
     'outgoing_widths': {
-        'E': 1.0,
-        'SST': 2.0,  
-        'PV': 2.0
+        'E': 0.8,
+        'SST': 1.0,  
+        'PV': 0.6
     },
     
     'strength_scaling': {
-        'E': 1.0,      
-        'SST': 1.0,    
-        'PV': 1.0,     
-        'thalamus': 0.0
+        'E': 4.0,      
+        'SST': 2.0,    
+        'PV': 2.0,     
+        'thalamus': 1.0
     },
     
     'sparsity': {
@@ -544,23 +544,23 @@ P16_PRESET = {
         'thalamus': 1.0  
     },
 
-    'thalamic_alpha': 0.7,
+    'thalamic_alpha': 1.0,
     
     'noise_params': {
         'E': {
-            'mean': 0.0,
-            'std': 0.2,  
-            'c': 0.4     
+            'mean': 0.05,
+            'std': 0.04,  
+            'c': 0.2     
         },
         'SST': {
-            'mean': 0.0, 
-            'std': 0.2,  
-            'c': 0.4     
+            'mean': 0.00, 
+            'std': 0.04,  
+            'c': 0.2     
         },
         'PV': {
-            'mean': 0.0,   
-            'std': 0.2,    
-            'c': 0.4     
+            'mean': 0.05,   
+            'std': 0.04,    
+            'c': 0.2     
         }
     },
 
@@ -573,7 +573,7 @@ P16_PRESET = {
             'L23_SST_to_L23_E': -0.7,   
             'L23_SST_to_L23_PV': -0.3,
             'L23_PV_to_L23_E': -0.6,    
-            'L23_PV_to_L23_SST': -0.2,  
+            'L23_PV_to_L23_SST': -0.4,  
             'L23_PV_to_L23_PV': -0.5,   
 
             # ---------- L2/3 to L4 ----------
@@ -597,13 +597,13 @@ P16_PRESET = {
             'L23_PV_to_L5_PV': 0.0,
 
             # ---------- L4 (within L4) ----------
-            'L4_E_to_L4_E': 0.5,
+            'L4_E_to_L4_E': 0.6,
             'L4_E_to_L4_SST': 1.0,
             'L4_E_to_L4_PV': 1.0,
             'L4_SST_to_L4_E': -0.7,
             'L4_SST_to_L4_PV': -0.3,
             'L4_PV_to_L4_E': -1.0,
-            'L4_PV_to_L4_SST': -0.2,
+            'L4_PV_to_L4_SST': -0.4,
             'L4_PV_to_L4_PV': -0.7,
 
             # ---------- L4 to L2/3 ----------
@@ -621,7 +621,7 @@ P16_PRESET = {
             'L4_E_to_L5_SST': 0.3,
             'L4_E_to_L5_PV': 0.2,
             'L4_SST_to_L5_E': -0.2,
-            'L4_SST_to_L5_PV': -0.1,
+            'L4_SST_to_L5_PV': 0.0,
             'L4_PV_to_L5_E': -0.3,
             'L4_PV_to_L5_SST': -0.1,
             'L4_PV_to_L5_PV': -0.3,
@@ -631,16 +631,16 @@ P16_PRESET = {
             'L5_E_to_L5_SST': 1.0,
             'L5_E_to_L5_PV': 1.0,
             'L5_SST_to_L5_E': -1.0,
-            'L5_SST_to_L5_PV': -0.3,
+            'L5_SST_to_L5_PV': -0.1,
             'L5_PV_to_L5_E': -1.0,
-            'L5_PV_to_L5_SST': -0.2,
+            'L5_PV_to_L5_SST': -0.4,
             'L5_PV_to_L5_PV': -0.7,
 
             # ---------- L5 to L2/3 ----------
             'L5_E_to_L23_E': 0.2,  
             'L5_E_to_L23_SST': 0.1,
             'L5_E_to_L23_PV': 0.2,
-            'L5_SST_to_L23_E': 0.0,
+            'L5_SST_to_L23_E': -0.4,
             'L5_SST_to_L23_PV': 0.0,
             'L5_PV_to_L23_E': 0.0,
             'L5_PV_to_L23_SST': 0.0,
@@ -661,10 +661,10 @@ P16_PRESET = {
             'thalamus_to_L23_SST': 0.0,
             'thalamus_to_L23_PV': 0.1,
             'thalamus_to_L4_E': 1.0,
-            'thalamus_to_L4_SST': 0.1,
+            'thalamus_to_L4_SST': 0.0,
             'thalamus_to_L4_PV': 0.7,
             'thalamus_to_L5_E': 0.2,
-            'thalamus_to_L5_SST': 0.1,
+            'thalamus_to_L5_SST': 0.0,
             'thalamus_to_L5_PV': 0.2
         }
 

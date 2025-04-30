@@ -39,19 +39,18 @@ CONNECTIONS = [
 #------------------------------------------------------------------------------
 # Thalamic Input Parameters
 #------------------------------------------------------------------------------
-THALAMIC_ALPHA = P4_PRESET['thalamic_alpha']  # Balance between intrinsic (0) and sensory (1) thalamic activity
 
 # Intrinsic burst parameters
-THALAMIC_INTRINSIC_SIGMA = 4.0  # Mean spatial spread of intrinsic bursts (grid units)
+THALAMIC_INTRINSIC_SIGMA = 2.0  # Mean spatial spread of intrinsic bursts (grid units)
 THALAMIC_INTRINSIC_DURATION = 30.0  # Mean duration of intrinsic bursts (ms)
 THALAMIC_INTRINSIC_INTERVAL = 20.0  # Mean interval between intrinsic bursts (ms)
-THALAMIC_INTRINSIC_AMP = 2.0  # Mean amplitude of intrinsic bursts
+THALAMIC_INTRINSIC_AMP = 5.0  # Mean amplitude of intrinsic bursts
 
 # Sensory burst parameters
-THALAMIC_SENSORY_SIGMA = 1.5  # Spatial spread of sensory inputs (grid units)
+THALAMIC_SENSORY_SIGMA = 0.5  # Spatial spread of sensory inputs (grid units)
 THALAMIC_SENSORY_DURATION = 10.0  # Duration of sensory bursts (ms)
 THALAMIC_SENSORY_INTERVAL = 10.0  # Mean interval between sensory bursts (ms)
-THALAMIC_SENSORY_AMP = 1.0  # Mean amplitude of sensory bursts
+THALAMIC_SENSORY_AMP = 2.0  # Mean amplitude of sensory bursts
 
 #------------------------------------------------------------------------------
 # Initial Network Parameters
@@ -63,6 +62,7 @@ INITIAL_SPARSITY = P4_PRESET['sparsity']
 INITIAL_TIME_CONSTANTS = P4_PRESET['time_constants']
 INITIAL_GAINS = P4_PRESET['gains']
 INITIAL_NOISE_PARAMS = P4_PRESET['noise_params']  
+THALAMIC_ALPHA = P4_PRESET['thalamic_alpha']  # Balance between intrinsic (0) and sensory (1) thalamic activity
 
 #------------------------------------------------------------------------------
 # Visualization Settings
