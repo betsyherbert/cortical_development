@@ -8,7 +8,6 @@ from model.config import (
     GRID_SIZE, INTEGRATION_STEPS, THALAMIC_ALPHA
 )
 
-
 class CorticalSimulation:
     """Main simulation class that integrates thalamic input with the cortical circuit."""
     
@@ -209,8 +208,12 @@ def main():
     args = parse_arguments()
     sim = CorticalSimulation()
     app = DashboardApp(sim)
-    app.run(debug=args.debug, port=8051)
+    app.run(debug=args.debug, port=args.port)
 
+# Create the server variable that will be used by gunicorn
+sim = CorticalSimulation()
+app = DashboardApp(sim)
+server = app.app  # Dash apps expose their Flask server through the app attribute
 
 if __name__ == "__main__":
     main() 
