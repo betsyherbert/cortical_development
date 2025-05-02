@@ -16,7 +16,7 @@ GRID_SIZE = 20  # Size of the 2D grid
 DT = 1.5  # Time step in milliseconds - INCREASE to speed up simulation
 INTEGRATION_STEPS = 5  # Number of steps per update cycle - INCREASE for faster visual changes
 VISUALIZATION_STEPS = 3  # Number of simulation steps per visualization update - DECREASE for more frequent visual updates
-UPDATE_INTERVAL = 60  # Time between visualization updates (ms) - DECREASE for more frequent visual updates
+UPDATE_INTERVAL = 500  # Time between visualization updates (ms) - DECREASE for more frequent visual updates
 NOISE_TAU = 20.0  # Time constant for Ornstein-Uhlenbeck process (ms)
 
 
