@@ -213,7 +213,7 @@ def main():
 # Create the server variable that will be used by gunicorn
 sim = CorticalSimulation()
 app = DashboardApp(sim)
-server = app.app  # Dash apps expose their Flask server through the app attribute
+server = app.app.server  #  Flask instance — which is the callable WSGI application Gunicorn expects.
 
 if __name__ == "__main__":
     main() 
