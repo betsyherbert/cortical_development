@@ -40,3 +40,33 @@ ENV/
 .Trashes
 ehthumbs.db
 Thumbs.db 
+
+# Heroku / Deployment logs
+heroku-debug.log
+
+# Secrets
+.env
+*.env
+.envrc
+
+# Logs, outputs, profiler
+*.log
+*.out
+*.prof
+.cache/
+
+# Testing
+.coverage
+htmlcov/
+pytest_cache/
+
+# Checkpoints / models
+*.npy
+*.npz
+*.pkl
+*.pt
+*.h5
+*.ckpt
+
+# Jupyter notebooks
+.ipynb_checkpoints/
