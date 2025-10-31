@@ -12,7 +12,7 @@ import pickle
 from pathlib import Path
 
 from src.main import CorticalSimulation
-from src.analysis.utils import save_with_version, load_with_version
+from src.analysis.common import save_with_version, load_with_version
 from .config import NUMERICAL_TOLERANCES
 from .parameter_sweeper import BifurcationAnalysisResult, ParameterPoint
 

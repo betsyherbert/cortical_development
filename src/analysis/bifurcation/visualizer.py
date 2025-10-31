@@ -12,7 +12,7 @@ import pickle
 from pathlib import Path
 
 from .parameter_sweeper import BifurcationAnalysisResult
-from src.analysis.utils import load_with_version
+from src.analysis.common import load_with_version
 from .validation import ValidationReport
 from .config import NUMERICAL_TOLERANCES
 

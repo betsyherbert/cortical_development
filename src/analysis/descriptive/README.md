@@ -20,12 +20,12 @@ Analyzes cortical circuit activity patterns across four developmental timepoints
 ### Run Complete Analysis
 ```bash
 # From project root
-python -m src.analysis.descriptive_analysis
+python -m src.analysis.descriptive
 ```
 
 ### Programmatic Usage
 ```python
-from src.analysis.descriptive_analysis import DescriptiveAnalysis, ActivityVisualizer
+from src.analysis.descriptive import DescriptiveAnalysis, ActivityVisualizer
 
 # Run analysis
 analyzer = DescriptiveAnalysis()
@@ -49,7 +49,7 @@ Edit parameters in `config.py`:
 
 ## Output
 
-Plots saved to: `src/analysis/analysis_plots/descriptive/`
+Plots saved to: `outputs/descriptive/`
 - `activity_heatmaps.svg`
 - `average_firing_rates.svg` 
 - `active_cell_fractions.svg`

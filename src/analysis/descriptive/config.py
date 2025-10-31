@@ -2,8 +2,8 @@
 
 from typing import Dict, Any
 
-from src.model.config import RANDOM_SEED, CELL_TYPES, LAYERS
-from src.analysis.common_config import DEVELOPMENTAL_STAGES, PRESETS, ERROR_BAR_ALPHA, LINE_WIDTH, MARKER_SIZE, SEM_FACTOR, FIGSIZE_TRENDS, DPI
+from src.model.config import RANDOM_SEED, CELL_TYPES, LAYERS, CELL_COLORS, LAYER_COLORS
+from src.analysis.common import DEVELOPMENTAL_STAGES, PRESETS, ERROR_BAR_ALPHA, LINE_WIDTH, MARKER_SIZE, SEM_FACTOR, FIGSIZE_TRENDS, DPI
 
 # Analysis parameters
 ANALYSIS_PARAMS = {

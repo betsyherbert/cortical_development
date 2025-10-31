@@ -34,17 +34,30 @@ where `r_i = ReLU(V_i) = max(0, V_i)`
 ```
 .
 ├── src/
-│   ├── model/
+│   ├── model/                 # Core simulation components
 │   │   ├── __init__.py
-│   │   ├── config.py        # Centralized configuration
-│   │   ├── neurons.py       # Neural dynamics implementation
-│   │   ├── connectivity.py  # Connectivity matrices and profiles
-│   │   └── thalamus.py      # Thalamic input generation
+│   │   ├── config.py         # Centralized configuration
+│   │   ├── neurons.py        # Neural dynamics implementation
+│   │   ├── connectivity.py   # Connectivity matrices and profiles
+│   │   ├── thalamus.py       # Thalamic input generation
+│   │   └── presets.py        # Developmental stage presets
 │   ├── visualization/
 │   │   ├── __init__.py
-│   │   └── dashboard.py     # Interactive Dash application
-│   └── main.py              # Main entry point
-├── requirements.txt         # Python dependencies
+│   │   └── dashboard.py      # Interactive Dash application
+│   ├── analysis/              # Analysis modules
+│   │   ├── common.py         # Shared utilities and config
+│   │   ├── descriptive/      # Activity statistics and trends
+│   │   ├── perturbation/     # Inhibitory perturbation responses
+│   │   ├── stability/        # Stability analysis across stages
+│   │   └── bifurcation/      # Parameter sweep bifurcation diagrams
+│   └── main.py               # Main entry point
+├── outputs/                   # Analysis outputs (auto-generated)
+│   ├── descriptive/
+│   ├── perturbation/
+│   ├── stability/
+│   └── bifurcation/
+├── tests/                     # Test suite
+├── requirements.txt          # Python dependencies
 └── README.md
 ```
 

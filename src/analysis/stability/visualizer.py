@@ -61,7 +61,7 @@ FONT_SIZES = FONT_CONFIG['font_sizes']
 
 # Common plot settings
 DPI = FONT_CONFIG['dpi']
-OUTPUT_DIR = 'src/analysis/analysis_plots/stability'
+OUTPUT_DIR = 'outputs/stability'
 COLORBAR_WIDTH = FONT_CONFIG['colorbar_width']
 LINE_COLOR = 'black'
 REFERENCE_LINE_ALPHA = 0.5

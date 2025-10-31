@@ -14,7 +14,7 @@ from pathlib import Path
 import warnings
 
 from src.main import CorticalSimulation
-from src.analysis.utils import save_with_version
+from src.analysis.common import save_with_version
 from .config import (
     PARAMETER_RANGES,
     NUMERICAL_TOLERANCES

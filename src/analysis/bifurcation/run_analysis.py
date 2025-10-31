@@ -617,7 +617,7 @@ def main():
         # Default: print configuration and run basic test
         print_config_summary()
         print("\nUse --test, --production, or --comparison to run analysis")
-        print("Example: python -m analysis.bifurcation_analysis.run_analysis --test")
+        print("Example: python -m src.analysis.bifurcation.run_analysis --test")
         return 0
 
 

@@ -6,9 +6,9 @@ import pickle
 import argparse
 from pathlib import Path
 
-from src.analysis.stability_analysis.visualizer import StabilityVisualizer
-from src.analysis.stability_analysis.config import OUTPUT_DIR
-from src.analysis.utils import load_with_version
+from src.analysis.stability.visualizer import StabilityVisualizer
+from src.analysis.stability.config import OUTPUT_DIR
+from src.analysis.common import load_with_version
 
 
 def load_results(results_file=None):
@@ -19,7 +19,7 @@ def load_results(results_file=None):
     if not os.path.exists(results_file):
         print(f"Results file not found: {results_file}")
         print("Please run the stability analysis first:")
-        print("  python -m analysis.stability_analysis")
+        print("  python -m src.analysis.stability")
         sys.exit(1)
     
     print(f"Loading results from: {results_file}")

@@ -4,9 +4,9 @@ This module provides a command-line interface for running the bifurcation analys
 with different parameter configurations and analysis types.
 
 Usage:
-    python -m analysis.bifurcation_analysis --analysis pv
-    python -m analysis.bifurcation_analysis --analysis sst  
-    python -m analysis.bifurcation_analysis --analysis both
+    python -m src.analysis.bifurcation --analysis pv
+    python -m src.analysis.bifurcation --analysis sst  
+    python -m src.analysis.bifurcation --analysis both
 """
 
 import argparse
@@ -22,9 +22,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python -m analysis.bifurcation_analysis --analysis pv
-  python -m analysis.bifurcation_analysis --analysis sst --resolution 25
-  python -m analysis.bifurcation_analysis --analysis both --validate
+  python -m src.analysis.bifurcation --analysis pv
+  python -m src.analysis.bifurcation --analysis sst --resolution 25
+  python -m src.analysis.bifurcation --analysis both --validate
         """
     )
     

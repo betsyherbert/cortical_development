@@ -1,9 +1,7 @@
 """Configuration parameters for stability analysis."""
 
-import os
-
 from src.model.config import CELL_TYPES, LAYERS, DT
-from src.analysis.common_config import DEVELOPMENTAL_STAGES, PRESETS, DPI
+from src.analysis.common import DEVELOPMENTAL_STAGES, PRESETS, DPI
 
 # Analysis parameters
 ANALYSIS_PARAMS = {
@@ -19,8 +17,8 @@ ANALYSIS_PARAMS = {
 CONDITIONS = ['full', 'e_only', 'e_pv_only', 'e_sst_only']  # Updated to reflect actual conditions
 REGIMES = ['idle', 'driven']
 
-# Output - resolve to absolute path from project root
-OUTPUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../outputs/stability'))
+# Output - standardized relative path from project root
+OUTPUT_DIR = 'outputs/stability'
 
 # Visualization
 COLORMAP = 'RdBu_r'  # Red-blue colormap for lambda_max (red=unstable, blue=stable)

@@ -1,7 +1,7 @@
 """Command-line interface for descriptive analysis.
 
 Usage:
-    python -m src.analysis.descriptive_analysis
+    python -m src.analysis.descriptive
 """
 
 from .run_analysis import run_descriptive_analysis

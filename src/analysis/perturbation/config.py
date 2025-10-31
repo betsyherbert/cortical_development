@@ -1,7 +1,7 @@
 """Configuration parameters for perturbation analysis."""
 
 from src.model.config import CELL_TYPES, LAYERS, RANDOM_SEED
-from src.analysis.common_config import DEVELOPMENTAL_STAGES, PRESETS, ERROR_BAR_ALPHA, LINE_WIDTH, MARKER_SIZE, SEM_FACTOR, FIGSIZE_TRENDS, DPI
+from src.analysis.common import DEVELOPMENTAL_STAGES, PRESETS, ERROR_BAR_ALPHA, LINE_WIDTH, MARKER_SIZE, SEM_FACTOR, FIGSIZE_TRENDS, DPI
 
 # Core analysis parameters
 ANALYSIS_PARAMS = {

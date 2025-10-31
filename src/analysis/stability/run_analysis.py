@@ -5,10 +5,10 @@ import os
 import pickle
 from pathlib import Path
 
-from src.analysis.stability_analysis.stability_analysis import StabilityAnalysis
-from src.analysis.utils import save_with_version
-from src.analysis.stability_analysis.visualizer import StabilityVisualizer  
-from src.analysis.stability_analysis.config import ANALYSIS_PARAMS, DEVELOPMENTAL_STAGES, OUTPUT_DIR, REGIMES
+from src.analysis.stability.stability_analysis import StabilityAnalysis
+from src.analysis.common import save_with_version
+from src.analysis.stability.visualizer import StabilityVisualizer  
+from src.analysis.stability.config import ANALYSIS_PARAMS, DEVELOPMENTAL_STAGES, OUTPUT_DIR, REGIMES
 
 
 def main():
