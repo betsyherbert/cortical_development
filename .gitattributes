@@ -1,0 +1,34 @@
+# Auto-normalize line endings
+* text=auto
+
+# Source code - force LF
+*.py text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Configuration files
+*.ini text eol=lf
+*.cfg text eol=lf
+*.conf text eol=lf
+requirements*.txt text eol=lf
+
+# Mark binary files explicitly
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pkl binary
+*.pickle binary
+*.h5 binary
+*.hdf5 binary
+*.mat binary
+*.npy binary
+*.npz binary
+*.so binary
+*.dylib binary
+*.dll binary
+

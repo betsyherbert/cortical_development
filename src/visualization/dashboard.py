@@ -9,14 +9,14 @@ import numpy as np
 import dash_bootstrap_components as dbc
 
 
-from model.config import (
+from src.model.config import (
     COLORMAPS, UPDATE_INTERVAL, CELL_TYPES, LAYERS, LAYER_NAMES,
     LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, CONNECTIONS,
     INITIAL_THALAMIC_WIDTHS, INITIAL_OUTGOING_WIDTHS, 
     INITIAL_TIME_CONSTANTS, INITIAL_GAINS, CELL_ACTIVITY_COLORS,
     INITIAL_STRENGTH_SCALING, INITIAL_SPARSITY, INITIAL_NOISE_PARAMS
 )
-from model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
+from src.model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
 
 # Constants for styling
 CELL_SIZE = 40  # Size for data cells in pixels
@@ -99,6 +99,10 @@ SLIDER_CONTAINER_STYLE = {
 # Graph configuration
 GRAPH_CONFIG = {'displayModeBar': False}
 
+# Heatmap scaling constants for fair comparison across all cell types
+HEATMAP_ZMIN = 0.0  # Minimum activity value
+HEATMAP_ZMAX = 1.0  # Maximum activity value (allows for some headroom)
+
 GRAPH_LAYOUT = {
     "margin": dict(l=0, r=0, t=0, b=0),
     "height": 150,  # Reduced height
@@ -117,6 +121,44 @@ GRAPH_LAYOUT = {
         zeroline=False
     )
 }
+
+class ConnectionKeyUtils:
+    """Utility for parsing and building connection keys."""
+    
+    @staticmethod
+    def parse(conn_key: str):
+        """Parse connection key to (source_layer, source_cell, target_layer, target_cell).
+        
+        Args:
+            conn_key: String like 'L23_E_to_L4_PV' or 'thalamus_to_L4_E'
+            
+        Returns:
+            Tuple of (source_layer, source_cell, target_layer, target_cell)
+        """
+        parts = conn_key.split('_to_')
+        source_parts = parts[0].split('_')
+        target_parts = parts[1].split('_')
+        
+        if source_parts[0] == 'thalamus':
+            return 'thalamus', None, target_parts[0], target_parts[1]
+        return source_parts[0], source_parts[1], target_parts[0], target_parts[1]
+    
+    @staticmethod
+    def build(source_layer, source_cell, target_layer, target_cell):
+        """Build connection key from components.
+        
+        Args:
+            source_layer: Source layer ('L23', 'L4', 'L5', 'Th', or 'thalamus')
+            source_cell: Source cell type ('E', 'SST', 'PV', or None for thalamus)
+            target_layer: Target layer ('L23', 'L4', 'L5')
+            target_cell: Target cell type ('E', 'SST', 'PV')
+            
+        Returns:
+            Connection key string
+        """
+        if source_layer in ['Th', 'thalamus']:
+            return f'thalamus_to_{target_layer}_{target_cell}'
+        return f'{source_layer}_{source_cell}_to_{target_layer}_{target_cell}'
 
 class DashboardApp:
     """
@@ -342,16 +384,16 @@ class DashboardApp:
                 # Buttons container
                 dbc.Col([
                     html.Div([
-                        dbc.Button("P3", id="p4-preset-button", color="dark", 
+                        dbc.Button("P4", id="p4-preset-button", color="dark", 
                                 className="mx-2 px-3", 
                                 style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
-                        dbc.Button("P7", id="p8-preset-button", color="dark", 
+                        dbc.Button("P8", id="p8-preset-button", color="dark", 
                                 className="mx-2 px-3", 
                                 style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
-                        dbc.Button("P11", id="p12-preset-button", color="dark", 
+                        dbc.Button("P12", id="p12-preset-button", color="dark", 
                                  className="mx-2 px-3", 
                                  style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
-                        dbc.Button("P15", id="p16-preset-button", color="dark", 
+                        dbc.Button("P16", id="p16-preset-button", color="dark", 
                                  className="mx-2 px-3", 
                                  style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"})
                     ], style={"display": "flex", "justifyContent": "center"})
@@ -538,8 +580,7 @@ class DashboardApp:
 
     def create_heatmap(self, data: np.ndarray, cell_type: str) -> go.Figure:
         """Create a heatmap figure for the given neural activity data."""
-        colorscale = COLORMAPS.get(cell_type, [[0, 'black'], [1, 'gray']])
-        zmax = 1 # ACTIVITY_SCALING[cell_type]['zmax']
+        colorscale = COLORMAPS.get(cell_type, [[0, 'black'], [1, 'white']])
         
         return go.Figure(
             data=[go.Heatmap(
@@ -547,8 +588,8 @@ class DashboardApp:
                 colorscale=colorscale,
                 showscale=False,
                 hoverinfo='none',  # Disable hover info for performance
-                zmin=0,
-                zmax=zmax
+                zmin=HEATMAP_ZMIN,
+                zmax=HEATMAP_ZMAX
             )],
             layout=GRAPH_LAYOUT
         )
@@ -563,22 +604,7 @@ class DashboardApp:
         Returns:
             Tuple of (source_layer, source_cell, target_layer, target_cell)
         """
-        parts = conn_key.split('_to_')
-        source_parts = parts[0].split('_')
-        target_parts = parts[1].split('_')
-        
-        if source_parts[0] == 'thalamus':
-            source_layer = 'thalamus'
-            source_cell = None
-            target_layer = target_parts[0]
-            target_cell = target_parts[1]
-        else:
-            source_layer = source_parts[0]
-            source_cell = source_parts[1]
-            target_layer = target_parts[0]
-            target_cell = target_parts[1]
-            
-        return source_layer, source_cell, target_layer, target_cell
+        return ConnectionKeyUtils.parse(conn_key)
 
     def _apply_preset(self, preset):
         """Apply a preset configuration to the simulation."""
@@ -602,9 +628,7 @@ class DashboardApp:
 
     def get_connection_key(self, source_layer, source_cell, target_layer, target_cell):
         """Generate a connection key based on source and target information."""
-        if source_layer == 'Th':
-            source_layer = 'thalamus'  # Normalize layer name
-        return f'{source_layer}_to_{target_layer}_{target_cell}' if source_layer == 'thalamus' else f'{source_layer}_{source_cell}_to_{target_layer}_{target_cell}'
+        return ConnectionKeyUtils.build(source_layer, source_cell, target_layer, target_cell)
 
     def create_connection_matrix(self) -> html.Div:
         """Create a matrix visualization of all layer and cell type connections."""
@@ -1179,25 +1203,6 @@ class DashboardApp:
              Input('selected-cell', 'data')],
         )
         
-        # Add callback for updating time constants and gains in simulation
-        @self.app.callback(
-            [Output('interval-component', 'n_intervals')],  # Dummy output to trigger update
-            [Input('tau-e-slider', 'value'),
-             Input('tau-sst-slider', 'value'),
-             Input('tau-pv-slider', 'value'),
-             Input('gain-e-slider', 'value'),
-             Input('gain-sst-slider', 'value'),
-             Input('gain-pv-slider', 'value')],
-            [State('interval-component', 'n_intervals')]
-        )
-        # def update_neuron_parameters(tau_e, tau_sst, tau_pv, gain_e, gain_sst, gain_pv, n_intervals):
-        #     # No need to update parameters here since it's already handled in update_graphs
-        #     # This callback is kept just to maintain the slider interactivity and force a refresh
-        #     # when the sliders are moved
-            
-        #     # Return unchanged intervals to not disrupt the update loop
-        #     return [n_intervals]
-        
         # Add callback for updating connectivity widths in simulation
         @self.app.callback(
             [Output('interval-component', 'n_intervals', allow_duplicate=True)],
@@ -1324,9 +1329,8 @@ class DashboardApp:
                         data = activities[layer][cell_type].reshape(self.simulation.grid_size, self.simulation.grid_size)
                         fig.data[0]['z'] = data
                         
-                        # Update colorscale max for better contrast
-                        max_val = max(data.max(), 0.5)
-                        fig.update_traces(zmax=max_val)
+                        # Keep consistent scaling for fair comparison across heatmaps
+                        fig.update_traces(zmin=HEATMAP_ZMIN, zmax=HEATMAP_ZMAX)
                         
                     updated_figures.append(fig)
             
@@ -1335,8 +1339,8 @@ class DashboardApp:
             with thal_fig.batch_update():
                 thal_data = activities['thalamus']
                 thal_fig.data[0]['z'] = thal_data
-                max_val = max(thal_data.max(), 0.5)
-                thal_fig.update_traces(zmax=max_val)
+                # Keep consistent scaling for fair comparison with cortical heatmaps
+                thal_fig.update_traces(zmin=HEATMAP_ZMIN, zmax=HEATMAP_ZMAX)
             
             updated_figures.append(thal_fig)
             

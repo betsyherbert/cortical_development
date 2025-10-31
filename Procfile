@@ -1,1 +1,0 @@
-web: PYTHONPATH=src gunicorn main:server

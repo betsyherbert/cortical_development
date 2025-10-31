@@ -39,34 +39,47 @@ ENV/
 .Spotlight-V100
 .Trashes
 ehthumbs.db
-Thumbs.db 
+Thumbs.db
 
-# Heroku / Deployment logs
-heroku-debug.log
+# ========================================
+# Scientific Computing & Analysis Outputs
+# ========================================
 
-# Secrets
-.env
-*.env
-.envrc
+# Temporary analysis outputs (untracked)
+outputs/
+temp/
 
-# Logs, outputs, profiler
-*.log
-*.out
-*.prof
-.cache/
-
-# Testing
-.coverage
-htmlcov/
-pytest_cache/
-
-# Checkpoints / models
+# Generated data and plots (untracked by default)
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.mat
 *.npy
 *.npz
-*.pkl
-*.pt
-*.h5
-*.ckpt
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.pdf
+*.eps
 
-# Jupyter notebooks
+# Analysis text outputs
+src/analysis/**/*.txt
+src/analysis/**/*.csv
+src/analysis/**/*.log
+
+# Jupyter checkpoints
 .ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Legacy output directory
+src/analysis/analysis_plots/
+
+# ========================================
+# Exceptions: Track publication materials
+# ========================================
+
+# Track results directory and all contents
+!results/
+!results/**

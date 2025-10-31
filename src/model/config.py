@@ -7,6 +7,7 @@ This module contains all the key parameters for:
 4. Visualization settings
 """
 
+import numpy as np
 from .presets import P4_PRESET
 
 #------------------------------------------------------------------------------
@@ -14,10 +15,11 @@ from .presets import P4_PRESET
 #------------------------------------------------------------------------------
 GRID_SIZE = 20  # Size of the 2D grid
 DT = 1.5  # Time step in milliseconds - INCREASE to speed up simulation
-INTEGRATION_STEPS = 5  # Number of steps per update cycle - INCREASE for faster visual changes
-VISUALIZATION_STEPS = 3  # Number of simulation steps per visualization update - DECREASE for more frequent visual updates
-UPDATE_INTERVAL = 500  # Time between visualization updates (ms) - DECREASE for more frequent visual updates
+INTEGRATION_STEPS = 3  # Number of steps per update cycle - INCREASE for faster visual changes
+VISUALIZATION_STEPS = 5  # Number of simulation steps per visualization update - DECREASE for more frequent visual updates
+UPDATE_INTERVAL = 60  # Time between visualization updates (ms) - DECREASE for more frequent visual updates
 NOISE_TAU = 20.0  # Time constant for Ornstein-Uhlenbeck process (ms)
+RANDOM_SEED = 9  # Global random seed for reproducible simulations
 
 
 #------------------------------------------------------------------------------
@@ -44,13 +46,13 @@ CONNECTIONS = [
 THALAMIC_INTRINSIC_SIGMA = 2.0  # Mean spatial spread of intrinsic bursts (grid units)
 THALAMIC_INTRINSIC_DURATION = 30.0  # Mean duration of intrinsic bursts (ms)
 THALAMIC_INTRINSIC_INTERVAL = 20.0  # Mean interval between intrinsic bursts (ms)
-THALAMIC_INTRINSIC_AMP = 5.0  # Mean amplitude of intrinsic bursts
+THALAMIC_INTRINSIC_AMP = 3.0  # Mean amplitude of intrinsic bursts
 
 # Sensory burst parameters
 THALAMIC_SENSORY_SIGMA = 0.5  # Spatial spread of sensory inputs (grid units)
 THALAMIC_SENSORY_DURATION = 10.0  # Duration of sensory bursts (ms)
 THALAMIC_SENSORY_INTERVAL = 10.0  # Mean interval between sensory bursts (ms)
-THALAMIC_SENSORY_AMP = 2.0  # Mean amplitude of sensory bursts
+THALAMIC_SENSORY_AMP = 1.0  # Mean amplitude of sensory bursts
 
 #------------------------------------------------------------------------------
 # Initial Network Parameters
@@ -69,31 +71,38 @@ THALAMIC_ALPHA = P4_PRESET['thalamic_alpha']  # Balance between intrinsic (0) an
 #------------------------------------------------------------------------------
 # Color configuration for cell types
 CELL_COLORS = {
-    'E': '#17BFD8',    # Blue
+    'E': '#4292c2',    # Blue  #17BFD8
     'SST': '#FF630C',  # Orange
     'PV': '#D91B12'    # Red
 }
 
 # Colormaps for heatmaps and connectivity visualization
 COLORMAPS = {
-    'E': [[0, 'black'], [1, CELL_COLORS['E']]],
-    'SST': [[0, 'black'], [1, CELL_COLORS['SST']]],
-    'PV': [[0, 'black'], [1, CELL_COLORS['PV']]],
+    'E': [[0, 'white'], [1, CELL_COLORS['E']]],
+    'SST': [[0, 'white'], [1, CELL_COLORS['SST']]],
+    'PV': [[0, 'white'], [1, CELL_COLORS['PV']]],
+}
+
+# Layer colors for visualizations
+LAYER_COLORS = {
+    'L5': '#999999',     # Light grey
+    'L4': '#555555',     # Medium grey  
+    'L23': '#222222'     # Dark grey
 }
 
 # Cell activity colors for connectivity matrix
 CELL_ACTIVITY_COLORS = {
     'E': {
-        'bg': lambda i: f"rgba{(*hex_to_rgb(CELL_COLORS['E']), i)}",
-        'hover': lambda i: f"rgba{(*hex_to_rgb(CELL_COLORS['E']), min(i + 0.2, 1.0))}"
+        'bg': lambda i: f"rgba{(*(int(CELL_COLORS['E'].lstrip('#')[j:j+2], 16) for j in (0, 2, 4)), i)}",
+        'hover': lambda i: f"rgba{(*(int(CELL_COLORS['E'].lstrip('#')[j:j+2], 16) for j in (0, 2, 4)), min(i + 0.2, 1.0))}"
     },
     'SST': {
-        'bg': lambda i: f"rgba{(*hex_to_rgb(CELL_COLORS['SST']), i)}",
-        'hover': lambda i: f"rgba{(*hex_to_rgb(CELL_COLORS['SST']), min(i + 0.2, 1.0))}"
+        'bg': lambda i: f"rgba{(*(int(CELL_COLORS['SST'].lstrip('#')[j:j+2], 16) for j in (0, 2, 4)), i)}",
+        'hover': lambda i: f"rgba{(*(int(CELL_COLORS['SST'].lstrip('#')[j:j+2], 16) for j in (0, 2, 4)), min(i + 0.2, 1.0))}"
     },
     'PV': {
-        'bg': lambda i: f"rgba{(*hex_to_rgb(CELL_COLORS['PV']), i)}",
-        'hover': lambda i: f"rgba{(*hex_to_rgb(CELL_COLORS['PV']), min(i + 0.2, 1.0))}"
+        'bg': lambda i: f"rgba{(*(int(CELL_COLORS['PV'].lstrip('#')[j:j+2], 16) for j in (0, 2, 4)), i)}",
+        'hover': lambda i: f"rgba{(*(int(CELL_COLORS['PV'].lstrip('#')[j:j+2], 16) for j in (0, 2, 4)), min(i + 0.2, 1.0))}"
     },
     'inactive': {
         'bg': "rgba(80, 80, 80, 0.1)",
@@ -231,9 +240,37 @@ LAYER_CONNECTIVITY_PARAMS = {
 }
 
 #------------------------------------------------------------------------------
-# Helper Functions
+# Random Seed Management
 #------------------------------------------------------------------------------
-def hex_to_rgb(hex_color):
-    """Convert hex color string to RGB tuple."""
-    hex_color = hex_color.lstrip('#')
-    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) 
+
+def seed_random(seed=None):
+    """Set random seed for reproducible results.
+    
+    This function should be used instead of calling np.random.seed() directly.
+    It ensures consistent seeding behavior across the entire codebase.
+    
+    Args:
+        seed: Random seed to use. If None, uses RANDOM_SEED from config.
+        
+    Returns:
+        The seed that was set (useful for logging/debugging)
+        
+    Example:
+        >>> from src.model.config import seed_random
+        >>> seed_random()  # Uses default seed from config
+        >>> seed_random(42)  # Uses custom seed
+    """
+    if seed is None:
+        seed = RANDOM_SEED
+    
+    np.random.seed(seed)
+    return seed
+
+
+def get_default_seed():
+    """Get the default random seed from configuration.
+    
+    Returns:
+        The default RANDOM_SEED value
+    """
+    return RANDOM_SEED 

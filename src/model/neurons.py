@@ -58,6 +58,8 @@ class NoiseGenerator:
         self.sqrt_dt_tau = np.sqrt(2.0 * dt / tau)
         self.dt_tau = dt / tau
 
+
+
     def update_ou_process(self, current: np.ndarray, mean: float, std: float) -> np.ndarray:
         """
         Update an Ornstein-Uhlenbeck process for one time step.

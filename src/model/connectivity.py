@@ -8,8 +8,6 @@ from .config import (
     INITIAL_STRENGTH_SCALING, INITIAL_SPARSITY
 )
 
-#CELL_TYPES, CONNECTIONS, LAYERS,
-
 class ConnectivityProfile:
     """
     Handles the computation and caching of spatial connectivity profiles.
@@ -193,8 +191,7 @@ class LayerConnectivity:
         # Cache for sparsity masks to avoid regenerating them every time
         self._sparsity_masks = {}
         
-        # Create a fixed random number generator for consistency
-        self.rng = np.random.default_rng(42)
+        # Use the global random state for consistency with centralized seed management
         
         # Initialize weight matrices
         self.update_weights()
@@ -219,7 +216,7 @@ class LayerConnectivity:
         
         # Generate a new mask if sparsity is less than 1.0
         if sparsity_level < 1.0:
-            mask = self.rng.random(shape) < sparsity_level
+            mask = np.random.random(shape) < sparsity_level
         else:
             # For full connectivity, use a mask of all ones (more efficient)
             mask = np.ones(shape, dtype=bool)
@@ -551,4 +548,70 @@ class LayerConnectivity:
             for key in keys_to_remove:
                 del self._sparsity_masks[key]
                 
-            self.update_weights() 
+            self.update_weights()
+
+    def apply_preset(self, preset: dict) -> None:
+        """
+        Apply a preset configuration to initialize all connection parameters.
+        
+        Args:
+            preset: Dictionary containing connection strengths, widths, scaling, and sparsity
+        """
+        # Set strength scaling factors
+        if 'strength_scaling' in preset:
+            for cell_type, scaling in preset['strength_scaling'].items():
+                self.strength_scaling[cell_type] = scaling
+        
+        # Set sparsity factors
+        if 'sparsity' in preset:
+            for cell_type, sparsity_val in preset['sparsity'].items():
+                self.sparsity[cell_type] = sparsity_val
+        
+        # Set connection strengths
+        if 'connection_strengths' in preset:
+            for conn_name, strength in preset['connection_strengths'].items():
+                # Parse connection name to extract components
+                if conn_name.startswith('thalamus_to_'):
+                    # Thalamic connection: thalamus_to_L23_E
+                    parts = conn_name.split('_')
+                    target_layer = parts[2]
+                    target_cell = parts[3]
+                    self.set_connection_strength('thalamus', None, target_layer, target_cell, strength)
+                elif '_to_' in conn_name:
+                    # Layer-to-layer connection: L23_E_to_L4_SST
+                    source_part, target_part = conn_name.split('_to_')
+                    source_parts = source_part.split('_')
+                    target_parts = target_part.split('_')
+                    
+                    source_layer = source_parts[0]
+                    source_cell = source_parts[1]
+                    target_layer = target_parts[0]
+                    target_cell = target_parts[1]
+                    
+                    self.set_connection_strength(source_layer, source_cell, target_layer, target_cell, strength)
+        
+        # Set connection widths based on preset defaults
+        if 'outgoing_widths' in preset:
+            for cell_type, width in preset['outgoing_widths'].items():
+                # Set outgoing connection widths for this cell type
+                for target_layer in ['L23', 'L4', 'L5']:
+                    for target_cell in ['E', 'SST', 'PV']:
+                        for source_layer in ['L23', 'L4', 'L5']:
+                            # Skip SST->SST connections which don't exist
+                            if cell_type == 'SST' and target_cell == 'SST':
+                                continue
+                            
+                            conn_key = f'{source_layer}_{cell_type}_to_{target_layer}_{target_cell}'
+                            if conn_key in preset.get('connection_strengths', {}):
+                                self.set_connection_sigma(source_layer, cell_type, target_layer, target_cell, width)
+        
+        # Set thalamic input widths
+        if 'thalamic_widths' in preset:
+            for cell_type, width in preset['thalamic_widths'].items():
+                for target_layer in ['L23', 'L4', 'L5']:
+                    conn_key = f'thalamus_to_{target_layer}_{cell_type}'
+                    if conn_key in preset.get('connection_strengths', {}):
+                        self.set_connection_sigma('thalamus', None, target_layer, cell_type, width)
+        
+        # Update all weights with new parameters
+        self.update_weights() 

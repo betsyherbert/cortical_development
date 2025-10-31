@@ -40,6 +40,8 @@ class ThalamicInput:
         # Pre-compute components
         self._prepare_gaussian_components()
     
+
+    
     def _prepare_gaussian_components(self):
         """Pre-compute coordinate arrays for faster Gaussian calculation."""
         self.x_coords, self.y_coords = self.coords

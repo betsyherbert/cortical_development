@@ -59,7 +59,7 @@ where `r_i = ReLU(V_i) = max(0, V_i)`
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/cortical-circuit-simulator.git
+git clone <repository-url>
 cd cortical-circuit-simulator
 ```
 
@@ -83,12 +83,12 @@ pip install -r requirements.txt
 
 ### Running the Simulation
 
-Start the simulation with default parameters:
+Start the simulation with default parameters (port 8050):
 ```bash
 python src/main.py
 ```
 
-For custom configurations:
+For custom configurations (e.g., change port or enable debug):
 ```bash
 python src/main.py --port 8052 --debug
 ```
@@ -100,10 +100,14 @@ python src/main.py --port 8052 --debug
 
 ### Interactive Controls
 
-- **Connection Strength Sliders**: Adjust the amplitude of connections between different cell types
-- **Thalamic Input Slider**: Control the balance between intrinsic and sensory-driven thalamic activity
-- **Reset Button**: Return the simulation to its initial state
-- **Pause/Resume Button**: Stop or continue the simulation
+- **Neuron parameters**: Time constants and gains per cell type
+- **Connection widths**: Thalamic and outgoing sigmas per cell type
+- **Strength scaling**: Per cell-type scaling of all outgoing connections (incl. thalamus)
+- **Sparsity**: Per cell-type sparsity of connections
+- **Thalamic input balance**: `alpha` between intrinsic and sensory
+- **External input (noise)**: Mean, std, and correlation per cell type
+- **Connection matrix**: Click any cell to adjust that connection's strength via a slider
+- **Pause/Resume**: Toggle simulation updates
 
 ## Customization
 
@@ -114,6 +118,25 @@ Core simulation parameters can be adjusted in `src/model/config.py`, including:
 - Time constants
 - Connectivity profiles
 - Visualization settings
+- Random seed (for reproducibility)
+
+### Random Seed Management
+
+The simulation uses a centralized random seed management system for reproducibility:
+- Default seed is defined in `src/model/config.py` as `RANDOM_SEED`
+- Use `seed_random()` from `src.model.config` to set the seed
+- The seed is automatically set when creating a `CorticalSimulation` instance
+- The seed is reset when calling `simulation.reset()`
+
+```python
+from src.model.config import seed_random
+
+# Use default seed from config
+seed_random()
+
+# Use custom seed
+seed_random(42)
+```
 
 ### Extending the Model
 
