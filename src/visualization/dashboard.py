@@ -14,7 +14,7 @@ from src.model.config import (
     LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, CONNECTIONS,
     INITIAL_THALAMIC_WIDTHS, INITIAL_OUTGOING_WIDTHS, 
     INITIAL_TIME_CONSTANTS, INITIAL_GAINS, CELL_ACTIVITY_COLORS,
-    INITIAL_STRENGTH_SCALING, INITIAL_SPARSITY, INITIAL_NOISE_PARAMS
+    INITIAL_STRENGTH_SCALING, INITIAL_NOISE_PARAMS
 )
 from src.model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
 
@@ -202,13 +202,6 @@ class DashboardApp:
         "marks": {i: f"{i}" for i in range(0, 6)}
     }
     
-    SPARSITY_PARAMS = {
-        "min_val": 0.0,
-        "max_val": 1.0,
-        "step": 0.05,
-        "marks": {i/10: f"{i/10:.1f}" for i in range(0, 11, 2)}
-    }
-    
     NOISE_MEAN_PARAMS = {
         "min_val": -0.2,
         "max_val": 0.2,
@@ -340,10 +333,6 @@ class DashboardApp:
             Output('strength-scaling-sst-slider', 'value'),
             Output('strength-scaling-pv-slider', 'value'),
             Output('strength-scaling-thalamus-slider', 'value'),
-            Output('sparsity-e-slider', 'value'),
-            Output('sparsity-sst-slider', 'value'),
-            Output('sparsity-pv-slider', 'value'),
-            Output('sparsity-thalamus-slider', 'value'),
             Output('alpha-slider', 'value'),
             Output('noise-mean-e-slider', 'value'),
             Output('noise-mean-sst-slider', 'value'),
@@ -621,11 +610,6 @@ class DashboardApp:
             for cell_type, scaling in preset['strength_scaling'].items():
                 self.simulation.set_strength_scaling(cell_type, scaling)
                 
-        # Update sparsity factors if present in the preset
-        if 'sparsity' in preset:
-            for cell_type, sparsity in preset['sparsity'].items():
-                self.simulation.set_sparsity(cell_type, sparsity)
-
     def get_connection_key(self, source_layer, source_cell, target_layer, target_cell):
         """Generate a connection key based on source and target information."""
         return ConnectionKeyUtils.build(source_layer, source_cell, target_layer, target_cell)
@@ -891,10 +875,6 @@ class DashboardApp:
             'strength_sst': preset['strength_scaling']['SST'],
             'strength_pv': preset['strength_scaling']['PV'],
             'strength_thal': preset['strength_scaling']['thalamus'],
-            'sparsity_e': preset['sparsity']['E'],
-            'sparsity_sst': preset['sparsity']['SST'],
-            'sparsity_pv': preset['sparsity']['PV'],
-            'sparsity_thal': preset['sparsity']['thalamus'],
             'alpha': preset['thalamic_alpha'],
             'noise_mean_e': preset['noise_params']['E']['mean'],
             'noise_mean_sst': preset['noise_params']['SST']['mean'],
@@ -935,7 +915,6 @@ class DashboardApp:
                 values['sigma_thal_e'], values['sigma_thal_sst'], values['sigma_thal_pv'],
                 values['sigma_e_out'], values['sigma_sst_out'], values['sigma_pv_out'],
                 values['strength_e'], values['strength_sst'], values['strength_pv'], values['strength_thal'],
-                values['sparsity_e'], values['sparsity_sst'], values['sparsity_pv'], values['sparsity_thal'],
                 values['alpha'], values['noise_mean_e'], values['noise_mean_sst'], values['noise_mean_pv'],
                 values['noise_std_e'], values['noise_std_sst'], values['noise_std_pv'], values['noise_corr_e'],
                 values['noise_corr_sst'], values['noise_corr_pv'], self.create_connection_matrix()
@@ -1256,7 +1235,7 @@ class DashboardApp:
             [Output('graph-thalamus', 'figure')],
             
             # Inputs: interval trigger, alpha slider, time constant sliders, gain sliders, connectivity width sliders
-            # Remove the strength scaling and sparsity sliders from the inputs
+            # Remove the strength scaling sliders from the inputs
             [Input('interval-component', 'n_intervals'),
              Input('alpha-slider', 'value'),
              Input('tau-e-slider', 'value'),
@@ -1371,27 +1350,6 @@ class DashboardApp:
             self.simulation.set_strength_scaling('SST', sst_scaling)
             self.simulation.set_strength_scaling('PV', pv_scaling)
             self.simulation.set_strength_scaling('thalamus', thalamus_scaling)
-            
-            # Return unchanged intervals to not disrupt the update loop
-            return [n_intervals]
-        
-        # Add callback for updating sparsity factors
-        @self.app.callback(
-            [Output('interval-component', 'n_intervals', allow_duplicate=True)],
-            [Input('sparsity-e-slider', 'value'),
-             Input('sparsity-sst-slider', 'value'),
-             Input('sparsity-pv-slider', 'value'),
-             Input('sparsity-thalamus-slider', 'value')],
-            [State('interval-component', 'n_intervals')],
-            prevent_initial_call=True
-        )
-        def update_sparsity_parameters(e_sparsity, sst_sparsity, pv_sparsity, thalamus_sparsity, n_intervals):
-            """Update all sparsity parameters in the simulation."""
-            # Update sparsity parameters
-            self.simulation.set_sparsity('E', e_sparsity)
-            self.simulation.set_sparsity('SST', sst_sparsity)
-            self.simulation.set_sparsity('PV', pv_sparsity)
-            self.simulation.set_sparsity('thalamus', thalamus_sparsity)
             
             # Return unchanged intervals to not disrupt the update loop
             return [n_intervals]
@@ -1523,37 +1481,6 @@ class DashboardApp:
             ), width=11)
         ], className="mb-1")
         
-    def create_sparsity_sliders(self):
-        """Create the connection sparsity sliders section."""
-        return html.Div([
-            # Headers row
-            dbc.Row([
-                dbc.Col("", width=1),
-                dbc.Col(html.Div("Sparsity", className="text-center"), width=11),
-            ], className="mb-1"),
-            
-            # Sparsity rows
-            *[self._create_sparsity_row(cell_type) for cell_type in CELL_TYPES],
-            
-            # Add thalamus sparsity slider
-            self._create_sparsity_row('thalamus')
-        ])
-
-    def _create_sparsity_row(self, cell_type):
-        """Create a row for a cell type's sparsity parameter."""
-        return dbc.Row([
-            # Cell type label
-            dbc.Col(html.Strong(cell_type if cell_type != 'thalamus' else 'TC'), 
-                   width=1, className="d-flex align-items-center", style={"paddingRight": "5px"}),
-            # Sparsity slider
-            dbc.Col(self._create_slider(
-                id_prefix='sparsity',
-                cell_type=cell_type.lower(),
-                initial_value=INITIAL_SPARSITY[cell_type],
-                **self.SPARSITY_PARAMS
-            ), width=11)
-        ], className="mb-1")
-
     def _create_slider(self, id_prefix, cell_type, min_val, max_val, step, initial_value, marks):
         """Create a slider with consistent styling."""
         return dcc.Slider(
@@ -1659,12 +1586,7 @@ class DashboardApp:
                 # Section for noise parameters
                 html.Div([html.Hr()], className="my-3"),
                 html.H5("External Input", className="text-center"),
-                self.create_noise_sliders(),
-                
-                # Section for sparsity
-                html.Div([html.Hr()], className="my-3"),
-                html.H5("Sparsity", className="text-center"),
-                self.create_sparsity_sliders()
+                self.create_noise_sliders()
             ], className="mb-3"),
             
             # Pause/Play control

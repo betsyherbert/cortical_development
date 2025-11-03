@@ -49,14 +49,13 @@ The model implements three cell types across three cortical layers:
 Connections between populations follow spatially-structured patterns with Gaussian profiles:
 
 ```
-W_sc(x,y,x',y') = A_sc * G_σsc(x-x', y-y') * M_sc(x,y,x',y')
+W_sc(x,y,x',y') = A_sc * G_σsc(x-x', y-y')
 ```
 
 Where:
 - `A_sc` is the connection amplitude between source type `s` and target type `c`
 - `G_σsc(dx,dy) = exp(-0.5 * (dx² + dy²) / σ_sc²) / (2π * σ_sc²)` is the normalized Gaussian profile
 - `σ_sc` is the spatial spread of connections
-- `M_sc` is a binary sparsity mask determining which connections exist
 
 ### Noise Model
 

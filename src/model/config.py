@@ -60,7 +60,6 @@ THALAMIC_SENSORY_AMP = 1.0  # Mean amplitude of sensory bursts
 INITIAL_THALAMIC_WIDTHS = P4_PRESET['thalamic_widths']
 INITIAL_OUTGOING_WIDTHS = P4_PRESET['outgoing_widths']
 INITIAL_STRENGTH_SCALING = P4_PRESET['strength_scaling']
-INITIAL_SPARSITY = P4_PRESET['sparsity']
 INITIAL_TIME_CONSTANTS = P4_PRESET['time_constants']
 INITIAL_GAINS = P4_PRESET['gains']
 INITIAL_NOISE_PARAMS = P4_PRESET['noise_params']  

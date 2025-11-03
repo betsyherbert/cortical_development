@@ -73,9 +73,6 @@ src/analysis/**/*.log
 .ipynb_checkpoints/
 *.ipynb_checkpoints
 
-# Legacy output directory
-src/analysis/analysis_plots/
-
 # ========================================
 # Exceptions: Track publication materials
 # ========================================

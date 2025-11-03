@@ -93,20 +93,6 @@ def test_layer_connectivity_strength_scaling(grid_size):
     assert retrieved_scaling == scaling
 
 
-def test_layer_connectivity_sparsity(grid_size):
-    """Test LayerConnectivity sparsity setter/getter."""
-    connectivity = LayerConnectivity(grid_size)
-    
-    # Set sparsity
-    sparsity = 0.5
-    connectivity.set_sparsity('E', sparsity)
-    
-    # Get sparsity
-    retrieved_sparsity = connectivity.get_sparsity('E')
-    
-    assert retrieved_sparsity == sparsity
-
-
 def test_connectivity_profile_caching(grid_size):
     """Test ConnectivityProfile caches computed profiles."""
     profile = ConnectivityProfile(grid_size)

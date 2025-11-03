@@ -57,14 +57,6 @@ P4_PRESET = {
         'thalamus': 1.0  # Thalamic input is present but not fully developed
     },
     
-    # Sparsity factors: fraction of connections present (1 = all, 0 = none).
-    'sparsity': {
-        'E': 1.0,      # E cells have moderately sparse connectivity
-        'SST': 1.0,    # SST cells have sparser connectivity
-        'PV': 1.0,     # PV cells have very sparse connectivity
-        'thalamus': 1.0  # Thalamic connectivity is more complete but still developing
-    },
-
     # Thalamic alpha: ratio between sensory-driven vs. intrinsic input.
     'thalamic_alpha': 0.1,
     
@@ -223,13 +215,6 @@ P8_PRESET = {
         'PV': 1.0,   
         'thalamus': 3.0
     },
-    
-    'sparsity': {
-        'E': 1.0,      
-        'SST': 1.0,    
-        'PV': 1.0,     
-        'thalamus': 1.0 
-    },
 
     'thalamic_alpha': 0.3,
         
@@ -369,13 +354,6 @@ P12_PRESET = {
         'SST': 1.5,    
         'PV': 1.5,     
         'thalamus': 3.0
-    },
-    
-    'sparsity': {
-        'E': 1.0,     
-        'SST': 1.0,   
-        'PV': 1.0,    
-        'thalamus': 1.0 
     },
 
     'thalamic_alpha': 0.6, 
@@ -535,13 +513,6 @@ P16_PRESET = {
         'SST': 1.5,    
         'PV': 3.5,     
         'thalamus': 4.0
-    },
-    
-    'sparsity': {
-        'E': 1.0,      
-        'SST': 1.0,    
-        'PV': 1.0,     
-        'thalamus': 1.0  
     },
 
     'thalamic_alpha': 0.8,

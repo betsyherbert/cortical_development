@@ -42,7 +42,7 @@ class DescriptiveAnalysis:
     def _apply_preset(self, preset: Dict[str, Any]) -> None:
         """Apply developmental stage preset to simulation."""
         self._update_connection_strengths(preset)
-        self._update_scaling_and_sparsity(preset)
+        self._update_scaling(preset)
         self._update_time_constants_and_gains(preset)
         self._update_noise_parameters(preset)
         self._update_thalamic_widths(preset)
@@ -59,15 +59,11 @@ class DescriptiveAnalysis:
                 source_layer, source_cell, target_layer, target_cell, strength
             )
 
-    def _update_scaling_and_sparsity(self, preset: Dict[str, Any]) -> None:
-        """Update strength scaling and sparsity parameters."""
+    def _update_scaling(self, preset: Dict[str, Any]) -> None:
+        """Update strength scaling parameters."""
         if 'strength_scaling' in preset:
             for cell_type, scaling in preset['strength_scaling'].items():
                 self.simulation.set_strength_scaling(cell_type, scaling)
-                
-        if 'sparsity' in preset:
-            for cell_type, sparsity in preset['sparsity'].items():
-                self.simulation.set_sparsity(cell_type, sparsity)
 
     def _update_time_constants_and_gains(self, preset: Dict[str, Any]) -> None:
         """Update time constants and gains from preset."""

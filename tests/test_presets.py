@@ -28,7 +28,7 @@ def test_preset_structure(preset_name='P4'):
     required_keys = [
         'time_constants', 'gains', 'noise_params',
         'thalamic_widths', 'outgoing_widths',
-        'strength_scaling', 'sparsity', 'thalamic_alpha',
+        'strength_scaling', 'thalamic_alpha',
         'connection_strengths'
     ]
     

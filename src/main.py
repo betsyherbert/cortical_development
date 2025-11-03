@@ -147,28 +147,6 @@ class CorticalSimulation:
         """
         return self.circuit.connectivity.get_strength_scaling(cell_type)
     
-    def set_sparsity(self, cell_type: str, sparsity: float) -> None:
-        """
-        Set the sparsity factor for a cell type's outgoing connections.
-        
-        Args:
-            cell_type: Cell type ('E', 'SST', 'PV', or 'thalamus')
-            sparsity: Sparsity factor (0 to 1, where 1 means all connections present)
-        """
-        self.circuit.connectivity.set_sparsity(cell_type, sparsity)
-    
-    def get_sparsity(self, cell_type: str) -> float:
-        """
-        Get the current sparsity factor for a cell type's outgoing connections.
-        
-        Args:
-            cell_type: Cell type ('E', 'SST', 'PV', or 'thalamus')
-            
-        Returns:
-            Current sparsity factor
-        """
-        return self.circuit.connectivity.get_sparsity(cell_type)
-        
     def set_noise_params(self, cell_type: str, mean: float, std: float, c: float) -> None:
         """
         Set the noise parameters for a specific cell type.

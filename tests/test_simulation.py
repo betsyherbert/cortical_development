@@ -122,18 +122,6 @@ def test_simulation_strength_scaling(grid_size):
     assert retrieved == scaling
 
 
-def test_simulation_sparsity(grid_size):
-    """Test sparsity setter/getter."""
-    sim = CorticalSimulation(grid_size=grid_size)
-    
-    sparsity = 0.7
-    sim.set_sparsity('E', sparsity)
-    
-    retrieved = sim.get_sparsity('E')
-    
-    assert retrieved == sparsity
-
-
 def test_simulation_noise_params(grid_size):
     """Test noise parameters setter."""
     sim = CorticalSimulation(grid_size=grid_size)

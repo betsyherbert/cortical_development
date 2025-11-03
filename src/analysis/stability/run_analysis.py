@@ -67,7 +67,7 @@ def main():
                 total_snapshots += stage_snapshots
         
         print(f"\nTotal snapshots analyzed: {total_snapshots}")
-        print(f"Output directory: src/analysis/analysis_plots/stability")
+        print(f"Output directory: {OUTPUT_DIR}")
         print("\nStability analysis complete!")
         
     except Exception as e:
