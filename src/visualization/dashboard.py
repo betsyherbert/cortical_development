@@ -234,6 +234,13 @@ class DashboardApp:
         }
     }
     
+    CONSTANT_DRIVE_PARAMS = {
+        "min_val": 0.0,
+        "max_val": 10.0,
+        "step": 0.1,
+        "marks": {0: "0", 5: "5", 10: "10"}
+    }
+    
     def __init__(self, simulation, update_interval: int = UPDATE_INTERVAL):
         """
         Initialize the dashboard application.
@@ -1379,6 +1386,24 @@ class DashboardApp:
             
             # Return unchanged intervals to not disrupt the update loop
             return [n_intervals]
+        
+        # Add callback for updating constant drive parameters
+        @self.app.callback(
+            [Output('interval-component', 'n_intervals', allow_duplicate=True)],
+            [Input('constant-drive-e-slider', 'value'),
+             Input('constant-drive-sst-slider', 'value'),
+             Input('constant-drive-pv-slider', 'value')],
+            [State('interval-component', 'n_intervals')],
+            prevent_initial_call=True
+        )
+        def update_constant_drives(drive_e, drive_sst, drive_pv, n_intervals):
+            """Update constant background drive parameters in the simulation."""
+            self.simulation.set_constant_drive('E', drive_e)
+            self.simulation.set_constant_drive('SST', drive_sst)
+            self.simulation.set_constant_drive('PV', drive_pv)
+            
+            # Return unchanged intervals to not disrupt the update loop
+            return [n_intervals]
     
     def create_parameter_sliders(self):
         """Create the neural parameter sliders section."""
@@ -1559,6 +1584,33 @@ class DashboardApp:
             ), width=3)
         ], className="mb-1 g-0", style={"marginBottom": "10px"})
 
+    def create_constant_drive_sliders(self):
+        """Create the constant background drive sliders section."""
+        return html.Div([
+            # Headers row
+            dbc.Row([
+                dbc.Col("", width=1),
+                dbc.Col(html.Div("Background Drive", className="text-center"), width=11),
+            ], className="mb-1"),
+            
+            # Constant drive rows
+            *[self._create_constant_drive_row(cell_type) for cell_type in CELL_TYPES]
+        ])
+
+    def _create_constant_drive_row(self, cell_type):
+        """Create a row for a cell type's constant drive parameter."""
+        return dbc.Row([
+            # Cell type label
+            dbc.Col(html.Strong(cell_type), width=1, className="d-flex align-items-center"),
+            # Constant drive slider
+            dbc.Col(self._create_slider(
+                id_prefix='constant-drive',
+                cell_type=cell_type,
+                initial_value=0.0,
+                **self.CONSTANT_DRIVE_PARAMS
+            ), width=11)
+        ], className="mb-1")
+
     def create_control_panel(self):
         """Create the control panel with all sliders and controls."""
         return html.Div([
@@ -1588,6 +1640,11 @@ class DashboardApp:
                 html.H5("External Input", className="text-center"),
                 self.create_noise_sliders()
             ], className="mb-3"),
+            
+            # Section for constant background drive
+            html.Div([html.Hr()], className="my-3"),
+            html.H5("Constant Background Drive", className="text-center"),
+            self.create_constant_drive_sliders(),
             
             # Pause/Play control
             html.Div([
