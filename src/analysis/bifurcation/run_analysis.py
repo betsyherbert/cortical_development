@@ -7,218 +7,298 @@ from typing import Dict, List, Optional
 from .bifurcation_analysis import NetworkModel, SteadyStateFinder, StabilityAnalyzer
 from .visualizer import BifurcationVisualizer
 from .config import (
-    DEVELOPMENTAL_STAGES, PRESETS, DEFAULT_N_POPULATIONS,
-    DEFAULT_LAYERS, ALL_LAYERS, ANALYSIS_PARAMS
+    DEVELOPMENTAL_STAGES, PRESETS,
+    DEFAULT_LAYERS, ALL_LAYERS, ANALYSIS_PARAMS,
+    ANALYSIS_MODES, DEFAULT_ANALYSIS_MODE, THALAMIC_INPUT_MAGNITUDE
 )
 
 
-def analyze_single_stage_data(stage_name: str, n_populations: int = None, 
-                              layers: List[str] = None) -> Dict:
+def analyze_single_stage_data(stage_name: str, 
+                              layers: List[str] = None,
+                              analysis_mode: str = None,
+                              thalamic_magnitude: float = None,
+                              verbose: bool = False) -> Dict:
     """
     Analyze a single stage and return results as dictionary.
     
     Args:
         stage_name: Developmental stage name (P4, P8, P12, P16)
-        n_populations: Number of populations (2 or 3, defaults to config)
         layers: List of layers to analyze (defaults to config)
+        analysis_mode: 'silent', 'driven', or 'both' (defaults to config)
+        thalamic_magnitude: Magnitude of thalamic input for driven analysis (defaults to config)
         
     Returns:
         Dictionary with analysis results
     """
-    if n_populations is None:
-        n_populations = DEFAULT_N_POPULATIONS
     if layers is None:
         layers = DEFAULT_LAYERS
+    if analysis_mode is None:
+        analysis_mode = DEFAULT_ANALYSIS_MODE
+    if thalamic_magnitude is None:
+        thalamic_magnitude = THALAMIC_INPUT_MAGNITUDE
     
     preset = PRESETS[stage_name.upper()]
-    network = NetworkModel(preset, layers=layers, n_populations=n_populations)
+    network = NetworkModel(preset, layers=layers)
     params = network.get_parameters()
     
     finder = SteadyStateFinder(network)
-    r_star, converged = finder.find_steady_state()
     
-    analyzer = StabilityAnalyzer(network, r_star)
-    distance, critical_mode, critical_k = analyzer.compute_stability()
+    # Perform analysis based on mode
+    if analysis_mode in ['silent', 'both']:
+        # Silent fixed point analysis
+        r_star_silent, status_silent = finder.find_steady_state(thalamic_input=None)
+        analyzer_silent = StabilityAnalyzer(network, r_star_silent)
+        distance_silent, critical_mode_silent, critical_k_silent, wavelength_silent = analyzer_silent.compute_stability(verbose=verbose)
+        is_silent = np.all(np.abs(r_star_silent) < 1e-10)
+        
+        # Compute forced response at silent operating point
+        max_gain_silent, fr_mode_silent, fr_k_silent, max_cond_silent = analyzer_silent.compute_forced_response(
+            network.thalamic_strengths, verbose=verbose
+        )
+        
+        silent_results = {
+            'steady_state': r_star_silent,
+            'distance': distance_silent,
+            'critical_mode': critical_mode_silent,
+            'critical_k': critical_k_silent,
+            'wavelength': wavelength_silent,
+            'status': status_silent,
+            'converged': (status_silent == 'converged'),
+            'is_silent': is_silent,
+            'forced_response_max_gain': max_gain_silent,
+            'forced_response_critical_mode': fr_mode_silent,
+            'forced_response_critical_k': fr_k_silent,
+            'forced_response_max_condition': max_cond_silent
+        }
+    else:
+        silent_results = None
     
-    # Determine if network is silent (all rates near zero)
-    is_silent = np.all(np.abs(r_star) < 1e-10)
+    if analysis_mode in ['driven', 'both']:
+        # Driven operating point analysis
+        # The driven fixed point represents the spatially uniform mean firing rate
+        # during thalamic input epochs (captures mean depolarization, not spatial burst structure)
+        thalamic_input = network.compute_thalamic_input(thalamic_magnitude)
+        
+        # Diagnostic: Log thalamic input details (only if verbose)
+        if verbose:
+            print(f"  [Input] Thalamic strengths: {network.thalamic_strengths}")
+            print(f"  [Input] Thalamic input (mag={thalamic_magnitude}): {thalamic_input}")
+            print(f"  [Input] Noise mean (mu): {network.mu}")
+            print(f"  [Input] Total external: {network.mu + thalamic_input}")
+        
+        r_star_driven, status_driven = finder.find_steady_state(thalamic_input=thalamic_input)
+        analyzer_driven = StabilityAnalyzer(network, r_star_driven)
+        distance_driven, critical_mode_driven, critical_k_driven, wavelength_driven = analyzer_driven.compute_stability(verbose=verbose)
+        is_silent_driven = np.all(np.abs(r_star_driven) < 1e-10)
+        
+        # Compute forced response at driven operating point
+        max_gain_driven, fr_mode_driven, fr_k_driven, max_cond_driven = analyzer_driven.compute_forced_response(
+            network.thalamic_strengths, verbose=verbose
+        )
+        
+        driven_results = {
+            'steady_state': r_star_driven,
+            'distance': distance_driven,
+            'critical_mode': critical_mode_driven,
+            'critical_k': critical_k_driven,
+            'wavelength': wavelength_driven,
+            'status': status_driven,
+            'converged': (status_driven == 'converged'),
+            'is_silent': is_silent_driven,
+            'thalamic_magnitude': thalamic_magnitude,
+            'forced_response_max_gain': max_gain_driven,
+            'forced_response_critical_mode': fr_mode_driven,
+            'forced_response_critical_k': fr_k_driven,
+            'forced_response_max_condition': max_cond_driven
+        }
+        
+        # Diagnostic: Compare driven vs silent (if both modes and verbose)
+        if analysis_mode == 'both' and verbose:
+            r_diff = np.linalg.norm(r_star_driven - r_star_silent, ord=np.inf)
+            n_active_silent = np.sum(r_star_silent > 1e-10)
+            n_active_driven = np.sum(r_star_driven > 1e-10)
+            
+            print(f"  [Debug] Stage {stage_name}:")
+            print(f"    ||r_driven - r_silent||_∞ = {r_diff:.6f}")
+            print(f"    Active units: silent={n_active_silent}, driven={n_active_driven}")
+            print(f"    Max r_silent: {np.max(r_star_silent):.6f}, max r_driven: {np.max(r_star_driven):.6f}")
+            print(f"    Max Re(λ): silent={-distance_silent:.6f}, driven={-distance_driven:.6f}")
+    else:
+        driven_results = None
     
-    return {
+    # Build result dictionary
+    result = {
         'stage': stage_name.upper(),
         'network_params': params,
-        'steady_state': r_star,
-        'distance': distance,
-        'critical_mode': critical_mode,
-        'critical_k': critical_k,
-        'converged': converged,
-        'is_silent': is_silent
+        'analysis_mode': analysis_mode
     }
+    
+    # Add mode-specific results
+    if analysis_mode == 'silent':
+        result.update(silent_results)
+    elif analysis_mode == 'driven':
+        result.update(driven_results)
+    elif analysis_mode == 'both':
+        result['silent'] = silent_results
+        result['driven'] = driven_results
+        # For backward compatibility, default to silent results at top level
+        result.update(silent_results)
+    
+    return result
 
 
-def analyze_all_stages(n_populations: int = None, layers: List[str] = None,
-                       compare_layers: bool = False):
+def analyze_all_stages(layers: List[str] = None,
+                       compare_layers: bool = False, analysis_mode: str = None,
+                       thalamic_magnitude: float = None, verbose: bool = False):
     """
     Compare stability across all developmental stages.
     
     Args:
-        n_populations: Number of populations (2 or 3, defaults to config)
         layers: List of layers to analyze (defaults to config)
         compare_layers: If True, also run single-layer analysis and compare
+        analysis_mode: 'silent', 'driven', or 'both' (defaults to config)
+        thalamic_magnitude: Magnitude of thalamic input for driven analysis (defaults to config)
+        verbose: If True, print diagnostic information
     """
-    if n_populations is None:
-        n_populations = DEFAULT_N_POPULATIONS
     if layers is None:
         layers = DEFAULT_LAYERS
-    
-    layers_str = '-'.join(layers)
-    pop_desc = f"{n_populations}-population ({', '.join(['E', 'SST', 'PV'][:n_populations])})" if n_populations == 3 else "2-population (E-I)"
-    
-    print(f"Analyzing developmental stages ({pop_desc}, layers: {layers_str})...")
-    print()
+    if analysis_mode is None:
+        analysis_mode = DEFAULT_ANALYSIS_MODE
+    if thalamic_magnitude is None:
+        thalamic_magnitude = THALAMIC_INPUT_MAGNITUDE
     
     # Analyze all stages
     results_dict = {}
     
     for stage in DEVELOPMENTAL_STAGES:
-        print(f"  {stage}", end=' ')
-        result = analyze_single_stage_data(stage, n_populations, layers)
+        print(f"{stage}", end=' ')
+        result = analyze_single_stage_data(stage, layers, analysis_mode, thalamic_magnitude, verbose)
         results_dict[stage] = result
-        status_symbol = "✓" if result['distance'] > 0 else "✗"
+        
+        # Show status: ✓ for stable, ✗ for unstable, ⚠ for divergence/no convergence
+        if analysis_mode == 'both':
+            # Check both modes
+            silent_status = result['silent'].get('status', 'unknown')
+            driven_status = result['driven'].get('status', 'unknown')
+            distance = result['distance']  # Silent distance (top-level)
+            if distance > 0:
+                status_symbol = "✓"
+            elif silent_status == 'diverged' or driven_status == 'diverged':
+                status_symbol = "⚠"
+            else:
+                status_symbol = "✗"
+        else:
+            status_str = result.get('status', 'unknown')
+            distance = result['distance']
+            if distance > 0:
+                status_symbol = "✓"
+            elif status_str == 'diverged':
+                status_symbol = "⚠"
+            else:
+                status_symbol = "✗"
         print(f"{status_symbol}")
-    
-    print()
     
     # Generate visualizations
     visualizer = BifurcationVisualizer()
-    print("Generating figures...")
-    visualizer.plot_developmental_comparison(results_dict, n_populations)
-    visualizer.plot_eigenvalue_spectra(results_dict, n_populations)
+    visualizer.plot_developmental_comparison(results_dict)
     
-    # Generate detail plots for each stage
+    # For mode='both', generate separate spectrum plots for silent and driven
+    if analysis_mode == 'both':
+        # Plot silent spectrum
+        visualizer.plot_eigenvalue_spectra(results_dict, mode_override='silent')
+        # Plot driven spectrum
+        visualizer.plot_eigenvalue_spectra(results_dict, mode_override='driven')
+    else:
+        visualizer.plot_eigenvalue_spectra(results_dict)
+    
+    # Generate forced response visualizations
+    visualizer.plot_forced_response_development(results_dict)
+    
+    # Generate per-stage forced response plots
     for stage in DEVELOPMENTAL_STAGES:
-        visualizer.plot_single_stage_detail(results_dict[stage], stage, n_populations)
+        visualizer.plot_forced_response_per_stage(results_dict, stage)
     
     # If requested, compare with individual layer analyses
     if compare_layers and len(layers) > 1:
-        print()
-        print("Running layer isolation comparison...")
         l23_results = {}
         l4_results = {}
         l5_results = {}
         for stage in DEVELOPMENTAL_STAGES:
-            print(f"  {stage}", end=' ')
-            l23_result = analyze_single_stage_data(stage, n_populations, ['L23'])
-            l4_result = analyze_single_stage_data(stage, n_populations, ['L4'])
-            l5_result = analyze_single_stage_data(stage, n_populations, ['L5'])
+            l23_result = analyze_single_stage_data(stage, ['L23'], analysis_mode, thalamic_magnitude, verbose)
+            l4_result = analyze_single_stage_data(stage, ['L4'], analysis_mode, thalamic_magnitude, verbose)
+            l5_result = analyze_single_stage_data(stage, ['L5'], analysis_mode, thalamic_magnitude, verbose)
             l23_results[stage] = l23_result
             l4_results[stage] = l4_result
             l5_results[stage] = l5_result
-            print("✓")
         
-        print()
-        visualizer.plot_layer_coupling_comparison(l5_results, l4_results, l23_results, results_dict, n_populations)
+        visualizer.plot_layer_coupling_comparison(l5_results, l4_results, l23_results, results_dict)
+        
+        # Generate forced response plots for individual layers
+        visualizer.plot_forced_response_development(l23_results)
+        visualizer.plot_forced_response_development(l4_results)
+        visualizer.plot_forced_response_development(l5_results)
+        
+        for stage in DEVELOPMENTAL_STAGES:
+            visualizer.plot_forced_response_per_stage(l23_results, stage)
+            visualizer.plot_forced_response_per_stage(l4_results, stage)
+            visualizer.plot_forced_response_per_stage(l5_results, stage)
     
-    # Print concise summary
-    print()
-    print("Results Summary:")
-    max_real_eigenvalues = [-results_dict[s]['distance'] for s in DEVELOPMENTAL_STAGES]
-    min_stage = DEVELOPMENTAL_STAGES[np.argmax(max_real_eigenvalues)]  # Most positive (most unstable)
-    max_real_str = ' → '.join([f"{s}={max_real_eigenvalues[i]:.4f}" for i, s in enumerate(DEVELOPMENTAL_STAGES)])
-    print(f"  Max Re(λ): {max_real_str}")
-    print(f"  Most unstable: {min_stage} (Max Re(λ) = {max(max_real_eigenvalues):.4f})")
+    # Determine scope and mode for filenames
+    scope = layers[0] if len(layers) == 1 else 'full'
+    mode_suffix = 'silent' if analysis_mode == 'both' else analysis_mode
     
-    # Check for critical transitions
-    transitions = []
-    for i in range(len(DEVELOPMENTAL_STAGES) - 1):
-        prev_k = results_dict[DEVELOPMENTAL_STAGES[i]]['critical_k']
-        curr_k = results_dict[DEVELOPMENTAL_STAGES[i+1]]['critical_k']
-        if prev_k >= 0.1 and curr_k < 0.1:
-            transitions.append(f"  {DEVELOPMENTAL_STAGES[i]}→{DEVELOPMENTAL_STAGES[i+1]}: Transition to global patterns (k → 0)")
+    # Build figure list
+    figure_list = []
+    if analysis_mode == 'both':
+        figure_list.append(f"{scope}_development_{mode_suffix}.svg")
+        figure_list.append(f"{scope}_spectrum_silent.svg")
+        figure_list.append(f"{scope}_spectrum_driven.svg")
+        figure_list.append(f"{scope}_forced_response_silent.svg")
+        figure_list.append(f"{scope}_forced_response_driven.svg")
+    else:
+        figure_list.append(f"{scope}_development_{mode_suffix}.svg")
+        figure_list.append(f"{scope}_spectrum_{mode_suffix}.svg")
+        figure_list.append(f"{scope}_forced_response_{mode_suffix}.svg")
     
-    if transitions:
-        print("  Critical transitions:")
-        for t in transitions:
-            print(t)
+    # Add per-stage forced response figures
+    for stage in DEVELOPMENTAL_STAGES:
+        if analysis_mode == 'both':
+            figure_list.append(f"{scope}_forced_response_{stage}_silent.svg")
+            figure_list.append(f"{scope}_forced_response_{stage}_driven.svg")
+        else:
+            figure_list.append(f"{scope}_forced_response_{stage}_{mode_suffix}.svg")
     
-    print()
-    print("Figures saved (SVG format):")
-    print(f"  • outputs/bifurcation/stability_across_development_{n_populations}pop.svg")
-    print(f"  • outputs/bifurcation/eigenvalue_spectrum_{n_populations}pop.svg")
-    print(f"  • outputs/bifurcation/<STAGE>_stability_detail_{n_populations}pop.svg (for each stage)")
     if compare_layers and len(layers) > 1:
-        print(f"  • outputs/bifurcation/layer_isolation_comparison_{n_populations}pop.svg")
-
-
-def analyze_single_stage(stage_name: str, n_populations: int = None, 
-                         layers: List[str] = None):
-    """
-    Run detailed stability analysis for a single developmental stage.
+        figure_list.append(f"layers_comparison_{mode_suffix}.svg")
     
-    Args:
-        stage_name: Developmental stage name
-        n_populations: Number of populations (2 or 3, defaults to config)
-        layers: List of layers to analyze (defaults to config)
-    """
-    if n_populations is None:
-        n_populations = DEFAULT_N_POPULATIONS
-    if layers is None:
-        layers = DEFAULT_LAYERS
-    
-    preset = PRESETS.get(stage_name.upper())
-    if preset is None:
-        print(f"Error: Unknown stage '{stage_name}'. Available: {list(PRESETS.keys())}")
-        return
-    
-    layers_str = '-'.join(layers)
-    pop_desc = f"{n_populations}-population ({', '.join(['E', 'SST', 'PV'][:n_populations])})" if n_populations == 3 else "2-population (E-I)"
-    
-    print(f"Analyzing {stage_name.upper()} ({pop_desc}, layers: {layers_str})...")
-    
-    # Run analysis
-    result = analyze_single_stage_data(stage_name, n_populations, layers)
-    
-    # Generate detail plot
-    visualizer = BifurcationVisualizer()
-    visualizer.plot_single_stage_detail(result, stage_name.upper(), n_populations)
-    
-    # Print summary
-    max_real_eigenvalue = -result['distance']
-    print()
-    print("Analysis Complete:")
-    print(f"  Stage: {result['stage']}")
-    print(f"  Max Re(λ): {max_real_eigenvalue:.6f}")
-    print(f"  Status: {'STABLE ✓' if max_real_eigenvalue < 0 else 'UNSTABLE ✗'}")
-    print(f"  Critical mode: {result['critical_mode']} (k = {result['critical_k']:.4f})")
-    print()
-    print(f"  Figure saved: outputs/bifurcation/{stage_name.upper()}_stability_detail_{n_populations}pop.svg")
+    print(f"Figures: {', '.join(figure_list)}")
 
 
 def main():
     """Main entry point with CLI support."""
     parser = argparse.ArgumentParser(
-        description='Analyze network stability across developmental stages using bifurcation analysis',
+        description='Analyze network stability across developmental stages',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s                           # 3-population analysis, L4 (default)
-  %(prog)s --cell-types 2            # 2-population E-I analysis
-  %(prog)s --stage P4                # Single stage, 3-population
-  %(prog)s --layers L23 L4 L5        # Multi-layer (full network)
-  %(prog)s --layers L23 L4 L5 --compare-layers  # Full network + single-layer comparison
+  %(prog)s                           # L4 layer, silent mode (default)
+  %(prog)s --layers L23 L4 L5        # Full network
+  %(prog)s --layers L23 L4 L5 --compare-layers  # Full network + layer comparison
+  %(prog)s --mode driven              # Driven operating point
+  %(prog)s --mode both --verbose      # Compare modes with diagnostics
         """
     )
-    parser.add_argument('--cell-types', type=int, choices=[2, 3], default=DEFAULT_N_POPULATIONS,
-                       help=f'Number of cell types: 2 for E-I, 3 for E-SST-PV (default: {DEFAULT_N_POPULATIONS})')
-    parser.add_argument('--stage', type=str, choices=DEVELOPMENTAL_STAGES,
-                       help='Analyze single stage instead of all stages')
     parser.add_argument('--layers', nargs='+', choices=['L23', 'L4', 'L5'], default=DEFAULT_LAYERS,
-                       help='Layers to analyze (default: L4). Can specify multiple: --layers L23 L4 L5')
+                       help='Layers to analyze (default: L4). Use --layers L23 L4 L5 for full network')
     parser.add_argument('--compare-layers', action='store_true',
-                       help='If using multi-layer, also run single-layer (L4) analysis and compare')
+                       help='Compare isolated layers vs full network')
+    parser.add_argument('--mode', type=str, choices=ANALYSIS_MODES, default=DEFAULT_ANALYSIS_MODE,
+                       help=f'Analysis mode: silent, driven, or both (default: {DEFAULT_ANALYSIS_MODE})')
+    parser.add_argument('--thalamic-input', type=float, default=THALAMIC_INPUT_MAGNITUDE,
+                       help=f'Thalamic input magnitude for driven mode (default: {THALAMIC_INPUT_MAGNITUDE})')
+    parser.add_argument('--verbose', action='store_true',
+                       help='Print diagnostic information')
     
     args = parser.parse_args()
     
-    if args.stage:
-        analyze_single_stage(args.stage, args.cell_types, args.layers)
-    else:
-        analyze_all_stages(args.cell_types, args.layers, args.compare_layers)
+    analyze_all_stages(args.layers, args.compare_layers, args.mode, args.thalamic_input, args.verbose)
