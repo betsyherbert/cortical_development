@@ -344,4 +344,13 @@ class CorticalCircuit:
         Returns:
             Background input value
         """
-        return self.layers['L4'].get_background_input(cell_type) 
+        return self.layers['L4'].get_background_input(cell_type)
+    
+    def get_all_background_inputs(self) -> Dict[str, float]:
+        """
+        Get current background input values for all cell types (from L4 layer).
+        
+        Returns:
+            Dictionary mapping cell types to their background input values
+        """
+        return self.layers['L4'].background_input.copy() 

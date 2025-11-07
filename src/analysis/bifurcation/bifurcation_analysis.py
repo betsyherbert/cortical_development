@@ -38,6 +38,7 @@ class NetworkModel:
         self._extract_connection_strengths()
         self._extract_spatial_scales()
         self._extract_thalamic_strengths()
+        self._extract_thalamic_widths()
         
         # Baseline input: noise mean provides constant baseline input in the simulation
         # For spatially uniform steady state, we use the noise mean as mu
@@ -184,6 +185,17 @@ class NetworkModel:
         
         self.thalamic_strengths = np.array(thalamic_per_layer) * thalamic_scaling
     
+    def _extract_thalamic_widths(self):
+        """Extract thalamic spatial widths for each population in each layer."""
+        # Get thalamic widths from preset
+        thal_width_e = self.preset['thalamic_widths']['E']
+        thal_width_sst = self.preset['thalamic_widths']['SST']
+        thal_width_pv = self.preset['thalamic_widths']['PV']
+        thalamic_widths_per_layer = np.array([thal_width_e, thal_width_sst, thal_width_pv])
+        
+        # Repeat for each layer
+        self.thalamic_widths = np.tile(thalamic_widths_per_layer, len(self.layers))
+    
     def compute_thalamic_input(self, input_magnitude: float) -> np.ndarray:
         """
         Compute spatially-averaged thalamic drive.
@@ -215,7 +227,8 @@ class NetworkModel:
             'A': self.A.copy(),
             'sigma': self.sigma.copy(),
             'mu': self.mu.copy(),
-            'thalamic_strengths': self.thalamic_strengths.copy()
+            'thalamic_strengths': self.thalamic_strengths.copy(),
+            'thalamic_widths': self.thalamic_widths.copy()
         }
         return params
 
@@ -546,5 +559,3 @@ class StabilityAnalyzer:
             'gain_profile': gain_profile,
             'max_real_profile': max_real_profile
         }
-        
-        return max_gain, critical_mode, critical_k, max_condition

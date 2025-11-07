@@ -5,7 +5,7 @@ from src.analysis.common import DEVELOPMENTAL_STAGES, PRESETS, DPI
 
 # Analysis parameters
 ANALYSIS_PARAMS = {
-    'n_modes': 30,                  # Number of Fourier modes to scan in each direction (increased to check boundary-locking)
+    'n_modes': 10,                  # Number of Fourier modes to scan in each direction (increased to check boundary-locking)
     'tolerance': 1e-6,              # Convergence tolerance for steady state finder
     'max_iters': 1000,              # Maximum iterations for steady state finder
     'grid_size': 20,                # Standard grid size for spatial scaling

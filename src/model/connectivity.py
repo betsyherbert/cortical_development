@@ -327,6 +327,20 @@ class LayerConnectivity:
         
         return raw_amplitude * scaling
 
+    def get_all_connection_strengths(self) -> dict:
+        """
+        Get all raw (unscaled) connection strengths in the network.
+        
+        Returns:
+            Dictionary mapping connection keys to their raw amplitudes
+        """
+        raw_strengths = {}
+        
+        for conn_key, params in self.layer_params.items():
+            raw_strengths[conn_key] = params['amplitude']
+        
+        return raw_strengths
+
     def get_all_scaled_strengths(self) -> dict:
         """
         Get all scaled connection strengths in the network.
@@ -360,6 +374,20 @@ class LayerConnectivity:
             )
         
         return scaled_strengths
+    
+    def get_all_sigmas(self) -> dict:
+        """
+        Get all connection widths (sigmas) in the network.
+        
+        Returns:
+            Dictionary mapping connection keys to their sigma values
+        """
+        sigmas = {}
+        
+        for conn_key, params in self.layer_params.items():
+            sigmas[conn_key] = params['sigma']
+        
+        return sigmas
 
     def get_scaled_strength_range(self) -> tuple:
         """
@@ -531,6 +559,15 @@ class LayerConnectivity:
             Current strength scaling factor
         """
         return self.strength_scaling.get(cell_type, 1.0)
+    
+    def get_all_strength_scaling(self) -> dict:
+        """
+        Get all current strength scaling factors.
+        
+        Returns:
+            Dictionary mapping cell types to their strength scaling factors
+        """
+        return self.strength_scaling.copy()
     
     def set_strength_scaling(self, cell_type: str, scaling: float) -> None:
         """
