@@ -16,23 +16,11 @@ P4_PRESET = {
         'PV': 1.0
     },
     
-    # Input noise parameters for each cell type.
-    'noise_params': {
-        'E': {
-            'mean': -0.05,
-            'std': 0.04,  
-            'c': 0.2     
-        },
-        'SST': {
-            'mean': -0.05, 
-            'std': 0.04,  
-            'c': 0.2     
-        },
-        'PV': {
-            'mean': -0.05,   
-            'std': 0.04,    
-            'c': 0.2     
-        }
+    # Constant background input for each cell type.
+    'background_input': {
+        'E': 0.0,
+        'SST': 0.0,
+        'PV': 0.0
     },
 
     # Thalamic input widths: how broadly thalamic input is spatially spread. 
@@ -178,23 +166,10 @@ P8_PRESET = {
         'PV': 1.0
     },
     
-    # Input noise parameters for each cell type.
-    'noise_params': {
-        'E': {
-            'mean': -0.05,
-            'std': 0.04,  
-            'c': 0.2     
-        },
-        'SST': {
-            'mean': -0.05, 
-            'std': 0.04,  
-            'c': 0.2     
-        },
-        'PV': {
-            'mean': -0.05,   
-            'std': 0.04,    
-            'c': 0.2     
-        }
+    'background_input': {
+        'E': 0.0,
+        'SST': 0.0,
+        'PV': 0.0
     },
 
     'thalamic_widths': {
@@ -358,22 +333,10 @@ P12_PRESET = {
 
     'thalamic_alpha': 0.6, 
     
-    'noise_params': {
-        'E': {
-            'mean': 0.0,
-            'std': 0.04,  
-            'c': 0.2     
-        },
-        'SST': {
-            'mean': 0.0, 
-            'std': 0.04,  
-            'c': 0.2     
-        },
-        'PV': {
-            'mean': 0.0,   
-            'std': 0.04,    
-            'c': 0.2     
-        }
+    'background_input': {
+        'E': 0.0,
+        'SST': 0.0,
+        'PV': 0.0
     },
 
     'connection_strengths': {
@@ -517,22 +480,10 @@ P16_PRESET = {
 
     'thalamic_alpha': 0.8,
     
-    'noise_params': {
-        'E': {
-            'mean': 0.1,
-            'std': 0.04,  
-            'c': 0.2     
-        },
-        'SST': {
-            'mean': 0.0, 
-            'std': 0.04,  
-            'c': 0.2     
-        },
-        'PV': {
-            'mean': 0.0,   
-            'std': 0.04,    
-            'c': 0.2     
-        }
+    'background_input': {
+        'E': 0.1,
+        'SST': 0.0,
+        'PV': 0.0
     },
 
     'connection_strengths': {

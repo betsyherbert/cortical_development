@@ -122,12 +122,14 @@ def test_simulation_strength_scaling(grid_size):
     assert retrieved == scaling
 
 
-def test_simulation_noise_params(grid_size):
-    """Test noise parameters setter."""
+def test_simulation_background_input(grid_size):
+    """Test background input setter."""
     sim = CorticalSimulation(grid_size=grid_size)
     
-    # Set noise parameters
-    sim.set_noise_params('E', mean=0.1, std=0.2, c=0.5)
+    # Set background input
+    sim.set_background_input('E', 0.1)
+    sim.set_background_input('SST', -0.05)
+    sim.set_background_input('PV', 0.0)
     
     # Verify by checking if simulation still works
     activities = sim.update()

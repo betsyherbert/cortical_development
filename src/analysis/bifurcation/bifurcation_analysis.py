@@ -158,13 +158,12 @@ class NetworkModel:
                         self.sigma[row_idx, col_idx] = sigma_src
     
     def _extract_baseline_input(self):
-        """Extract baseline input from noise mean parameters, repeated for each layer."""
-        # In the simulation, noise mean provides a constant baseline input
-        # Noise formula: noise = mean + std * (private + shared components)
-        # For steady state analysis, we use the mean component as baseline
-        mean_e = self.preset['noise_params']['E']['mean']
-        mean_sst = self.preset['noise_params']['SST']['mean']
-        mean_pv = self.preset['noise_params']['PV']['mean']
+        """Extract baseline input from background_input parameters, repeated for each layer."""
+        # In the simulation, each cell type receives a constant background input
+        # For steady state analysis, we use these background input values as baseline
+        mean_e = self.preset['background_input']['E']
+        mean_sst = self.preset['background_input']['SST']
+        mean_pv = self.preset['background_input']['PV']
         mu_per_layer = np.array([mean_e, mean_sst, mean_pv])
         
         # Repeat for each layer
@@ -267,7 +266,7 @@ class SteadyStateFinder:
         # Damping parameter for stability near criticality
         alpha = 0.25
         
-        for iteration in range(self.max_iters):
+        for _ in range(self.max_iters):
             # Compute input: A @ r + external_input
             input_vec = self.network.A @ r + external_input
             # Apply ReLU: r = max(0, gain * input)
@@ -424,7 +423,7 @@ class StabilityAnalyzer:
         
         return distance_to_instability, critical_mode, critical_k, wavelength
     
-    def compute_forced_response(self, B: np.ndarray, verbose: bool = False) -> Tuple[float, Tuple[int, int], float, float]:
+    def compute_forced_response(self, B: np.ndarray, verbose: bool = False) -> Dict:
         """
         Compute forced response gain by finding the Fourier mode with maximum static gain.
         
@@ -436,11 +435,14 @@ class StabilityAnalyzer:
             verbose: If True, print diagnostic information
         
         Returns:
-            (max_gain, critical_mode, critical_k, max_condition) tuple where:
-            - max_gain: Maximum forced response gain across all modes
-            - critical_mode: (n₁, n₂) tuple of the mode with maximum gain
-            - critical_k: k value (sqrt(n₁² + n₂²)) of the critical mode
-            - max_condition: Maximum condition number encountered (for diagnostics)
+            Dictionary containing forced response diagnostics:
+            - 'max_gain': Maximum forced response gain across all modes
+            - 'critical_mode': (n₁, n₂) tuple of the mode with maximum gain
+            - 'critical_k': k value (sqrt(n₁² + n₂²)) of the critical mode
+            - 'max_condition': Maximum condition number encountered
+            - 'k_values': Sorted array of unique k magnitudes evaluated
+            - 'gain_profile': Gain for each k (maximum across degenerate modes)
+            - 'max_real_profile': Max real part of eigenvalues for each k
         """
         # Normalize B once per analysis call
         B_norm_vec = np.linalg.norm(B)
@@ -448,7 +450,15 @@ class StabilityAnalyzer:
             # Zero thalamic input - return NaN values
             if verbose:
                 print(f"  [ForcedResponse] Zero thalamic input (||B||={B_norm_vec:.2e}), skipping analysis")
-            return np.nan, (0, 0), 0.0, np.nan
+            return {
+                'max_gain': np.nan,
+                'critical_mode': (0, 0),
+                'critical_k': 0.0,
+                'max_condition': np.nan,
+                'k_values': np.array([]),
+                'gain_profile': np.array([]),
+                'max_real_profile': np.array([])
+            }
         
         B_norm = B / B_norm_vec
         
@@ -464,6 +474,9 @@ class StabilityAnalyzer:
         critical_mode = (0, 0)
         critical_k = 0.0
         max_condition = 0.0
+
+        # Aggregate results per k^2 (to handle degeneracy of Fourier modes sharing same magnitude)
+        profile_by_k2: Dict[int, Dict[str, float]] = {}
         
         # Scan Fourier modes (clamped range)
         for n1 in range(-n_modes_effective, n_modes_effective + 1):
@@ -478,22 +491,60 @@ class StabilityAnalyzer:
                 
                 # Compute J(k)⁻¹ @ B_norm using pseudo-inverse (handles singular matrices)
                 try:
+                    eigenvalues = np.linalg.eigvals(Jk)
+                    max_real_mode = np.max(eigenvalues.real)
+
                     Jk_inv_B = np.linalg.pinv(Jk) @ B_norm
                     gain_k = np.linalg.norm(Jk_inv_B)
-                    
+
                     if gain_k > max_gain:
                         max_gain = gain_k
                         critical_mode = (n1, n2)
                         critical_k = np.sqrt(n1**2 + n2**2)
+
+                    k_squared = n1**2 + n2**2
+                    if k_squared not in profile_by_k2:
+                        profile_by_k2[k_squared] = {
+                            'k': np.sqrt(k_squared),
+                            'gain': gain_k,
+                            'max_real': max_real_mode
+                        }
+                    else:
+                        profile_entry = profile_by_k2[k_squared]
+                        profile_entry['gain'] = max(profile_entry['gain'], gain_k)
+                        profile_entry['max_real'] = max(profile_entry['max_real'], max_real_mode)
                 except np.linalg.LinAlgError:
                     # If pseudo-inverse fails, skip this mode
                     if verbose:
                         print(f"  [ForcedResponse] Warning: Failed to compute pseudo-inverse for mode ({n1}, {n2})")
                     continue
         
+        # Sort profiles by k magnitude
+        if profile_by_k2:
+            sorted_items = sorted(profile_by_k2.values(), key=lambda item: item['k'])
+            k_values = np.array([item['k'] for item in sorted_items])
+            gain_profile = np.array([item['gain'] for item in sorted_items])
+            max_real_profile = np.array([item['max_real'] for item in sorted_items])
+        else:
+            k_values = np.array([])
+            gain_profile = np.array([])
+            max_real_profile = np.array([])
+
         if verbose:
             print(f"  [ForcedResponse] Critical mode: {critical_mode}, k={critical_k:.4f}")
             print(f"  [ForcedResponse] Max gain: {max_gain:.6f}")
             print(f"  [ForcedResponse] Max condition number: {max_condition:.2e}")
+            if k_values.size > 0:
+                print(f"  [ForcedResponse] Evaluated {k_values.size} unique k values")
+
+        return {
+            'max_gain': max_gain,
+            'critical_mode': critical_mode,
+            'critical_k': critical_k,
+            'max_condition': max_condition,
+            'k_values': k_values,
+            'gain_profile': gain_profile,
+            'max_real_profile': max_real_profile
+        }
         
         return max_gain, critical_mode, critical_k, max_condition

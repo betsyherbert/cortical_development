@@ -44,7 +44,7 @@ class DescriptiveAnalysis:
         self._update_connection_strengths(preset)
         self._update_scaling(preset)
         self._update_time_constants_and_gains(preset)
-        self._update_noise_parameters(preset)
+        self._update_background_input(preset)
         self._update_thalamic_widths(preset)
         self._update_outgoing_widths(preset)
 
@@ -75,18 +75,13 @@ class DescriptiveAnalysis:
             for cell_type, gain in preset['gains'].items():
                 self.simulation.set_gain(cell_type, gain)
 
-    def _update_noise_parameters(self, preset: Dict[str, Any]) -> None:
-        """Update noise parameters from preset."""
-        if 'noise_params' not in preset:
+    def _update_background_input(self, preset: Dict[str, Any]) -> None:
+        """Update background input from preset."""
+        if 'background_input' not in preset:
             return
             
-        for cell_type, noise_dict in preset['noise_params'].items():
-            self.simulation.set_noise_params(
-                cell_type, 
-                noise_dict['mean'], 
-                noise_dict['std'], 
-                noise_dict['c']
-            )
+        for cell_type, value in preset['background_input'].items():
+            self.simulation.set_background_input(cell_type, value)
 
     def _update_thalamic_widths(self, preset: Dict[str, Any]) -> None:
         """Update thalamic connection widths (sigma values)."""

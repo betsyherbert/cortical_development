@@ -8,13 +8,12 @@ import plotly.graph_objects as go
 import numpy as np
 import dash_bootstrap_components as dbc
 
-
 from src.model.config import (
     COLORMAPS, UPDATE_INTERVAL, CELL_TYPES, LAYERS, LAYER_NAMES,
     LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, CONNECTIONS,
     INITIAL_THALAMIC_WIDTHS, INITIAL_OUTGOING_WIDTHS, 
-    INITIAL_TIME_CONSTANTS, INITIAL_GAINS, CELL_ACTIVITY_COLORS,
-    INITIAL_STRENGTH_SCALING, INITIAL_NOISE_PARAMS
+    INITIAL_TIME_CONSTANTS, CELL_ACTIVITY_COLORS,
+    INITIAL_STRENGTH_SCALING, INITIAL_BACKGROUND_INPUT
 )
 from src.model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
 
@@ -41,20 +40,21 @@ CELL_STYLE = {
     "maxHeight": f"{CELL_SIZE}px"
 }
 
-# Colors
+# Colors for light mode
 LAYER_COLORS = {
-    "L4": "rgba(180, 180, 180, 0.3)",
-    "default": "rgba(180, 180, 180, 0.15)",
+    "L4": "rgba(52, 73, 94, 0.15)",
+    "default": "rgba(149, 165, 166, 0.15)",
     "transparent": "transparent"
 }
 
-# Table header styles
+# Table header styles for light mode
 MAIN_HEADER_STYLE = {
     **HEADER_STYLE,
     "backgroundColor": LAYER_COLORS["default"],
-    "color": "white",
+    "color": "#2c3e50",
     "padding": "10px 5px",
-    "fontSize": "0.9rem"
+    "fontSize": "0.9rem",
+    "fontWeight": "600"
 }
 
 LAYER_HEADER_STYLE = {
@@ -64,36 +64,40 @@ LAYER_HEADER_STYLE = {
 
 CELL_TYPE_HEADER_STYLE = {
     **HEADER_STYLE,
-    "color": "white",
+    "color": "#2c3e50",
     "padding": "8px 5px",
-    "fontSize": "0.9rem"
+    "fontSize": "0.9rem",
+    "fontWeight": "500"
 }
 
 ROW_HEADER_STYLE = {
     **HEADER_STYLE,
-    "color": "white",
+    "color": "#2c3e50",
     "textAlign": "center",
     "verticalAlign": "middle",
     "padding": "10px 5px",
     "height": "100%",
-    "fontSize": "0.9rem"
+    "fontSize": "0.9rem",
+    "fontWeight": "600"
 }
 
 # Common layout styles
 CONTROL_PANEL_STYLE = {
-    "backgroundColor": "#28323f",
+    "backgroundColor": "#ffffff",
     "borderRadius": "10px",
-    "padding": "15px"
+    "padding": "15px",
+    "border": "1px solid #ddd"
 }
 
 SLIDER_CONTAINER_STYLE = {
-    "backgroundColor": "rgba(50, 50, 50, 0.9)",
+    "backgroundColor": "rgba(255, 255, 255, 0.95)",
     "padding": "10px",
-    "border": "1px solid #444",
+    "border": "1px solid #ccc",
     "borderRadius": "5px",
     "zIndex": "1000",
     "width": "200px",
-    "position": "absolute"
+    "position": "absolute",
+    "boxShadow": "0 2px 8px rgba(0,0,0,0.15)"
 }
 
 # Graph configuration
@@ -202,35 +206,14 @@ class DashboardApp:
         "marks": {i: f"{i}" for i in range(0, 6)}
     }
     
-    NOISE_MEAN_PARAMS = {
-        "min_val": -0.2,
-        "max_val": 0.2,
-        "step": 0.05,
-        "marks": {
-            -0.2: "-0.2",
-            0.0: "0",
-            0.2: "0.2"
-        }
-    }
-    
-    NOISE_STD_PARAMS = {
+    BACKGROUND_INPUT_PARAMS = {
         "min_val": 0.0,
         "max_val": 0.4,
-        "step": 0.02,
-        "marks": {
-            0: "0",
-            0.2: "0.2",
-            0.4: "0.4"
-        }
-    }
-    
-    NOISE_CORR_PARAMS = {
-        "min_val": 0.0,
-        "max_val": 1.0,
         "step": 0.05,
         "marks": {
-            0: "0",
-            1.0: "1"
+            0.0: "0.0",
+            0.2: "0.2",
+            0.4: "0.4"
         }
     }
     
@@ -245,14 +228,14 @@ class DashboardApp:
         self.simulation = simulation
         self.update_interval = update_interval
         
-        # Initialize the Dash app with dark theme
+        # Initialize the Dash app with light theme
         self.app = dash.Dash(
             __name__, 
-            external_stylesheets=[dbc.themes.DARKLY],
+            external_stylesheets=[dbc.themes.FLATLY],
             suppress_callback_exceptions=True
         )
         
-        # Add custom CSS for sliders
+        # Add custom CSS for sliders and light mode styling
         self.app.index_string = '''
         <!DOCTYPE html>
         <html>
@@ -264,36 +247,39 @@ class DashboardApp:
                 {%favicon%}
                 {%css%}
                 <style>
+                    body {
+                        background-color: #f8f9fa !important;
+                    }
                     .custom-slider .rc-slider-track {
-                        background-color: white !important;
+                        background-color: #2c3e50 !important;
                     }
                     .custom-slider .rc-slider-rail {
-                        background-color: #555 !important;
+                        background-color: #ddd !important;
                     }
                     .custom-slider .rc-slider-handle {
-                        border-color: white !important;
-                        background-color: white !important;
+                        border-color: #2c3e50 !important;
+                        background-color: #2c3e50 !important;
                     }
                     .custom-slider .rc-slider-handle:hover {
-                        border-color: white !important;
+                        border-color: #34495e !important;
                     }
                     .custom-slider .rc-slider-handle:active {
-                        border-color: white !important;
-                        box-shadow: 0 0 5px white !important;
+                        border-color: #2c3e50 !important;
+                        box-shadow: 0 0 5px #2c3e50 !important;
                     }
                     .custom-slider .rc-slider-dot {
-                        border-color: #888 !important;
-                        background-color: #888 !important;
+                        border-color: #ccc !important;
+                        background-color: #ccc !important;
                     }
                     .custom-slider .rc-slider-dot-active {
-                        border-color: white !important;
-                        background-color: white !important;
+                        border-color: #2c3e50 !important;
+                        background-color: #2c3e50 !important;
                     }
                     .custom-slider .rc-slider-mark {
                         width: 100% !important;
                     }
                     .custom-slider .rc-slider-mark-text {
-                        color: white !important;
+                        color: #333 !important;
                     }
                     .custom-slider .rc-slider-mark-text:last-child {
                         transform: translateX(-100%) !important;
@@ -320,9 +306,9 @@ class DashboardApp:
             Output('tau-e-slider', 'value'),
             Output('tau-sst-slider', 'value'),
             Output('tau-pv-slider', 'value'),
-            Output('gain-e-slider', 'value'),
-            Output('gain-sst-slider', 'value'),
-            Output('gain-pv-slider', 'value'),
+            Output('background-input-e-slider', 'value'),
+            Output('background-input-sst-slider', 'value'),
+            Output('background-input-pv-slider', 'value'),
             Output('thalamic-width-e-slider', 'value'),
             Output('thalamic-width-sst-slider', 'value'),
             Output('thalamic-width-pv-slider', 'value'),
@@ -334,15 +320,6 @@ class DashboardApp:
             Output('strength-scaling-pv-slider', 'value'),
             Output('strength-scaling-thalamus-slider', 'value'),
             Output('alpha-slider', 'value'),
-            Output('noise-mean-e-slider', 'value'),
-            Output('noise-mean-sst-slider', 'value'),
-            Output('noise-mean-pv-slider', 'value'),
-            Output('noise-std-e-slider', 'value'),
-            Output('noise-std-sst-slider', 'value'),
-            Output('noise-std-pv-slider', 'value'),
-            Output('noise-corr-e-slider', 'value'),
-            Output('noise-corr-sst-slider', 'value'),
-            Output('noise-corr-pv-slider', 'value'),
             Output('connection-matrix-container', 'children')
         ]
         
@@ -609,10 +586,48 @@ class DashboardApp:
         if 'strength_scaling' in preset:
             for cell_type, scaling in preset['strength_scaling'].items():
                 self.simulation.set_strength_scaling(cell_type, scaling)
+        
+        # Update gains if present in the preset
+        if 'gains' in preset:
+            for cell_type, gain in preset['gains'].items():
+                self.simulation.set_gain(cell_type, gain)
+        
+        # Update background input if present in the preset
+        if 'background_input' in preset:
+            for cell_type, value in preset['background_input'].items():
+                self.simulation.set_background_input(cell_type, value)
                 
     def get_connection_key(self, source_layer, source_cell, target_layer, target_cell):
         """Generate a connection key based on source and target information."""
         return ConnectionKeyUtils.build(source_layer, source_cell, target_layer, target_cell)
+
+    def get_max_scaled_strength_magnitude(self):
+        """Get the maximum absolute scaled connection strength across all presets.
+        
+        This is used to normalize colors across developmental stages for fair comparison.
+        
+        Returns:
+            Maximum absolute scaled strength value
+        """
+        max_magnitude = 0.0
+        
+        # Check all developmental presets
+        for preset in [P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET]:
+            for conn_key, raw_strength in preset['connection_strengths'].items():
+                # Parse to get source cell type
+                parts = conn_key.split('_to_')
+                source_part = parts[0]
+                
+                if source_part == 'thalamus':
+                    scaling = preset['strength_scaling'].get('thalamus', 1.0)
+                else:
+                    source_cell = source_part.split('_')[1]
+                    scaling = preset['strength_scaling'].get(source_cell, 1.0)
+                
+                scaled_strength = raw_strength * scaling
+                max_magnitude = max(max_magnitude, abs(scaled_strength))
+        
+        return max_magnitude
 
     def create_connection_matrix(self) -> html.Div:
         """Create a matrix visualization of all layer and cell type connections."""
@@ -633,9 +648,10 @@ class DashboardApp:
                     style={
                         **HEADER_STYLE,
                         "backgroundColor": LAYER_COLORS["L4"] if layer == "L4" else LAYER_COLORS["default"],
-                        "color": "white",
+                        "color": "#2c3e50",
                         "padding": "10px 5px",
-                        "fontSize": "0.9rem"
+                        "fontSize": "0.9rem",
+                        "fontWeight": "600"
                     }
                 )
             )
@@ -655,10 +671,11 @@ class DashboardApp:
                         style={
                             **HEADER_STYLE,
                             "backgroundColor": header_color,
-                            "color": "white",
+                            "color": "#2c3e50",
                             "padding": "8px 5px",
                             "fontSize": "0.9rem",
-                            "borderRight": "1px solid #555" if cell_type == "PV" else "none"
+                            "fontWeight": "500",
+                            "borderRight": "1px solid #ddd" if cell_type == "PV" else "none"
                         }
                     )
                 )
@@ -690,12 +707,13 @@ class DashboardApp:
                     style={
                         **HEADER_STYLE,
                         "backgroundColor": bg_color,
-                        "color": "white",
+                        "color": "#2c3e50",
                         "textAlign": "center",
                         "verticalAlign": "middle",
                         "padding": "10px 5px",
                         "height": "100%",
-                        "fontSize": "0.9rem"
+                        "fontSize": "0.9rem",
+                        "fontWeight": "600"
                     }
                 )
             else:
@@ -709,34 +727,38 @@ class DashboardApp:
                 style={
                     **HEADER_STYLE,
                     "backgroundColor": header_color,
-                    "color": "white",
+                    "color": "#2c3e50",
                     "padding": "5px",
-                    "fontSize": "0.9rem"
+                    "fontSize": "0.9rem",
+                    "fontWeight": "500"
                 }
             )
             
             # Create data cells
             cells = []
+            # Get max magnitude for normalization across all presets
+            max_magnitude = self.get_max_scaled_strength_magnitude()
+            
             for target_layer in LAYERS:
                 for target_cell in CELL_TYPES:
                     # Skip thalamus to thalamus connections
                     if source_layer == 'Th' and target_layer == 'Th':
                         cells.append(html.Td("", className="text-center", style={
                             **CELL_STYLE,
-                            "backgroundColor": "#1a1a1a"
+                            "backgroundColor": "#f8f9fa"
                         }))
                         continue
                     
-                    # Get connection strength
-                    value = self.get_connection_value(source_layer, source_cell, target_layer, target_cell)
+                    # Get scaled connection strength for display
+                    value = self.get_connection_value(source_layer, source_cell, target_layer, target_cell, scaled=True)
                     
-                    # Determine cell colors based on connection strength and source cell type
-                    bg_color, hover_color = self._get_connection_colors(source_layer, source_cell, value)
+                    # Determine cell colors based on scaled connection strength and source cell type
+                    bg_color, hover_color = self._get_connection_colors(source_layer, source_cell, value, max_magnitude)
                     
                     # Create cell with unique ID for callbacks
                     cell_id = f"{source_layer}-{source_cell or 'None'}-{target_layer}-{target_cell}"
                     cells.append(html.Td(
-                        f"{value:.1f}",
+                        f"{value:.2f}",  # Show 2 decimals for scaled values
                         id={'type': 'connection-cell', 'id': cell_id},
                         className="connection-cell text-center",
                         style={
@@ -746,7 +768,8 @@ class DashboardApp:
                             "transition": "background-color 0.2s",
                             "padding": "5px",
                             "fontSize": "0.8rem",
-                            "borderRight": "1px solid #555" if target_cell == "PV" else "none"
+                            "borderRight": "1px solid #ddd" if target_cell == "PV" else "none",
+                            "color": "#2c3e50"
                         },
                         **{'data-highlight-color': hover_color}
                     ))
@@ -755,43 +778,120 @@ class DashboardApp:
             is_last_in_layer = (source_layer != 'Th' and source_cell == 'PV') or source_layer == 'Th'
             row_style = {"marginLeft": "0", "marginRight": "0"}
             if is_last_in_layer:
-                row_style["borderBottom"] = "1px solid #555"
+                row_style["borderBottom"] = "1px solid #ddd"
             
             row_cells = [cell for cell in [row_header, cell_type_header] + cells if cell is not None]
             rows.append(html.Tr(row_cells, style=row_style))
         
-        # Create table
+        # Create table with colorbar
+        # Use symmetric range based on max magnitude across all presets
+        colorbar_max = max_magnitude  # Already computed above for color normalization
+        
         return html.Div([
-            html.Table(
-                [html.Tr(main_header_cells), html.Tr(sub_header_cells)] + rows,
-                className="table connection-matrix",
-                style={
-                    "tableLayout": "fixed",
-                    "fontSize": "0.8rem",
-                    "borderCollapse": "collapse",
-                    "width": "auto",
-                    "margin": "0 auto",
-                    "borderSpacing": "0",
-                    "border": "none"
-                }
-            )
+            html.Div([
+                # Connection matrix table
+                html.Div(
+                    html.Table(
+                        [html.Tr(main_header_cells), html.Tr(sub_header_cells)] + rows,
+                        className="table connection-matrix",
+                        style={
+                            "tableLayout": "fixed",
+                            "fontSize": "0.8rem",
+                            "borderCollapse": "collapse",
+                            "width": "auto",
+                            "margin": "0",
+                            "borderSpacing": "0",
+                            "border": "none"
+                        }
+                    ),
+                    style={"display": "flex", "flexDirection": "column"}
+                ),
+                # Colorbar
+                html.Div([
+                    # Top label (max)
+                    html.Div(
+                        f"+{colorbar_max:.1f}",
+                        style={
+                            "fontSize": "0.7rem",
+                            "textAlign": "center",
+                            "marginBottom": "2px",
+                            "color": "#2c3e50",
+                            "fontWeight": "500"
+                        }
+                    ),
+                    # Gradient bar (excitatory to inhibitory)
+                    html.Div(
+                        style={
+                            "width": "25px",
+                            "flex": "1",
+                            "background": "linear-gradient(to bottom, #4292c2, rgba(200, 200, 200, 0.2), #D91B12)",
+                            "border": "1px solid #ddd",
+                            "borderRadius": "3px",
+                            "position": "relative"
+                        },
+                        children=[
+                            # Zero label (positioned in middle)
+                            html.Div(
+                                "0.0",
+                                style={
+                                    "fontSize": "0.7rem",
+                                    "textAlign": "center",
+                                    "color": "#2c3e50",
+                                    "fontWeight": "500",
+                                    "position": "absolute",
+                                    "top": "50%",
+                                    "left": "50%",
+                                    "transform": "translate(-50%, -50%)",
+                                    "backgroundColor": "white",
+                                    "padding": "0 2px"
+                                }
+                            )
+                        ]
+                    ),
+                    # Bottom label (min)
+                    html.Div(
+                        f"-{colorbar_max:.1f}",
+                        style={
+                            "fontSize": "0.7rem",
+                            "textAlign": "center",
+                            "marginTop": "2px",
+                            "color": "#2c3e50",
+                            "fontWeight": "500"
+                        }
+                    )
+                ], style={
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "alignItems": "center",
+                    "marginLeft": "15px",
+                    "alignSelf": "stretch"
+                })
+            ], style={
+                "display": "flex",
+                "alignItems": "stretch",
+                "justifyContent": "center"
+            })
         ])
 
-    def _get_connection_colors(self, source_layer, source_cell, value):
+    def _get_connection_colors(self, source_layer, source_cell, value, max_magnitude=None):
         """Get background and hover colors for a connection based on source and value.
         
         Args:
             source_layer: Source layer ('thalamus' or layer name)
             source_cell: Source cell type (E, SST, PV, or None for thalamus)
-            value: Connection strength value
+            value: Connection strength value (scaled)
+            max_magnitude: Maximum absolute value for normalization (if None, uses 1.0)
             
         Returns:
             Tuple of (background_color, hover_color)
         """
+        if max_magnitude is None or max_magnitude == 0:
+            max_magnitude = 1.0
+            
         if source_layer == 'thalamus' or source_layer == 'Th':
             # For thalamic connections, always use E color and only positive values
             if value > 0:
-                intensity = min(value / 1.0, 1.0) * 0.7
+                intensity = min(abs(value) / max_magnitude, 1.0) * 0.7
                 bg_color = CELL_ACTIVITY_COLORS['E']['bg'](intensity)
                 hover_color = CELL_ACTIVITY_COLORS['E']['hover'](intensity)
             else:
@@ -800,7 +900,7 @@ class DashboardApp:
         else:
             # For cell-type specific connections
             if value != 0:
-                intensity = min(abs(value) / 1.0, 1.0) * 0.7
+                intensity = min(abs(value) / max_magnitude, 1.0) * 0.7
                 if source_cell in ['PV', 'SST']:
                     # For inhibitory cells: use their color for negative values, E color for positive
                     if value < 0:
@@ -819,7 +919,7 @@ class DashboardApp:
                         hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
             else:
                 bg_color = CELL_ACTIVITY_COLORS['inactive']['bg']
-                hover_color = CELL_ACTIVITY_COLORS['inactive']['hover']
+                hover_color = CELL_ACTIVITY_COLORS['inactive']['bg']
                 
         return bg_color, hover_color
 
@@ -862,9 +962,9 @@ class DashboardApp:
             'tau_e': preset['time_constants']['E'],
             'tau_sst': preset['time_constants']['SST'],
             'tau_pv': preset['time_constants']['PV'],
-            'gain_e': preset['gains']['E'],
-            'gain_sst': preset['gains']['SST'],
-            'gain_pv': preset['gains']['PV'],
+            'background_input_e': preset['background_input']['E'],
+            'background_input_sst': preset['background_input']['SST'],
+            'background_input_pv': preset['background_input']['PV'],
             'sigma_thal_e': preset['thalamic_widths']['E'],
             'sigma_thal_sst': preset['thalamic_widths']['SST'],
             'sigma_thal_pv': preset['thalamic_widths']['PV'],
@@ -875,16 +975,7 @@ class DashboardApp:
             'strength_sst': preset['strength_scaling']['SST'],
             'strength_pv': preset['strength_scaling']['PV'],
             'strength_thal': preset['strength_scaling']['thalamus'],
-            'alpha': preset['thalamic_alpha'],
-            'noise_mean_e': preset['noise_params']['E']['mean'],
-            'noise_mean_sst': preset['noise_params']['SST']['mean'],
-            'noise_mean_pv': preset['noise_params']['PV']['mean'],
-            'noise_std_e': preset['noise_params']['E']['std'],
-            'noise_std_sst': preset['noise_params']['SST']['std'],
-            'noise_std_pv': preset['noise_params']['PV']['std'],
-            'noise_corr_e': preset['noise_params']['E']['c'],
-            'noise_corr_sst': preset['noise_params']['SST']['c'],
-            'noise_corr_pv': preset['noise_params']['PV']['c']
+            'alpha': preset['thalamic_alpha']
         }
         return values
 
@@ -911,19 +1002,28 @@ class DashboardApp:
             # Return all values in the expected order
             return (
                 values['tau_e'], values['tau_sst'], values['tau_pv'],
-                values['gain_e'], values['gain_sst'], values['gain_pv'],
+                values['background_input_e'], values['background_input_sst'], values['background_input_pv'],
                 values['sigma_thal_e'], values['sigma_thal_sst'], values['sigma_thal_pv'],
                 values['sigma_e_out'], values['sigma_sst_out'], values['sigma_pv_out'],
                 values['strength_e'], values['strength_sst'], values['strength_pv'], values['strength_thal'],
-                values['alpha'], values['noise_mean_e'], values['noise_mean_sst'], values['noise_mean_pv'],
-                values['noise_std_e'], values['noise_std_sst'], values['noise_std_pv'], values['noise_corr_e'],
-                values['noise_corr_sst'], values['noise_corr_pv'], self.create_connection_matrix()
+                values['alpha'], self.create_connection_matrix()
             )
         
         return apply_preset_callback
 
-    def get_connection_value(self, source_layer, source_cell, target_layer, target_cell):
-        """Get the current connection strength value."""
+    def get_connection_value(self, source_layer, source_cell, target_layer, target_cell, scaled=False):
+        """Get the current connection strength value.
+        
+        Args:
+            source_layer: Source layer
+            source_cell: Source cell type
+            target_layer: Target layer
+            target_cell: Target cell type
+            scaled: If True, return strength-scaled value; if False, return raw amplitude
+            
+        Returns:
+            Connection strength (raw or scaled)
+        """
         try:
             # Get connection strength
             conn_key = self.get_connection_key(source_layer, source_cell, target_layer, target_cell)
@@ -932,13 +1032,27 @@ class DashboardApp:
             if hasattr(self, 'simulation') and hasattr(self.simulation, 'connectivity'):
                 # Convert 'Th' to 'thalamus' for the simulation API
                 source_layer_sim = 'thalamus' if source_layer == 'Th' else source_layer
-                return self.simulation.connectivity.get_connection_strength(
-                    source_layer_sim, source_cell, target_layer, target_cell
-                )
+                
+                if scaled:
+                    return self.simulation.connectivity.get_scaled_connection_strength(
+                        source_layer_sim, source_cell, target_layer, target_cell
+                    )
+                else:
+                    return self.simulation.connectivity.get_connection_strength(
+                        source_layer_sim, source_cell, target_layer, target_cell
+                    )
                 
             # Fall back to config-based lookup
             if conn_key in LAYER_CONNECTIVITY_PARAMS:
-                return LAYER_CONNECTIVITY_PARAMS[conn_key]['amplitude']
+                raw_value = LAYER_CONNECTIVITY_PARAMS[conn_key]['amplitude']
+                if scaled:
+                    # Apply strength scaling from config
+                    if source_layer == 'Th' or source_layer == 'thalamus':
+                        scaling = INITIAL_STRENGTH_SCALING.get('thalamus', 1.0)
+                    else:
+                        scaling = INITIAL_STRENGTH_SCALING.get(source_cell, 1.0)
+                    return raw_value * scaling
+                return raw_value
                 
             # Default to 0 if not found
             return 0.0
@@ -981,10 +1095,17 @@ class DashboardApp:
                 # Get the context that triggered the callback
                 ctx = dash.callback_context
                 if not ctx.triggered:
-                    return {'display': 'none', 'position': 'absolute'}, [], None
+                    return dash.no_update, dash.no_update, dash.no_update
                 
                 # Get the ID of the clicked cell
                 triggered_prop_id = ctx.triggered[0]['prop_id']
+                
+                # Check if this is actually a click (not just matrix recreation)
+                # If the value is None or the prop_id doesn't contain valid data, ignore it
+                triggered_value = ctx.triggered[0]['value']
+                if triggered_value is None or triggered_value == 0:
+                    return dash.no_update, dash.no_update, dash.no_update
+                
                 cell_data = json.loads(triggered_prop_id.split('.')[0])
                 clicked_id = cell_data['id']
                 
@@ -992,7 +1113,7 @@ class DashboardApp:
                 parts = clicked_id.split('-')
                 if len(parts) < 4:
                     print(f"Invalid cell ID format: {clicked_id}")
-                    return {'display': 'none', 'position': 'absolute'}, [], None
+                    return dash.no_update, dash.no_update, dash.no_update
                 
                 source_layer = parts[0]
                 source_cell = parts[1] if parts[1] != "None" else None
@@ -1019,19 +1140,21 @@ class DashboardApp:
                 # Return with initial position - exact positioning will be handled by clientside JS
                 return {
                     'display': 'block',
-                    'backgroundColor': 'rgba(50, 50, 50, 0.9)',
+                    'backgroundColor': 'rgba(255, 255, 255, 0.95)',
                     'padding': '10px',
-                    'border': '1px solid #444',
+                    'border': '1px solid #ccc',
                     'borderRadius': '5px',
                     'zIndex': '1000',
                     'width': '200px',
                     'position': 'absolute',
                     'top': '0px',
-                    'left': '0px'
+                    'left': '0px',
+                    'boxShadow': '0 2px 8px rgba(0,0,0,0.15)',
+                    'color': '#2c3e50'
                 }, slider, connection_data
             except (json.JSONDecodeError, KeyError, IndexError) as e:
                 print(f"Error handling cell click: {str(e)}")
-                return {'display': 'none', 'position': 'absolute'}, [], None
+                return dash.no_update, dash.no_update, dash.no_update
         
         # Update connection strength when slider changes
         @self.app.callback(
@@ -1072,22 +1195,45 @@ class DashboardApp:
              Output({'type': 'connection-cell', 'id': MATCH}, 'data-highlight-color')],
             Input({'type': 'matrix-slider', 'id': MATCH}, 'value'),
             [State({'type': 'connection-cell', 'id': MATCH}, 'style'),
-             State({'type': 'connection-cell', 'id': MATCH}, 'id')]
+             State({'type': 'connection-cell', 'id': MATCH}, 'id'),
+             State('selected-cell', 'data')]
         )
-        def update_matrix_cell(value, current_style, cell_id):  # pylint: disable=unused-argument
+        def update_matrix_cell(raw_value, current_style, cell_id, connection_data):  # pylint: disable=unused-argument
             """Update the matrix cell appearance and value when the slider changes."""
-            if value is None:
+            if raw_value is None:
                 # No change if value is None
                 return dash.no_update, dash.no_update, dash.no_update
             
             try:
                 # Parse cell ID from the dictionary
                 cell_id_str = cell_id['id']  # Extract the ID string from the dictionary
-                source_layer, source_cell, _, target_cell = cell_id_str.split('-')
-                source_cell = None if source_cell == 'None' else source_cell
+                parts = cell_id_str.split('-')
+                source_layer = parts[0]
+                source_cell = parts[1] if parts[1] != 'None' else None
+                target_layer = parts[2]
+                target_cell = parts[3]
                 
-                # Determine cell colors based on connection strength and source cell type
-                bg_color, hover_color = self._get_connection_colors(source_layer, source_cell, value)
+                # Convert to thalamus if needed
+                source_layer_sim = 'thalamus' if source_layer == 'Th' else source_layer
+                
+                # Get the scaled value to display (raw_value * strength_scaling)
+                if hasattr(self, 'simulation') and hasattr(self.simulation, 'connectivity'):
+                    scaled_value = self.simulation.connectivity.get_scaled_connection_strength(
+                        source_layer_sim, source_cell, target_layer, target_cell
+                    )
+                else:
+                    # Fallback: compute scaled value manually
+                    if source_layer_sim == 'thalamus':
+                        scaling = INITIAL_STRENGTH_SCALING.get('thalamus', 1.0)
+                    else:
+                        scaling = INITIAL_STRENGTH_SCALING.get(source_cell, 1.0)
+                    scaled_value = raw_value * scaling
+                
+                # Get max magnitude for color normalization
+                max_magnitude = self.get_max_scaled_strength_magnitude()
+                
+                # Determine cell colors based on scaled connection strength and source cell type
+                bg_color, hover_color = self._get_connection_colors(source_layer, source_cell, scaled_value, max_magnitude)
                 
                 # Update style with new background color while preserving other styles
                 updated_style = {
@@ -1097,11 +1243,12 @@ class DashboardApp:
                     "transition": "background-color 0.2s",
                     "padding": "5px",
                     "fontSize": "0.8rem",
-                    "borderRight": "1px solid #555" if target_cell == "PV" else "none"
+                    "borderRight": "1px solid #ddd" if target_cell == "PV" else "none",
+                    "color": "#2c3e50"
                 }
                 
-                # Return updated text, style, and hover color
-                return f"{value:.1f}", updated_style, hover_color
+                # Return updated text (scaled value), style, and hover color
+                return f"{scaled_value:.2f}", updated_style, hover_color
             except (KeyError, ValueError) as e:
                 print(f"Error updating matrix cell: {str(e)}")
                 return dash.no_update, dash.no_update, dash.no_update
@@ -1234,16 +1381,12 @@ class DashboardApp:
              for cell_type in CELL_TYPES] +
             [Output('graph-thalamus', 'figure')],
             
-            # Inputs: interval trigger, alpha slider, time constant sliders, gain sliders, connectivity width sliders
-            # Remove the strength scaling sliders from the inputs
+            # Inputs: interval trigger, alpha slider, time constant sliders, connectivity width sliders
             [Input('interval-component', 'n_intervals'),
              Input('alpha-slider', 'value'),
              Input('tau-e-slider', 'value'),
              Input('tau-sst-slider', 'value'),
              Input('tau-pv-slider', 'value'),
-             Input('gain-e-slider', 'value'),
-             Input('gain-sst-slider', 'value'),
-             Input('gain-pv-slider', 'value'),
              Input('thalamic-width-e-slider', 'value'),
              Input('thalamic-width-sst-slider', 'value'),
              Input('thalamic-width-pv-slider', 'value'),
@@ -1254,9 +1397,9 @@ class DashboardApp:
             # States: pause button state
             [State('pause-button', 'n_clicks')]
         )
-        def update_graphs(n_intervals, alpha, tau_e, tau_sst, tau_pv, gain_e, gain_sst, gain_pv, # pylint: disable=unused-argument
-                         sigma_thal_e, sigma_thal_sst, sigma_thal_pv, sigma_e_out, sigma_sst_out, sigma_pv_out,
-                         pause_clicks):  
+        def update_graphs(n_intervals, alpha, tau_e, tau_sst, tau_pv, # pylint: disable=unused-argument
+                         sigma_thal_e, sigma_thal_sst, sigma_thal_pv, 
+                         sigma_e_out, sigma_sst_out, sigma_pv_out, pause_clicks):  
             """Update all graphs based on current slider values."""
             # Check if simulation is paused
             is_paused = pause_clicks is not None and pause_clicks % 2 == 1
@@ -1270,9 +1413,7 @@ class DashboardApp:
             self.simulation.set_time_constant('E', tau_e)
             self.simulation.set_time_constant('SST', tau_sst)
             self.simulation.set_time_constant('PV', tau_pv)
-            self.simulation.set_gain('E', gain_e)
-            self.simulation.set_gain('SST', gain_sst)
-            self.simulation.set_gain('PV', gain_pv)
+            # Note: gains are set by presets, not sliders
             
             # Update all connectivity widths
             for layer in LAYERS:
@@ -1335,7 +1476,8 @@ class DashboardApp:
         
         # Add callback for updating strength scaling factors
         @self.app.callback(
-            [Output('interval-component', 'n_intervals', allow_duplicate=True)],
+            [Output('interval-component', 'n_intervals', allow_duplicate=True),
+             Output('connection-matrix-container', 'children', allow_duplicate=True)],
             [Input('strength-scaling-e-slider', 'value'),
              Input('strength-scaling-sst-slider', 'value'),
              Input('strength-scaling-pv-slider', 'value'),
@@ -1351,31 +1493,27 @@ class DashboardApp:
             self.simulation.set_strength_scaling('PV', pv_scaling)
             self.simulation.set_strength_scaling('thalamus', thalamus_scaling)
             
-            # Return unchanged intervals to not disrupt the update loop
-            return [n_intervals]
+            # Regenerate the connection matrix with updated scaled values
+            updated_matrix = self.create_connection_matrix()
+            
+            # Return unchanged intervals and updated matrix
+            return [n_intervals, updated_matrix]
         
-        # Add callback for updating noise parameters
+        # Add callback for updating background input parameters
         @self.app.callback(
             [Output('interval-component', 'n_intervals', allow_duplicate=True)],
-            [Input('noise-mean-e-slider', 'value'),
-             Input('noise-mean-sst-slider', 'value'),
-             Input('noise-mean-pv-slider', 'value'),
-             Input('noise-std-e-slider', 'value'),
-             Input('noise-std-sst-slider', 'value'),
-             Input('noise-std-pv-slider', 'value'),
-             Input('noise-corr-e-slider', 'value'),
-             Input('noise-corr-sst-slider', 'value'),
-             Input('noise-corr-pv-slider', 'value')],
+            [Input('background-input-e-slider', 'value'),
+             Input('background-input-sst-slider', 'value'),
+             Input('background-input-pv-slider', 'value')],
             [State('interval-component', 'n_intervals')],
             prevent_initial_call=True
         )
-        def update_noise_parameters(mean_e, mean_sst, mean_pv, std_e, std_sst, std_pv, 
-                                  corr_e, corr_sst, corr_pv, n_intervals):
-            """Update all noise parameters in the simulation."""
-            # Update noise parameters for each cell type
-            self.simulation.set_noise_params('E', mean_e, std_e, corr_e)
-            self.simulation.set_noise_params('SST', mean_sst, std_sst, corr_sst)
-            self.simulation.set_noise_params('PV', mean_pv, std_pv, corr_pv)
+        def update_background_input_parameters(bg_e, bg_sst, bg_pv, n_intervals):
+            """Update all background input parameters in the simulation."""
+            # Update background input for each cell type
+            self.simulation.set_background_input('E', bg_e)
+            self.simulation.set_background_input('SST', bg_sst)
+            self.simulation.set_background_input('PV', bg_pv)
             
             # Return unchanged intervals to not disrupt the update loop
             return [n_intervals]
@@ -1387,7 +1525,7 @@ class DashboardApp:
             dbc.Row([
                 dbc.Col("", width=1),
                 dbc.Col(html.Div("Time Constant", className="text-center"), width=5),
-                dbc.Col(html.Div("Gain", className="text-center"), width=5),
+                dbc.Col(html.Div("Background Input", className="text-center"), width=5),
             ], className="mb-1"),
             
             # Parameter rows
@@ -1406,12 +1544,12 @@ class DashboardApp:
                 initial_value=INITIAL_TIME_CONSTANTS[cell_type],
                 **self.TIME_CONSTANT_PARAMS
             ), width=5, style={"paddingRight": "5px"}),
-            # Gain slider
+            # Background input slider
             dbc.Col(self._create_slider(
-                id_prefix='gain',
+                id_prefix='background-input',
                 cell_type=cell_type,
-                initial_value=INITIAL_GAINS[cell_type],
-                **self.GAIN_PARAMS
+                initial_value=INITIAL_BACKGROUND_INPUT[cell_type],
+                **self.BACKGROUND_INPUT_PARAMS
             ), width=5)
         ], className="mb-1")
 
@@ -1515,49 +1653,6 @@ class DashboardApp:
                 )
             ])
         ])
-    
-    def create_noise_sliders(self):
-        """Create the noise parameter sliders section."""
-        return html.Div([
-            # Headers row
-            dbc.Row([
-                dbc.Col("", width=1),  # Reduced label width
-                dbc.Col(html.Div("Mean", className="text-center"), width=4),
-                dbc.Col(html.Div("Std", className="text-center"), width=4),
-                dbc.Col(html.Div("Correlation", className="text-center"), width=3),
-            ], className="mb-1 g-0"),  # g-0 removes gutters
-            
-            # Noise parameter rows
-            *[self._create_noise_row(cell_type) for cell_type in CELL_TYPES]
-        ], style={"width": "103%", "marginLeft": "0%"})  # Make container wider
-
-    def _create_noise_row(self, cell_type):
-        """Create a row of sliders for a cell type's noise parameters."""
-        return dbc.Row([
-            # Cell type label
-            dbc.Col(html.Strong(cell_type), width=1, className="d-flex align-items-center"),
-            # Mean slider
-            dbc.Col(self._create_slider(
-                id_prefix='noise-mean',
-                cell_type=cell_type,
-                initial_value=INITIAL_NOISE_PARAMS[cell_type]['mean'],
-                **self.NOISE_MEAN_PARAMS
-            ), width=4),
-            # Std slider
-            dbc.Col(self._create_slider(
-                id_prefix='noise-std',
-                cell_type=cell_type,
-                initial_value=INITIAL_NOISE_PARAMS[cell_type]['std'],
-                **self.NOISE_STD_PARAMS
-            ), width=4),
-            # Correlation slider
-            dbc.Col(self._create_slider(
-                id_prefix='noise-corr',
-                cell_type=cell_type,
-                initial_value=INITIAL_NOISE_PARAMS[cell_type]['c'],
-                **self.NOISE_CORR_PARAMS
-            ), width=3)
-        ], className="mb-1 g-0", style={"marginBottom": "10px"})
 
     def create_control_panel(self):
         """Create the control panel with all sliders and controls."""
@@ -1581,12 +1676,7 @@ class DashboardApp:
                 # Section for thalamic input balance
                 html.Div([html.Hr()], className="my-3"),
                 html.H5("Thalamic Input", className="text-center"),
-                self.create_input_controls(),
-                
-                # Section for noise parameters
-                html.Div([html.Hr()], className="my-3"),
-                html.H5("External Input", className="text-center"),
-                self.create_noise_sliders()
+                self.create_input_controls()
             ], className="mb-3"),
             
             # Pause/Play control

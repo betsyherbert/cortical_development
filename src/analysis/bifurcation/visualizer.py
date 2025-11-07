@@ -7,10 +7,10 @@ matplotlib.use('Agg')  # Use non-interactive backend to prevent plots from showi
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, Optional
 
 from .config import (
-    DEVELOPMENTAL_STAGES, OUTPUT_DIR, COLORMAP, FIGSIZE,
+    OUTPUT_DIR, COLORMAP, FIGSIZE,
     ANALYSIS_PARAMS, STAGE_COLORS
 )
 from src.model.config import CELL_COLORS
@@ -37,7 +37,8 @@ class BifurcationVisualizer:
         n_stages = len(stages)
         n_populations = 3  # Always E, SST, PV
         
-        # Extract data (convert distance to max real eigenvalue)
+        # Extract data: convert distance to max real eigenvalue for plotting
+        # distance = -max_real_eigenvalue, so max_real_eigenvalue = -distance
         distances = [results[s]['distance'] for s in stages]
         max_real_eigenvalues = [-d for d in distances]  # Convert distance to max real eigenvalue
         critical_ks = [results[s]['critical_k'] for s in stages]
@@ -111,15 +112,15 @@ class BifurcationVisualizer:
             fig = plt.figure(figsize=FIGSIZE)
             gs = fig.add_gridspec(4, 2, hspace=0.4, wspace=0.4)
         
-        # Panel: Stability Margin
+        # Panel: Max Real Eigenvalue
         ax_a = fig.add_subplot(gs[0, 0])
         stage_colors = [STAGE_COLORS.get(s, '#666666') for s in stages]
-        bars = ax_a.bar(range(n_stages), max_real_eigenvalues, color=stage_colors)
+        ax_a.bar(range(n_stages), max_real_eigenvalues, color=stage_colors)
         ax_a.axhline(0, color='k', linestyle='--', linewidth=1, alpha=0.5)
         ax_a.set_xticks(range(n_stages))
         ax_a.set_xticklabels(stages)
         ax_a.set_ylabel('Max Re(λ)', fontsize=10)
-        ax_a.set_title('Stability Margin', fontsize=10, fontweight='normal')
+        ax_a.set_title('Max Real Eigenvalue', fontsize=10, fontweight='normal')
         ax_a.grid(True, alpha=0.3, axis='y')
         # Format tick labels to limit decimals and right-justify
         ax_a.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.2f}'))
@@ -293,18 +294,17 @@ class BifurcationVisualizer:
     
     def plot_eigenvalue_spectra(self, all_results: Dict[str, Dict], mode_override: Optional[str] = None) -> None:
         """
-        Plot eigenvalue spectra for all stages in the complex plane.
+        Plot eigenvalue spectra for all stages in the complex plane, with 1D max Re(λ)(k) vs k curves below.
         
         Args:
             all_results: Dictionary mapping stage names to analysis results
             mode_override: Optional mode override ('silent' or 'driven') when mode='both'
         """
-        # Use square figure size with reasonable dimensions
-        # Make it slightly smaller than FIGSIZE for better proportions
+        # Use larger figure to accommodate both 2D spectra and 1D curves
         square_size = min(FIGSIZE[0], FIGSIZE[1]) * 0.9
-        fig, axes = plt.subplots(2, 2, figsize=(square_size, square_size))
-        fig.subplots_adjust(hspace=0.3, wspace=0.3)
-        axes = axes.flatten()
+        # Create 4x2 grid: top row for spectra, bottom row for 1D curves
+        fig = plt.figure(figsize=(square_size * 2, square_size * 1.2))
+        gs = fig.add_gridspec(2, 4, hspace=0.4, wspace=0.3, height_ratios=[1.2, 0.8])
         
         stages = ['P4', 'P8', 'P12', 'P16']
         
@@ -327,9 +327,19 @@ class BifurcationVisualizer:
                 critical_mode = result['driven']['critical_mode']
                 critical_k = result['driven']['critical_k']
             else:
-                steady_state = result['steady_state']
-                critical_mode = result['critical_mode']
-                critical_k = result['critical_k']
+                # For 'both' mode without override, use silent steady state
+                if analysis_mode == 'both' and 'silent' in result:
+                    steady_state = result['silent']['steady_state']
+                    critical_mode = result['silent']['critical_mode']
+                    critical_k = result['silent']['critical_k']
+                else:
+                    steady_state = result['steady_state']
+                    critical_mode = result['critical_mode']
+                    critical_k = result['critical_k']
+            
+            # Ensure steady_state is a numpy array
+            if not isinstance(steady_state, np.ndarray):
+                steady_state = np.array(steady_state)
             
             # Compute effective gains
             threshold = 1e-10
@@ -357,11 +367,60 @@ class BifurcationVisualizer:
             
             eigenvalues = np.linalg.eigvals(J_crit)
             all_eigenvalues.append(eigenvalues)
+            
+            # Scan k modes to compute max Re(λ)(k) vs k
+            n_modes = ANALYSIS_PARAMS['n_modes']
+            n_modes_effective = min(n_modes, int(0.6 * domain_length))
+            
+            k_values = []
+            max_real_values = []
+            
+            for n1 in range(-n_modes_effective, n_modes_effective + 1):
+                for n2 in range(-n_modes_effective, n_modes_effective + 1):
+                    k = np.sqrt(n1**2 + n2**2)
+                    k_squared = n1**2 + n2**2
+                    
+                    # Build Jacobian for this mode
+                    J = np.zeros((total_pops, total_pops))
+                    for i in range(total_pops):
+                        for j in range(total_pops):
+                            sigma_ij = network_params['sigma'][i, j] / domain_length
+                            w_tilde = network_params['A'][i, j] * np.exp(
+                                -2 * np.pi**2 * k_squared * sigma_ij**2
+                            )
+                            if i == j:
+                                J[i, j] = (-1.0 / network_params['tau'][i] + 
+                                           (gain_eff[i] * w_tilde) / network_params['tau'][i])
+                            else:
+                                J[i, j] = (gain_eff[i] * w_tilde) / network_params['tau'][i]
+                    
+                    # Compute eigenvalues and find max real part
+                    eigvals = np.linalg.eigvals(J)
+                    max_real = np.max(eigvals.real)
+                    
+                    k_values.append(k)
+                    max_real_values.append(max_real)
+            
+            # Sort by k for plotting
+            k_array = np.array(k_values)
+            max_real_array = np.array(max_real_values)
+            sort_idx = np.argsort(k_array)
+            k_sorted = k_array[sort_idx]
+            max_real_sorted = max_real_array[sort_idx]
+            
             stage_results.append({
                 'stage': stage,
                 'eigenvalues': eigenvalues,
                 'critical_k': critical_k,
-                'ax': axes[idx]
+                'ax_spectrum': fig.add_subplot(gs[0, idx]),
+                'ax_1d': fig.add_subplot(gs[1, idx]),
+                'k_values': k_sorted,
+                'max_real_values': max_real_sorted,
+                'steady_state': steady_state.copy(),  # Store for diagnostics
+                'active_mask': active_mask.copy(),  # Store for diagnostics
+                'gain_eff': gain_eff.copy(),  # Store for diagnostics
+                'network_params': network_params,  # Store for diagnostics
+                'domain_length': domain_length  # Store for diagnostics
             })
         
         # Compute global xlim/ylim with padding
@@ -398,29 +457,70 @@ class BifurcationVisualizer:
             ylim = (-1, 1)
         
         # Second pass: plot with standardized axes
+        # Collect all max_real_values for consistent y-limits on 1D plots
+        all_max_real_1d = []
         for sr in stage_results:
-            ax = sr['ax']
+            all_max_real_1d.extend(sr['max_real_values'])
+        
+        if all_max_real_1d:
+            max_real_1d_min = min(all_max_real_1d)
+            max_real_1d_max = max(all_max_real_1d)
+            max_real_1d_range = max_real_1d_max - max_real_1d_min
+            if max_real_1d_range < 0.1:
+                max_real_1d_range = 0.1
+            ylim_1d = (max_real_1d_min - max_real_1d_range * 0.1, max_real_1d_max + max_real_1d_range * 0.1)
+        else:
+            ylim_1d = (-1, 1)
+        
+        for sr in stage_results:
+            ax_spectrum = sr['ax_spectrum']
+            ax_1d = sr['ax_1d']
             stage = sr['stage']
             eigenvalues = sr['eigenvalues']
             critical_k = sr['critical_k']
+            k_values = sr['k_values']
+            max_real_values = sr['max_real_values']
+            steady_state = sr['steady_state']  # Retrieve from stored data
+            active_mask = sr['active_mask']  # Retrieve from stored data
+            gain_eff = sr['gain_eff']  # Retrieve from stored data
+            network_params = sr['network_params']  # Retrieve from stored data
+            domain_length = sr['domain_length']  # Retrieve from stored data
+            total_pops = len(network_params['tau'])
             
             stage_color = STAGE_COLORS.get(stage, '#666666')
-            ax.scatter(eigenvalues.real, eigenvalues.imag, s=50, 
+            
+            # Plot 2D spectrum
+            ax_spectrum.scatter(eigenvalues.real, eigenvalues.imag, s=50, 
                       c=stage_color, alpha=0.7)
-            ax.axvline(0, color='k', linestyle='--', linewidth=1, alpha=0.5)
-            ax.axhline(0, color='k', linestyle='--', linewidth=1, alpha=0.5)
-            ax.set_xlabel('Re(λ)', fontsize=10)
-            ax.set_ylabel('Im(λ)', fontsize=10)
-            ax.set_title(f'{stage} (k={critical_k:.1f})', fontsize=10, fontweight='normal')
-            ax.set_xlim(xlim)
-            ax.set_ylim(ylim)
+            ax_spectrum.axvline(0, color='k', linestyle='--', linewidth=1, alpha=0.5)
+            ax_spectrum.axhline(0, color='k', linestyle='--', linewidth=1, alpha=0.5)
+            ax_spectrum.set_xlabel('Re(λ)', fontsize=10)
+            ax_spectrum.set_ylabel('Im(λ)', fontsize=10)
+            ax_spectrum.set_title(f'{stage} (k={critical_k:.1f})', fontsize=10, fontweight='normal')
+            ax_spectrum.set_xlim(xlim)
+            ax_spectrum.set_ylim(ylim)
             # Force square aspect ratio with adjustable='box' to ensure true squares
-            ax.set_aspect('equal', adjustable='box')
-            ax.grid(True, alpha=0.3)
+            ax_spectrum.set_aspect('equal', adjustable='box')
+            ax_spectrum.grid(True, alpha=0.3)
             # Format tick labels to limit decimals and right-justify y-axis
-            ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1f}'))
-            ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1f}'))
-            for label in ax.get_yticklabels():
+            ax_spectrum.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1f}'))
+            ax_spectrum.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1f}'))
+            for label in ax_spectrum.get_yticklabels():
+                label.set_ha('right')
+            
+            # Plot 1D max Re(λ)(k) vs k
+            ax_1d.plot(k_values, max_real_values, color=stage_color, linewidth=1.5, alpha=0.8)
+            ax_1d.axhline(0, color='k', linestyle='--', linewidth=1, alpha=0.5)
+            ax_1d.axvline(critical_k, color=stage_color, linestyle=':', linewidth=1, alpha=0.6, label=f'k*={critical_k:.1f}')
+            ax_1d.set_xlabel('k', fontsize=10)
+            ax_1d.set_ylabel('max Re(λ)', fontsize=10)
+            ax_1d.set_ylim(ylim_1d)
+            ax_1d.grid(True, alpha=0.3)
+            ax_1d.legend(loc='best', fontsize=8)
+            # Format tick labels
+            ax_1d.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1f}'))
+            ax_1d.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.2f}'))
+            for label in ax_1d.get_yticklabels():
                 label.set_ha('right')
         
         # Determine scope (layer or full network) from first result
@@ -446,11 +546,12 @@ class BifurcationVisualizer:
         plt.suptitle(title, fontsize=12, fontweight='bold', y=0.98)
         
         # Apply tight_layout first for spacing
-        plt.tight_layout(rect=[0, 0, 1, 0.98])
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
         
-        # Manually adjust each subplot to be square
-        for ax in axes:
-            pos = ax.get_position()
+        # Manually adjust spectrum subplots to be square
+        for sr in stage_results:
+            ax_spectrum = sr['ax_spectrum']
+            pos = ax_spectrum.get_position()
             # Get current dimensions
             width = pos.x1 - pos.x0
             height = pos.y1 - pos.y0
@@ -460,7 +561,7 @@ class BifurcationVisualizer:
             center_x = (pos.x0 + pos.x1) / 2
             center_y = (pos.y0 + pos.y1) / 2
             # Set position to be centered square
-            ax.set_position([center_x - size/2, center_y - size/2, size, size])
+            ax_spectrum.set_position([center_x - size/2, center_y - size/2, size, size])
         
         # Save figure as SVG with clear scope and mode
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
@@ -484,7 +585,8 @@ class BifurcationVisualizer:
         """
         stages = ['P4', 'P8', 'P12', 'P16']
         
-        # Convert distances to max real eigenvalues
+        # Convert distances to max real eigenvalues for plotting
+        # distance = -max_real_eigenvalue, so max_real_eigenvalue = -distance
         l5_max_real = [-l5_results[s]['distance'] for s in stages]
         l4_max_real = [-l4_results[s]['distance'] for s in stages]
         l23_max_real = [-l23_results[s]['distance'] for s in stages]
@@ -503,14 +605,14 @@ class BifurcationVisualizer:
             'Full': '#4472c4'
         }
         
-        bars1 = ax.bar(x - 1.5*width, l23_max_real, width, 
-                      label='L23', color=layer_colors['L23'], alpha=0.8)
-        bars2 = ax.bar(x - 0.5*width, l4_max_real, width, 
-                      label='L4', color=layer_colors['L4'], alpha=0.8)
-        bars3 = ax.bar(x + 0.5*width, l5_max_real, width, 
-                      label='L5', color=layer_colors['L5'], alpha=0.8)
-        bars4 = ax.bar(x + 1.5*width, full_max_real, width, 
-                      label='Full', color=layer_colors['Full'], alpha=0.8)
+        ax.bar(x - 1.5*width, l23_max_real, width, 
+               label='L23', color=layer_colors['L23'], alpha=0.8)
+        ax.bar(x - 0.5*width, l4_max_real, width, 
+               label='L4', color=layer_colors['L4'], alpha=0.8)
+        ax.bar(x + 0.5*width, l5_max_real, width, 
+               label='L5', color=layer_colors['L5'], alpha=0.8)
+        ax.bar(x + 1.5*width, full_max_real, width, 
+               label='Full', color=layer_colors['Full'], alpha=0.8)
         
         ax.axhline(0, color='k', linestyle='--', linewidth=1, alpha=0.5)
         ax.set_xlabel('Stage', fontsize=10)
@@ -550,142 +652,83 @@ class BifurcationVisualizer:
         plt.savefig(output_path, format='svg', bbox_inches='tight')
         plt.close()
     
-    def plot_forced_response_per_stage(self, results: Dict[str, Dict], stage_name: str) -> None:
+    def compute_global_forced_response_ylims(self, all_results_dict: Dict[str, Dict[str, Dict]]) -> Dict[str, tuple]:
         """
-        Create separate figure per stage showing forced response gain.
+        Compute global y-limits for forced response plots across ALL scopes and modes.
         
         Args:
-            results: Dictionary mapping stage names to analysis results
-            stage_name: Specific stage to plot
+            all_results_dict: Dictionary mapping scope names to results dictionaries
+                             e.g., {'full': {...}, 'L23': {...}, 'L4': {...}, 'L5': {...}}
+        
+        Returns:
+            Dictionary with 'gain' and 'max_real' keys mapping to (ymin, ymax) tuples
         """
-        if stage_name not in results:
-            return
+        all_gains = []
+        all_max_reals = []
         
-        result = results[stage_name]
-        analysis_mode = result.get('analysis_mode', 'silent')
-        
-        # Determine which mode data to use
-        if analysis_mode == 'both':
-            modes_to_plot = ['silent', 'driven']
-            silent_data = result.get('silent', {})
-            driven_data = result.get('driven', {})
-        elif analysis_mode == 'silent':
-            modes_to_plot = ['silent']
-            silent_data = result
-            driven_data = None
-        else:  # driven
-            modes_to_plot = ['driven']
-            silent_data = None
-            driven_data = result
-        
-        # Determine scope
-        network_params = result['network_params']
-        layers = network_params.get('layers', ['L4'])
-        scope = layers[0] if len(layers) == 1 else 'full'
-        
-        # Create figure with subplots
-        n_modes = len(modes_to_plot)
-        fig, axes = plt.subplots(1, n_modes, figsize=(FIGSIZE[0] * n_modes, FIGSIZE[1]))
-        if n_modes == 1:
-            axes = [axes]
-        
-        for idx, mode in enumerate(modes_to_plot):
-            ax = axes[idx]
+        for scope_results in all_results_dict.values():
+            if not scope_results:
+                continue
             
-            # Get data for this mode
-            if mode == 'silent':
-                mode_data = silent_data
+            stages = list(scope_results.keys())
+            if not stages:
+                continue
+            
+            first_result = scope_results[stages[0]]
+            analysis_mode = first_result.get('analysis_mode', 'silent')
+            
+            # Determine which modes to scan
+            if analysis_mode == 'both':
+                modes_to_scan = ['silent', 'driven']
             else:
-                mode_data = driven_data
+                modes_to_scan = [analysis_mode]
             
-            if mode_data is None:
-                continue
-            
-            # Extract forced response data
-            max_gain = mode_data.get('forced_response_max_gain', np.nan)
-            critical_k = mode_data.get('forced_response_critical_k', 0.0)
-            
-            # Skip if NaN
-            if np.isnan(max_gain):
-                ax.text(0.5, 0.5, 'No thalamic input', ha='center', va='center', transform=ax.transAxes)
-                ax.set_title(f'{stage_name} - {mode.capitalize()}', fontsize=10, fontweight='normal')
-                continue
-            
-            # Plot bar with color-coded marker
-            # Use viridis colormap for k* values
-            # Normalize k* by a reasonable maximum (we'll use a fixed scale for per-stage plots)
-            k_max = 20.0  # Reasonable maximum k for normalization
-            k_normalized = min(critical_k / k_max, 1.0) if k_max > 0 else 0.0
-            cmap = plt.get_cmap('viridis')
-            color = cmap(k_normalized)
-            
-            ax.bar(0, max_gain, color=color, alpha=0.7, width=0.6)
-            ax.set_ylabel('Max Gain', fontsize=10)
-            ax.set_title(f'{stage_name} - {mode.capitalize()}\n(k*={critical_k:.2f})', fontsize=10, fontweight='normal')
-            ax.set_xticks([])
-            ax.grid(True, alpha=0.3, axis='y')
-            ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.2f}'))
-            for label in ax.get_yticklabels():
-                label.set_ha('right')
-        
-        plt.suptitle(f'Forced Response - {stage_name} ({scope})', fontsize=12, fontweight='bold', y=0.98)
-        plt.tight_layout(rect=[0, 0, 1, 0.96])
-        
-        # Save figure for each mode
-        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
-        for mode in modes_to_plot:
-            output_path = Path(self.output_dir) / f'{scope}_forced_response_{stage_name}_{mode}.svg'
-            # Save a copy of the figure for each mode
-            # Since we have subplots, we save the full figure with all modes shown
-            if n_modes > 1:
-                # For 'both' mode, save the combined figure for each mode separately
-                # by creating individual figures
-                fig_single, ax_single = plt.subplots(1, 1, figsize=FIGSIZE)
-                
-                # Get data for this specific mode
-                if mode == 'silent':
-                    mode_data = silent_data
-                else:
-                    mode_data = driven_data
-                
-                if mode_data is not None:
-                    max_gain = mode_data.get('forced_response_max_gain', np.nan)
-                    critical_k = mode_data.get('forced_response_critical_k', 0.0)
-                    
-                    if not np.isnan(max_gain):
-                        k_max = 20.0
-                        k_normalized = min(critical_k / k_max, 1.0) if k_max > 0 else 0.0
-                        cmap = plt.get_cmap('viridis')
-                        color = cmap(k_normalized)
-                        
-                        ax_single.bar(0, max_gain, color=color, alpha=0.7, width=0.6)
-                        ax_single.set_ylabel('Max Gain', fontsize=10)
-                        ax_single.set_title(f'{stage_name} - {mode.capitalize()}\n(k*={critical_k:.2f})', fontsize=10, fontweight='normal')
-                        ax_single.set_xticks([])
-                        ax_single.grid(True, alpha=0.3, axis='y')
-                        ax_single.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.2f}'))
-                        for label in ax_single.get_yticklabels():
-                            label.set_ha('right')
+            for mode in modes_to_scan:
+                for stage in stages:
+                    stage_result = scope_results[stage]
+                    if analysis_mode == 'both':
+                        mode_data = stage_result.get(mode, {})
                     else:
-                        ax_single.text(0.5, 0.5, 'No thalamic input', ha='center', va='center', transform=ax_single.transAxes)
-                        ax_single.set_title(f'{stage_name} - {mode.capitalize()}', fontsize=10, fontweight='normal')
-                
-                plt.suptitle(f'Forced Response - {stage_name} ({scope})', fontsize=12, fontweight='bold', y=0.98)
-                plt.tight_layout(rect=[0, 0, 1, 0.96])
-                plt.savefig(output_path, format='svg', bbox_inches='tight')
-                plt.close(fig_single)
-            else:
-                # Single mode, save the existing figure
-                plt.savefig(output_path, format='svg', bbox_inches='tight')
+                        mode_data = stage_result
+                    
+                    gain_profile = mode_data.get('forced_response_gain_profile')
+                    max_real_profile = mode_data.get('forced_response_max_real_profile')
+                    
+                    if gain_profile is not None and len(gain_profile) > 0:
+                        all_gains.append(np.array(gain_profile))
+                    if max_real_profile is not None and len(max_real_profile) > 0:
+                        all_max_reals.append(np.array(max_real_profile))
         
-        plt.close(fig)
+        # Compute global y-limits
+        if all_gains:
+            gain_concat = np.concatenate(all_gains)
+            gain_range = gain_concat.max() - gain_concat.min()
+            if gain_range < 1e-6:
+                gain_range = 1e-6
+            gain_ylim = (max(0.0, gain_concat.min() - 0.1 * gain_range), 
+                        gain_concat.max() + 0.1 * gain_range)
+        else:
+            gain_ylim = (0, 1)
+        
+        if all_max_reals:
+            max_real_concat = np.concatenate(all_max_reals)
+            real_range = max_real_concat.max() - max_real_concat.min()
+            if real_range < 1e-6:
+                real_range = 1e-6
+            max_real_ylim = (max_real_concat.min() - 0.1 * real_range,
+                           max_real_concat.max() + 0.1 * real_range)
+        else:
+            max_real_ylim = (-1, 1)
+        
+        return {'gain': gain_ylim, 'max_real': max_real_ylim}
     
-    def plot_forced_response_development(self, results: Dict[str, Dict]) -> None:
+    def plot_forced_response_development(self, results: Dict[str, Dict], global_ylims: Dict[str, tuple] = None) -> None:
         """
-        Create bar plot showing forced response gain across developmental stages.
+        Create line plots showing forced response gain and stability metrics across developmental stages.
         
         Args:
             results: Dictionary mapping stage names to analysis results
+            global_ylims: Optional dictionary with 'gain' and 'max_real' keys for consistent y-limits
         """
         stages = list(results.keys())
         
@@ -699,189 +742,89 @@ class BifurcationVisualizer:
         # Determine which modes to plot
         if analysis_mode == 'both':
             modes_to_plot = ['silent', 'driven']
-            # For 'both' mode, we'll create separate figures, so we don't need the combined one
-            fig = None
-            axes = None
-        elif analysis_mode == 'silent':
-            modes_to_plot = ['silent']
-            fig, axes = plt.subplots(1, 1, figsize=FIGSIZE)
-            axes = [axes]
-        else:  # driven
-            modes_to_plot = ['driven']
-            fig, axes = plt.subplots(1, 1, figsize=FIGSIZE)
-            axes = [axes]
-        
-        # First pass: collect all k* values for normalization
-        all_k_values = []
-        for stage in stages:
-            result = results[stage]
-            if analysis_mode == 'both':
-                for mode in ['silent', 'driven']:
-                    mode_data = result.get(mode, {})
-                    k_val = mode_data.get('forced_response_critical_k', 0.0)
-                    if not np.isnan(k_val) and k_val > 0:
-                        all_k_values.append(k_val)
-            else:
-                k_val = result.get('forced_response_critical_k', 0.0)
-                if not np.isnan(k_val) and k_val > 0:
-                    all_k_values.append(k_val)
-        
-        k_max = max(all_k_values) if all_k_values else 1.0
-        
-        # Second pass: collect all gains for consistent y-limits
-        all_gains = []
-        for stage in stages:
-            result = results[stage]
-            if analysis_mode == 'both':
-                for mode in ['silent', 'driven']:
-                    mode_data = result.get(mode, {})
-                    gain = mode_data.get('forced_response_max_gain', np.nan)
-                    if not np.isnan(gain):
-                        all_gains.append(gain)
-            else:
-                gain = result.get('forced_response_max_gain', np.nan)
-                if not np.isnan(gain):
-                    all_gains.append(gain)
-        
-        y_min = 0.0
-        y_max = max(all_gains) * 1.1 if all_gains else 1.0
-        
-        # Plot each mode
-        # For 'both' mode, we create separate figures in the save section
-        # For single mode, we plot on the existing axes
-        if analysis_mode != 'both':
-            # Single mode - plot on existing axes
-            mode = modes_to_plot[0]
-            ax = axes[0]
-            
-            # Extract data for this mode
-            gains = []
-            k_values = []
-            valid_stages = []
-            
-            for stage in stages:
-                result = results[stage]
-                mode_data = result
-                
-                gain = mode_data.get('forced_response_max_gain', np.nan)
-                k_val = mode_data.get('forced_response_critical_k', 0.0)
-                
-                if not np.isnan(gain):
-                    gains.append(gain)
-                    k_values.append(k_val)
-                    valid_stages.append(stage)
-            
-            if gains:
-                # Normalize k* values for color mapping
-                k_normalized = [min(k / k_max, 1.0) if k_max > 0 else 0.0 for k in k_values]
-                
-                # Create color map
-                cmap = plt.get_cmap('viridis')
-                colors = [cmap(k_norm) for k_norm in k_normalized]
-                
-                # Plot bars
-                x_pos = range(len(valid_stages))
-                ax.bar(x_pos, gains, color=colors, alpha=0.7, width=0.6)
-                
-                # Add colorbar
-                sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0, vmax=k_max))
-                sm.set_array([])
-                cbar = plt.colorbar(sm, ax=ax)
-                cbar.set_label('k*', fontsize=9)
-                cbar.ax.tick_params(labelsize=8)
-                
-                ax.set_xticks(x_pos)
-                ax.set_xticklabels(valid_stages, fontsize=10)
-                ax.set_ylabel('Max Gain', fontsize=10)
-                ax.set_title(f'Forced Response - {mode.capitalize()}', fontsize=10, fontweight='normal')
-                ax.set_ylim(y_min, y_max)
-                ax.grid(True, alpha=0.3, axis='y')
-                ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.2f}'))
-                for label in ax.get_yticklabels():
-                    label.set_ha('right')
-            else:
-                ax.text(0.5, 0.5, 'No valid data', ha='center', va='center', transform=ax.transAxes)
-                ax.set_title(f'Forced Response - {mode.capitalize()}', fontsize=10, fontweight='normal')
-            
-            # Create meaningful title
-            if scope == 'full':
-                title = 'Forced Response Development - Full Network'
-            else:
-                title = f'Forced Response Development - {scope} Layer'
-            
-            plt.suptitle(title, fontsize=12, fontweight='bold', y=0.98)
-            plt.tight_layout(rect=[0, 0, 1, 0.96])
-        
-        # Save figure
-        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
-        # For 'both' mode, save separate files for each mode (matching spectrum plot pattern)
-        # For single mode, save one file
-        if analysis_mode == 'both':
-            # Close the unused combined figure if it exists
-            if fig is not None:
-                plt.close(fig)
-            # Save separate files for silent and driven modes
-            for mode in modes_to_plot:
-                # Create a single subplot figure for this mode
-                fig_single, ax_single = plt.subplots(1, 1, figsize=FIGSIZE)
-                
-                # Extract data for this mode
-                gains = []
-                k_values = []
-                valid_stages = []
-                
-                for stage in stages:
-                    result = results[stage]
-                    mode_data = result.get(mode, {})
-                    gain = mode_data.get('forced_response_max_gain', np.nan)
-                    k_val = mode_data.get('forced_response_critical_k', 0.0)
-                    
-                    if not np.isnan(gain):
-                        gains.append(gain)
-                        k_values.append(k_val)
-                        valid_stages.append(stage)
-                
-                if gains:
-                    # Normalize k* values for color mapping
-                    k_normalized = [min(k / k_max, 1.0) if k_max > 0 else 0.0 for k in k_values]
-                    cmap = plt.get_cmap('viridis')
-                    colors = [cmap(k_norm) for k_norm in k_normalized]
-                    
-                    # Plot bars
-                    x_pos = range(len(valid_stages))
-                    ax_single.bar(x_pos, gains, color=colors, alpha=0.7, width=0.6)
-                    
-                    # Add colorbar
-                    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0, vmax=k_max))
-                    sm.set_array([])
-                    cbar = plt.colorbar(sm, ax=ax_single)
-                    cbar.set_label('k*', fontsize=9)
-                    cbar.ax.tick_params(labelsize=8)
-                    
-                    ax_single.set_xticks(x_pos)
-                    ax_single.set_xticklabels(valid_stages, fontsize=10)
-                    ax_single.set_ylabel('Max Gain', fontsize=10)
-                    ax_single.set_title(f'Forced Response - {mode.capitalize()}', fontsize=10, fontweight='normal')
-                    ax_single.set_ylim(y_min, y_max)
-                    ax_single.grid(True, alpha=0.3, axis='y')
-                    ax_single.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.2f}'))
-                    for label in ax_single.get_yticklabels():
-                        label.set_ha('right')
-                
-                # Create meaningful title
-                if scope == 'full':
-                    title = f'Forced Response Development - Full Network ({mode.capitalize()})'
-                else:
-                    title = f'Forced Response Development - {scope} Layer ({mode.capitalize()})'
-                
-                plt.suptitle(title, fontsize=12, fontweight='bold', y=0.98)
-                plt.tight_layout(rect=[0, 0, 1, 0.96])
-                
-                output_path = Path(self.output_dir) / f'{scope}_forced_response_{mode}.svg'
-                plt.savefig(output_path, format='svg', bbox_inches='tight')
-                plt.close(fig_single)
         else:
-            # Save single mode figure
-            output_path = Path(self.output_dir) / f'{scope}_forced_response_{analysis_mode}.svg'
+            modes_to_plot = [analysis_mode]
+
+        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+
+        for mode in modes_to_plot:
+            # Use smaller figure size with extra width for legend
+            fig_width = FIGSIZE[0] * 0.85  # Slightly larger to accommodate legend outside
+            fig_height = fig_width * 0.8  # Make overall figure roughly square
+            fig, axes = plt.subplots(2, 1, figsize=(fig_width, fig_height), sharex=True)
+
+            k_global = []
+
+            for stage in stages:
+                stage_color = STAGE_COLORS.get(stage, '#666666')
+                stage_result = results[stage]
+                if analysis_mode == 'both':
+                    mode_data = stage_result.get(mode, {})
+                else:
+                    mode_data = stage_result
+
+                k_values = mode_data.get('forced_response_k_values')
+                gain_profile = mode_data.get('forced_response_gain_profile')
+                max_real_profile = mode_data.get('forced_response_max_real_profile')
+
+                if k_values is None or len(k_values) == 0:
+                    continue
+
+                # Ensure numpy arrays for consistent operations
+                k_values = np.array(k_values)
+                gain_profile = np.array(gain_profile)
+                max_real_profile = np.array(max_real_profile)
+
+                axes[0].plot(k_values, gain_profile, label=stage, color=stage_color, linewidth=1.8, alpha=0.85)
+                axes[1].plot(k_values, max_real_profile, label=stage, color=stage_color, linewidth=1.8, alpha=0.85)
+
+                k_global.append(k_values)
+
+            # Configure axes
+            axes[0].set_ylabel('Gain ||J(k)⁻¹B||', fontsize=10)
+            axes[0].yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.2f}'))
+            for label in axes[0].get_yticklabels():
+                label.set_ha('right')
+
+            axes[1].set_ylabel('Max Re(λ(k))', fontsize=10)
+            axes[1].set_xlabel('k', fontsize=10)
+            axes[1].axhline(0, color='gray', linestyle='--', linewidth=1, alpha=0.5)
+            axes[1].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1f}'))
+            axes[1].yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.2f}'))
+            for label in axes[1].get_yticklabels():
+                label.set_ha('right')
+
+            # Determine x-limits from global k values
+            if k_global:
+                k_concat = np.concatenate(k_global)
+                axes[1].set_xlim(k_concat.min(), k_concat.max())
+
+            # Use global y-limits if provided, otherwise compute local ones
+            if global_ylims is not None:
+                axes[0].set_ylim(global_ylims['gain'])
+                axes[1].set_ylim(global_ylims['max_real'])
+            
+            # Place legend outside on the right
+            axes[0].legend(bbox_to_anchor=(1.02, 1), loc='upper left', fontsize=9, title='Stage', frameon=True)
+
+            if scope == 'full':
+                title = f'Forced Response Development — Full Network ({mode.capitalize()})'
+            else:
+                title = f'Forced Response Development — {scope} Layer ({mode.capitalize()})'
+
+            plt.suptitle(title, fontsize=12, fontweight='bold', y=0.98)
+            plt.tight_layout(rect=[0, 0, 0.88, 0.96])  # Leave room for legend on right
+            
+            # Make both subplots square
+            for ax in axes:
+                pos = ax.get_position()
+                width = pos.x1 - pos.x0
+                height = pos.y1 - pos.y0
+                size = min(width, height)
+                center_x = (pos.x0 + pos.x1) / 2
+                center_y = (pos.y0 + pos.y1) / 2
+                ax.set_position([center_x - size/2, center_y - size/2, size, size])
+
+            output_path = Path(self.output_dir) / f'{scope}_forced_response_{mode}.svg'
             plt.savefig(output_path, format='svg', bbox_inches='tight')
             plt.close(fig)

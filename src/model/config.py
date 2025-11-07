@@ -18,7 +18,6 @@ DT = 1.5  # Time step in milliseconds - INCREASE to speed up simulation
 INTEGRATION_STEPS = 3  # Number of steps per update cycle - INCREASE for faster visual changes
 VISUALIZATION_STEPS = 5  # Number of simulation steps per visualization update - DECREASE for more frequent visual updates
 UPDATE_INTERVAL = 60  # Time between visualization updates (ms) - DECREASE for more frequent visual updates
-NOISE_TAU = 20.0  # Time constant for Ornstein-Uhlenbeck process (ms)
 RANDOM_SEED = 9  # Global random seed for reproducible simulations
 
 
@@ -62,7 +61,7 @@ INITIAL_OUTGOING_WIDTHS = P4_PRESET['outgoing_widths']
 INITIAL_STRENGTH_SCALING = P4_PRESET['strength_scaling']
 INITIAL_TIME_CONSTANTS = P4_PRESET['time_constants']
 INITIAL_GAINS = P4_PRESET['gains']
-INITIAL_NOISE_PARAMS = P4_PRESET['noise_params']  
+INITIAL_BACKGROUND_INPUT = P4_PRESET['background_input']  
 THALAMIC_ALPHA = P4_PRESET['thalamic_alpha']  # Balance between intrinsic (0) and sensory (1) thalamic activity
 
 #------------------------------------------------------------------------------
@@ -80,6 +79,7 @@ COLORMAPS = {
     'E': [[0, 'white'], [1, CELL_COLORS['E']]],
     'SST': [[0, 'white'], [1, CELL_COLORS['SST']]],
     'PV': [[0, 'white'], [1, CELL_COLORS['PV']]],
+    'thalamus': [[0, 'white'], [1, 'black']],  # Black-on-white for thalamic activity
 }
 
 # Layer colors for visualizations
@@ -104,8 +104,8 @@ CELL_ACTIVITY_COLORS = {
         'hover': lambda i: f"rgba{(*(int(CELL_COLORS['PV'].lstrip('#')[j:j+2], 16) for j in (0, 2, 4)), min(i + 0.2, 1.0))}"
     },
     'inactive': {
-        'bg': "rgba(80, 80, 80, 0.1)",
-        'hover': "rgba(100, 100, 100, 0.3)"
+        'bg': "rgba(200, 200, 200, 0.2)",
+        'hover': "rgba(180, 180, 180, 0.3)"
     }
 }
 

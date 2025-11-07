@@ -2,13 +2,13 @@
 
 import argparse
 import numpy as np
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from .bifurcation_analysis import NetworkModel, SteadyStateFinder, StabilityAnalyzer
 from .visualizer import BifurcationVisualizer
 from .config import (
     DEVELOPMENTAL_STAGES, PRESETS,
-    DEFAULT_LAYERS, ALL_LAYERS, ANALYSIS_PARAMS,
+    DEFAULT_LAYERS,
     ANALYSIS_MODES, DEFAULT_ANALYSIS_MODE, THALAMIC_INPUT_MAGNITUDE
 )
 
@@ -52,10 +52,10 @@ def analyze_single_stage_data(stage_name: str,
         is_silent = np.all(np.abs(r_star_silent) < 1e-10)
         
         # Compute forced response at silent operating point
-        max_gain_silent, fr_mode_silent, fr_k_silent, max_cond_silent = analyzer_silent.compute_forced_response(
+        forced_response_silent = analyzer_silent.compute_forced_response(
             network.thalamic_strengths, verbose=verbose
         )
-        
+
         silent_results = {
             'steady_state': r_star_silent,
             'distance': distance_silent,
@@ -65,10 +65,13 @@ def analyze_single_stage_data(stage_name: str,
             'status': status_silent,
             'converged': (status_silent == 'converged'),
             'is_silent': is_silent,
-            'forced_response_max_gain': max_gain_silent,
-            'forced_response_critical_mode': fr_mode_silent,
-            'forced_response_critical_k': fr_k_silent,
-            'forced_response_max_condition': max_cond_silent
+            'forced_response_max_gain': forced_response_silent['max_gain'],
+            'forced_response_critical_mode': forced_response_silent['critical_mode'],
+            'forced_response_critical_k': forced_response_silent['critical_k'],
+            'forced_response_max_condition': forced_response_silent['max_condition'],
+            'forced_response_k_values': forced_response_silent['k_values'],
+            'forced_response_gain_profile': forced_response_silent['gain_profile'],
+            'forced_response_max_real_profile': forced_response_silent['max_real_profile']
         }
     else:
         silent_results = None
@@ -92,10 +95,10 @@ def analyze_single_stage_data(stage_name: str,
         is_silent_driven = np.all(np.abs(r_star_driven) < 1e-10)
         
         # Compute forced response at driven operating point
-        max_gain_driven, fr_mode_driven, fr_k_driven, max_cond_driven = analyzer_driven.compute_forced_response(
+        forced_response_driven = analyzer_driven.compute_forced_response(
             network.thalamic_strengths, verbose=verbose
         )
-        
+
         driven_results = {
             'steady_state': r_star_driven,
             'distance': distance_driven,
@@ -106,10 +109,13 @@ def analyze_single_stage_data(stage_name: str,
             'converged': (status_driven == 'converged'),
             'is_silent': is_silent_driven,
             'thalamic_magnitude': thalamic_magnitude,
-            'forced_response_max_gain': max_gain_driven,
-            'forced_response_critical_mode': fr_mode_driven,
-            'forced_response_critical_k': fr_k_driven,
-            'forced_response_max_condition': max_cond_driven
+            'forced_response_max_gain': forced_response_driven['max_gain'],
+            'forced_response_critical_mode': forced_response_driven['critical_mode'],
+            'forced_response_critical_k': forced_response_driven['critical_k'],
+            'forced_response_max_condition': forced_response_driven['max_condition'],
+            'forced_response_k_values': forced_response_driven['k_values'],
+            'forced_response_gain_profile': forced_response_driven['gain_profile'],
+            'forced_response_max_real_profile': forced_response_driven['max_real_profile']
         }
         
         # Diagnostic: Compare driven vs silent (if both modes and verbose)
@@ -211,13 +217,6 @@ def analyze_all_stages(layers: List[str] = None,
     else:
         visualizer.plot_eigenvalue_spectra(results_dict)
     
-    # Generate forced response visualizations
-    visualizer.plot_forced_response_development(results_dict)
-    
-    # Generate per-stage forced response plots
-    for stage in DEVELOPMENTAL_STAGES:
-        visualizer.plot_forced_response_per_stage(results_dict, stage)
-    
     # If requested, compare with individual layer analyses
     if compare_layers and len(layers) > 1:
         l23_results = {}
@@ -233,15 +232,23 @@ def analyze_all_stages(layers: List[str] = None,
         
         visualizer.plot_layer_coupling_comparison(l5_results, l4_results, l23_results, results_dict)
         
-        # Generate forced response plots for individual layers
-        visualizer.plot_forced_response_development(l23_results)
-        visualizer.plot_forced_response_development(l4_results)
-        visualizer.plot_forced_response_development(l5_results)
+        # Compute global y-limits across all forced response plots for consistency
+        all_results_for_ylims = {
+            'full': results_dict,
+            'L23': l23_results,
+            'L4': l4_results,
+            'L5': l5_results
+        }
+        global_ylims = visualizer.compute_global_forced_response_ylims(all_results_for_ylims)
         
-        for stage in DEVELOPMENTAL_STAGES:
-            visualizer.plot_forced_response_per_stage(l23_results, stage)
-            visualizer.plot_forced_response_per_stage(l4_results, stage)
-            visualizer.plot_forced_response_per_stage(l5_results, stage)
+        # Generate forced response plots with consistent y-limits
+        visualizer.plot_forced_response_development(results_dict, global_ylims=global_ylims)
+        visualizer.plot_forced_response_development(l23_results, global_ylims=global_ylims)
+        visualizer.plot_forced_response_development(l4_results, global_ylims=global_ylims)
+        visualizer.plot_forced_response_development(l5_results, global_ylims=global_ylims)
+    else:
+        # Single scope analysis - no need for global y-limits
+        visualizer.plot_forced_response_development(results_dict)
     
     # Determine scope and mode for filenames
     scope = layers[0] if len(layers) == 1 else 'full'
@@ -259,14 +266,6 @@ def analyze_all_stages(layers: List[str] = None,
         figure_list.append(f"{scope}_development_{mode_suffix}.svg")
         figure_list.append(f"{scope}_spectrum_{mode_suffix}.svg")
         figure_list.append(f"{scope}_forced_response_{mode_suffix}.svg")
-    
-    # Add per-stage forced response figures
-    for stage in DEVELOPMENTAL_STAGES:
-        if analysis_mode == 'both':
-            figure_list.append(f"{scope}_forced_response_{stage}_silent.svg")
-            figure_list.append(f"{scope}_forced_response_{stage}_driven.svg")
-        else:
-            figure_list.append(f"{scope}_forced_response_{stage}_{mode_suffix}.svg")
     
     if compare_layers and len(layers) > 1:
         figure_list.append(f"layers_comparison_{mode_suffix}.svg")

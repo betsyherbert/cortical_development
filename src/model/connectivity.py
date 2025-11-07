@@ -299,6 +299,83 @@ class LayerConnectivity:
         
         return 0.0
 
+    def get_scaled_connection_strength(self, source_layer: str, source_cell: str, 
+                                      target_layer: str, target_cell: str) -> float:
+        """
+        Get the strength-scaled connection strength between two populations.
+        
+        This returns amplitude * strength_scaling[source_cell_type], which is the
+        actual effective connection strength used in the simulation.
+        
+        Args:
+            source_layer: Source layer ('L23', 'L4', 'L5', or 'thalamus')
+            source_cell: Source cell type ('E', 'SST', 'PV', or None for thalamus)
+            target_layer: Target layer ('L23', 'L4', 'L5')
+            target_cell: Target cell type ('E', 'SST', 'PV')
+            
+        Returns:
+            Scaled connection amplitude or 0 if connection doesn't exist
+        """
+        # Get raw amplitude
+        raw_amplitude = self.get_connection_strength(source_layer, source_cell, target_layer, target_cell)
+        
+        # Get scaling factor for source cell type
+        if source_layer == 'thalamus':
+            scaling = self.strength_scaling.get('thalamus', 1.0)
+        else:
+            scaling = self.strength_scaling.get(source_cell, 1.0)
+        
+        return raw_amplitude * scaling
+
+    def get_all_scaled_strengths(self) -> dict:
+        """
+        Get all scaled connection strengths in the network.
+        
+        Returns:
+            Dictionary mapping connection keys to their scaled strengths
+        """
+        scaled_strengths = {}
+        
+        for conn_key in self.layer_params.keys():
+            # Parse connection key
+            parts = conn_key.split('_to_')
+            source_part, target_part = parts
+            
+            if source_part == 'thalamus':
+                source_layer = 'thalamus'
+                source_cell = None
+                target_parts = target_part.split('_')
+                target_layer = target_parts[0]
+                target_cell = target_parts[1]
+            else:
+                source_parts = source_part.split('_')
+                target_parts = target_part.split('_')
+                source_layer = source_parts[0]
+                source_cell = source_parts[1]
+                target_layer = target_parts[0]
+                target_cell = target_parts[1]
+            
+            scaled_strengths[conn_key] = self.get_scaled_connection_strength(
+                source_layer, source_cell, target_layer, target_cell
+            )
+        
+        return scaled_strengths
+
+    def get_scaled_strength_range(self) -> tuple:
+        """
+        Get the min and max scaled connection strengths across all connections.
+        
+        Returns:
+            Tuple of (min_strength, max_strength)
+        """
+        scaled_strengths = self.get_all_scaled_strengths()
+        
+        if not scaled_strengths:
+            return (0.0, 0.0)
+        
+        values = list(scaled_strengths.values())
+        return (min(values), max(values))
+
     def set_connection_strength(self, source_layer: str, source_cell: str, 
                               target_layer: str, target_cell: str, 
                               amplitude: float) -> None:

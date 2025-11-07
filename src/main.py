@@ -1,7 +1,6 @@
 """Main module for running the cortical circuit simulation."""
 
 import argparse
-import numpy as np
 
 from src.model.neurons import CorticalCircuit
 from src.model.thalamus import ThalamicInput
@@ -147,19 +146,15 @@ class CorticalSimulation:
         """
         return self.circuit.connectivity.get_strength_scaling(cell_type)
     
-    def set_noise_params(self, cell_type: str, mean: float, std: float, c: float) -> None:
+    def set_background_input(self, cell_type: str, value: float) -> None:
         """
-        Set the noise parameters for a specific cell type.
+        Set the background input for a specific cell type.
         
         Args:
             cell_type: The cell type to update ('E', 'SST', or 'PV')
-            mean: Mean of the noise
-            std: Standard deviation of the noise
-            c: Correlation coefficient
+            value: Background input value
         """
-        self.circuit.set_noise_parameters(cell_type, mean, std, c)
-
-
+        self.circuit.set_background_input(cell_type, value)
 
 
 def parse_arguments():
