@@ -423,16 +423,16 @@ class DashboardApp:
             selected_pops: List of population IDs or None for full network
             
         Returns:
-            Title string (e.g., " (Full Network)" or ": L23_E + L4_SST")
+            Title string (e.g., " Full Network" or ": L23_E + L4_SST")
         """
         if selected_pops is None or len(selected_pops) == 9:
-            return " (Full Network)"
+            return " full network"
         elif len(selected_pops) == 0:
             return ""
         elif len(selected_pops) <= 4:
             return ": " + " + ".join(selected_pops)
         else:
-            return f" ({len(selected_pops)} populations)"
+            return f" {len(selected_pops)} populations"
     
     def _extract_mean_rates_from_simulation(self) -> Optional[np.ndarray]:
         """
@@ -490,7 +490,11 @@ class DashboardApp:
                           If None, analyzes full network. If provided, analyzes subset in isolation.
             
         Returns:
-            Tuple of (k_values, max_real_eigenvalues) arrays
+            Tuple of (k_values, max_real_eigenvalues, eigenvalues_at_max_k, k_max)
+            - k_values: Array of k values
+            - max_real_eigenvalues: Array of max real parts for each k
+            - eigenvalues_at_max_k: Complex array of all eigenvalues at k with max instability
+            - k_max: The k value where maximum instability occurs
         """
         try:
             # Extract current spatial mean rates from simulation
@@ -499,7 +503,7 @@ class DashboardApp:
             # Check if network is active
             if steady_state is None:
                 # Network not yet active - return empty arrays
-                return np.array([]), np.array([])
+                return np.array([]), np.array([]), np.array([]), 0.0
             
             # Create network model for full network (all 3 layers)
             network = NetworkModel(preset, layers=['L23', 'L4', 'L5'])
@@ -575,22 +579,32 @@ class DashboardApp:
                     
                     # Store or update max real eigenvalue for this k
                     if k_squared not in results_by_k2:
-                        results_by_k2[k_squared] = {'k': k, 'max_real': max_real}
+                        results_by_k2[k_squared] = {'k': k, 'max_real': max_real, 'eigenvalues': eigenvalues}
                     else:
-                        results_by_k2[k_squared]['max_real'] = max(
-                            results_by_k2[k_squared]['max_real'], max_real
-                        )
+                        # Update if this has a larger max real part
+                        if max_real > results_by_k2[k_squared]['max_real']:
+                            results_by_k2[k_squared]['max_real'] = max_real
+                            results_by_k2[k_squared]['eigenvalues'] = eigenvalues
             
             # Sort by k and extract arrays
             sorted_results = sorted(results_by_k2.values(), key=lambda x: x['k'])
             k_values = np.array([r['k'] for r in sorted_results])
             max_real_values = np.array([r['max_real'] for r in sorted_results])
             
-            return k_values, max_real_values
+            # Find k with maximum instability (most positive real part)
+            if len(max_real_values) > 0:
+                max_idx = np.argmax(max_real_values)
+                k_max = k_values[max_idx]
+                eigenvalues_at_max_k = sorted_results[max_idx]['eigenvalues']
+            else:
+                k_max = 0.0
+                eigenvalues_at_max_k = np.array([])
+            
+            return k_values, max_real_values, eigenvalues_at_max_k, k_max
             
         except Exception as e:
             print(f"Error computing stability spectrum: {e}")
-            return np.array([]), np.array([])
+            return np.array([]), np.array([]), np.array([]), 0.0
     
     def compute_B_fourier(self, network: 'NetworkModel', k_squared: float, domain_length: float) -> np.ndarray:
         """
@@ -864,8 +878,7 @@ class DashboardApp:
             print(f"Error computing spatiotemporal gain: {e}")
             return np.array([]), np.array([]), np.array([])
     
-    def create_stability_spectrum_figure(self, k_values: np.ndarray, max_real_values: np.ndarray, 
-                                        selected_pops: Optional[list] = None) -> go.Figure:
+    def create_stability_spectrum_figure(self, k_values: np.ndarray, max_real_values: np.ndarray) -> go.Figure:
         """
         Create Plotly figure for stability spectrum (max Re(λ) vs k).
         
@@ -946,13 +959,13 @@ class DashboardApp:
         from src.analysis.bifurcation.config import ANALYSIS_PARAMS
         n_modes = ANALYSIS_PARAMS['n_modes']
         
-        # Generate title with population info
-        title_text = "Stability Spectrum" + self._format_population_title(selected_pops)
+        # Generate title
+        title_text = "Stability Spectrum"
         
         fig.update_layout(
             title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=12)),
             xaxis=dict(
-                title='Spatial freq k',
+                title='Spatial frequency k',
                 showgrid=True,
                 gridcolor='#e0e0e0',
                 zeroline=False,
@@ -967,8 +980,8 @@ class DashboardApp:
                 zerolinewidth=1,
                 range=[y_min - y_padding, y_max + y_padding] if len(k_values) > 0 else [-0.5, 0.5]
             ),
-            margin=dict(l=45, r=20, t=30, b=35),
-            height=200,
+            margin=dict(l=50, r=25, t=35, b=40),
+            height=280,
             plot_bgcolor='white',
             paper_bgcolor='white',
             hovermode='closest',
@@ -977,8 +990,116 @@ class DashboardApp:
         
         return fig
     
-    def create_static_gain_figure(self, k_values: np.ndarray, gain_values: np.ndarray,
-                                  selected_pops: Optional[list] = None) -> go.Figure:
+    def create_eigenvalue_spectrum_figure(self, eigenvalues: np.ndarray, k_max: float) -> go.Figure:
+        """
+        Create Plotly figure for eigenvalue spectrum in the complex plane.
+        
+        Args:
+            eigenvalues: Complex array of eigenvalues to plot
+            k_max: The k value at which these eigenvalues were computed
+            selected_pops: Optional list of selected population IDs for title
+            
+        Returns:
+            Plotly Figure object
+        """
+        fig = go.Figure()
+        
+        # Check if we have data
+        if len(eigenvalues) > 0:
+            # Extract real and imaginary parts
+            real_parts = eigenvalues.real
+            imag_parts = eigenvalues.imag
+            
+            # Add eigenvalue scatter plot
+            fig.add_trace(go.Scatter(
+                x=real_parts,
+                y=imag_parts,
+                mode='markers',
+                name='Eigenvalues',
+                marker=dict(
+                    size=8,
+                    color=real_parts,  # Color by real part
+                    colorscale='balance',  # Balance colormap
+                    cmin=-0.4,
+                    cmax=0.4,
+                    opacity=1.0,
+                    line=dict(color='black', width=0.5),
+                    showscale=False
+                ),
+                hovertemplate='Re(λ)=%{x:.3f}<br>Im(λ)=%{y:.3f}<extra></extra>',
+                showlegend=False
+            ))
+            
+            # Add vertical line at Re(λ) = 0 (stability boundary)
+            fig.add_trace(go.Scatter(
+                x=[0, 0],
+                y=[-0.4, 0.4],
+                mode='lines',
+                name='Stability boundary',
+                line=dict(color='gray', width=2, dash='dash'),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+        else:
+            # No data - show empty plot with message
+            fig.add_annotation(
+                text="Network not yet active",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5,
+                showarrow=False,
+                font=dict(size=14, color='gray')
+            )
+        
+        # Add k value annotation in top right corner (always show)
+        fig.add_annotation(
+            text=f"k = {k_max:.2f}",
+            xref="paper", yref="paper",
+            x=0.999, y=0.999,
+            xanchor='right', yanchor='top',
+            showarrow=False,
+            font=dict(size=10, color='black'),
+            bgcolor='rgba(220, 220, 220, 0.9)',  # Pale grey background
+            bordercolor='rgba(180, 180, 180, 0.8)',
+            borderwidth=1,
+            borderpad=3
+        )
+        
+        # Generate title
+        title_text = "Eigenvalue Spectrum"
+        
+        fig.update_layout(
+            title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=12)),
+            xaxis=dict(
+                title='Re(λ)',
+                showgrid=True,
+                gridcolor='#e0e0e0',
+                zeroline=True,
+                zerolinecolor='gray',
+                zerolinewidth=2,
+                range=[-0.4, 0.4],
+                tickvals=[-0.4, 0, 0.4]
+            ),
+            yaxis=dict(
+                title='Im(λ)',
+                showgrid=True,
+                gridcolor='#e0e0e0',
+                zeroline=True,
+                zerolinecolor='#e0e0e0',
+                zerolinewidth=1,
+                range=[-0.4, 0.4],
+                tickvals=[-0.4, 0, 0.4]
+            ),
+            margin=dict(l=50, r=25, t=35, b=40),
+            height=280,
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            hovermode='closest',
+            showlegend=False
+        )
+        
+        return fig
+    
+    def create_static_gain_figure(self, k_values: np.ndarray, gain_values: np.ndarray) -> go.Figure:
         """
         Create Plotly figure for static spatial gain G(k).
         
@@ -1044,13 +1165,13 @@ class DashboardApp:
         from src.analysis.bifurcation.config import ANALYSIS_PARAMS
         n_modes = ANALYSIS_PARAMS['n_modes']
         
-        # Generate title with population info
-        title_text = "Static Gain" + self._format_population_title(selected_pops)
+        # Generate title
+        title_text = "Static Gain"
         
         fig.update_layout(
             title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=12)),
             xaxis=dict(
-                title=' k',
+                title='Spatial frequency k',
                 showgrid=True,
                 gridcolor='#e0e0e0',
                 zeroline=False,
@@ -1063,8 +1184,8 @@ class DashboardApp:
                 zeroline=False,
                 range=[y_min, y_max]
             ),
-            margin=dict(l=45, r=20, t=30, b=35),
-            height=200,
+            margin=dict(l=50, r=25, t=35, b=40),
+            height=280,
             plot_bgcolor='white',
             paper_bgcolor='white',
             hovermode='closest',
@@ -1074,7 +1195,7 @@ class DashboardApp:
         return fig
     
     def create_spatiotemporal_gain_figure(self, k_values: np.ndarray, omega_values: np.ndarray, 
-                                         gain_matrix: np.ndarray, selected_pops: Optional[list] = None) -> go.Figure:
+                                         gain_matrix: np.ndarray) -> go.Figure:
         """
         Create Plotly figure for spatiotemporal amplification map A(k,ω).
         
@@ -1122,8 +1243,8 @@ class DashboardApp:
         from src.analysis.bifurcation.config import ANALYSIS_PARAMS
         n_modes = ANALYSIS_PARAMS['n_modes']
         
-        # Generate title with population info
-        title_text = "Spatiotemporal Gain" + self._format_population_title(selected_pops)
+        # Generate title
+        title_text = "Spatiotemporal Gain"
         
         fig.update_layout(
             title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=12)),
@@ -1137,8 +1258,8 @@ class DashboardApp:
                 showgrid=False,
                 range=[0, 1]
             ),
-            margin=dict(l=45, r=20, t=30, b=35),
-            height=200,
+            margin=dict(l=50, r=25, t=35, b=40),
+            height=280,
             plot_bgcolor='white',
             paper_bgcolor='white'
         )
@@ -1232,7 +1353,32 @@ class DashboardApp:
             *[self.create_layer_row(layer) for layer in LAYERS],
             
             # Thalamus visualization
-            self._create_thalamus_visualization()
+            self._create_thalamus_visualization(),
+            
+            # Selected populations display
+            html.Div([
+                dbc.Row([
+                    # Empty column to match heatmap label width
+                    dbc.Col(width=2),
+                    # Populations display container
+                    dbc.Col([
+                        html.Div(
+                            id='selected-populations-display',
+                            children="Click heatmaps to select populations for analysis",
+                            style={
+                                "textAlign": "center",
+                                "padding": "10px 16px",
+                                "backgroundColor": "#e0e0e0",  # Light grey
+                                "borderColor": "#e0e0e0",
+                                "borderRadius": "4px",
+                                "fontSize": "15px",
+                                "color": "black",  # Black text
+                                "fontWeight": "500"
+                            }
+                        )
+                    ], width=10)
+                ])
+            ], className="mt-3")
         ], width=4, className="px-4")
 
     def _create_connectivity_matrix(self):
@@ -1270,21 +1416,33 @@ class DashboardApp:
                 )
             ], className="mb-3"),
             
-            # Stability Spectrum Graph
+            # Stability Analysis (Spectrum and Eigenvalues)
             html.Div([
                 html.H5("Stability Analysis", 
                        className="mb-3 text-center",
                        style={
                            "textAlign": "center",
-                           "width": "85%",
+                           "width": "95%",
                            "margin": "0 auto"
                        }),
-                dcc.Graph(
-                    id='stability-spectrum-graph',
-                    figure=self.create_stability_spectrum_figure(np.array([]), np.array([])),
-                    config=GRAPH_CONFIG,
-                    style={"width": "85%", "margin": "0 auto", "height": "210px"}
-                )
+                dbc.Row([
+                    dbc.Col([
+                        dcc.Graph(
+                            id='stability-spectrum-graph',
+                            figure=self.create_stability_spectrum_figure(np.array([]), np.array([])),
+                            config=GRAPH_CONFIG,
+                            style={"width": "100%", "margin": "0 auto", "height": "300px"}
+                        )
+                    ], width=6),
+                    dbc.Col([
+                        dcc.Graph(
+                            id='eigenvalue-spectrum-graph',
+                            figure=self.create_eigenvalue_spectrum_figure(np.array([]), 0.0),
+                            config=GRAPH_CONFIG,
+                            style={"width": "100%", "margin": "0 auto", "height": "300px"}
+                        )
+                    ], width=6)
+                ], style={"width": "95%", "margin": "0 auto"})
             ], className="mt-4"),
             
             # Forced Response Analysis
@@ -1293,7 +1451,7 @@ class DashboardApp:
                        className="mb-3 text-center",
                        style={
                            "textAlign": "center",
-                           "width": "85%",
+                           "width": "95%",
                            "margin": "0 auto"
                        }),
                 dbc.Row([
@@ -1302,7 +1460,7 @@ class DashboardApp:
                             id='static-gain-graph',
                             figure=self.create_static_gain_figure(np.array([]), np.array([])),
                             config=GRAPH_CONFIG,
-                            style={"width": "95%", "margin": "0 auto", "height": "210px"}
+                            style={"width": "100%", "margin": "0 auto", "height": "300px"}
                         )
                     ], width=6),
                     dbc.Col([
@@ -1310,7 +1468,7 @@ class DashboardApp:
                             id='spatiotemporal-gain-graph',
                             figure=self.create_spatiotemporal_gain_figure(np.array([]), np.array([]), np.array([])),
                             config=GRAPH_CONFIG,
-                            style={"width": "95%", "margin": "0 auto", "height": "210px"}
+                            style={"width": "100%", "margin": "0 auto", "height": "300px"}
                         )
                     ], width=6)
                 ], style={"width": "95%", "margin": "0 auto"})
@@ -2402,9 +2560,10 @@ class DashboardApp:
             # Return unchanged intervals to not disrupt the update loop
             return [n_intervals]
         
-        # Update stability spectrum when parameters change or periodically
+        # Update stability spectrum and eigenvalue spectrum when parameters change or periodically
         @self.app.callback(
-            Output('stability-spectrum-graph', 'figure'),
+            [Output('stability-spectrum-graph', 'figure'),
+             Output('eigenvalue-spectrum-graph', 'figure')],
             [Input('spectrum-interval', 'n_intervals'),
              Input('selected-populations', 'data'),
              Input('tau-e-slider', 'value'),
@@ -2426,11 +2585,11 @@ class DashboardApp:
              Input({'type': 'matrix-slider', 'id': ALL}, 'value')]
         )
         def update_stability_spectrum(n_intervals, selected_pops, *args):  # pylint: disable=unused-argument
-            """Update the stability spectrum graph when parameters change or periodically."""
+            """Update the stability spectrum and eigenvalue spectrum graphs when parameters change or periodically."""
             try:
                 # Check if any populations are selected
                 if not selected_pops or len(selected_pops) == 0:
-                    # Return empty figure with message
+                    # Return empty figures with message
                     fig = go.Figure()
                     fig.add_annotation(
                         text="Select populations by clicking heatmaps",
@@ -2442,24 +2601,30 @@ class DashboardApp:
                     fig.update_layout(
                         xaxis=dict(visible=False),
                         yaxis=dict(visible=False),
-                        height=200,
-                        margin=dict(l=45, r=20, t=12, b=35)
+                        height=280,
+                        margin=dict(l=50, r=25, t=35, b=40)
                     )
-                    return fig
+                    # Return same empty figure for both plots
+                    return fig, fig
                 
                 # Build preset from current simulation state
                 preset = self.build_current_preset()
                 
                 # Compute stability spectrum for selected populations
-                k_values, max_real_values = self.compute_stability_spectrum(preset, selected_pops)
+                k_values, max_real_values, eigenvalues_at_max_k, k_max = self.compute_stability_spectrum(preset, selected_pops)
                 
-                # Create and return figure
-                return self.create_stability_spectrum_figure(k_values, max_real_values, selected_pops)
+                # Create both figures
+                stability_fig = self.create_stability_spectrum_figure(k_values, max_real_values)
+                eigenvalue_fig = self.create_eigenvalue_spectrum_figure(eigenvalues_at_max_k, k_max)
+                
+                return stability_fig, eigenvalue_fig
                 
             except Exception as e:
                 print(f"Error updating stability spectrum: {e}")
-                # Return empty figure on error
-                return self.create_stability_spectrum_figure(np.array([]), np.array([]))
+                # Return empty figures on error
+                empty_stability = self.create_stability_spectrum_figure(np.array([]), np.array([]))
+                empty_eigenvalue = self.create_eigenvalue_spectrum_figure(np.array([]), 0.0)
+                return empty_stability, empty_eigenvalue
         
         # Update forced response graphs when parameters change or periodically
         @self.app.callback(
@@ -2502,8 +2667,8 @@ class DashboardApp:
                     fig.update_layout(
                         xaxis=dict(visible=False),
                         yaxis=dict(visible=False),
-                        height=200,
-                        margin=dict(l=45, r=20, t=12, b=35)
+                        height=280,
+                        margin=dict(l=50, r=25, t=35, b=40)
                     )
                     return fig, fig
                 
@@ -2512,11 +2677,11 @@ class DashboardApp:
                 
                 # Compute static gain for selected populations
                 k_values_static, gain_values = self.compute_static_gain(preset, selected_pops)
-                static_fig = self.create_static_gain_figure(k_values_static, gain_values, selected_pops)
+                static_fig = self.create_static_gain_figure(k_values_static, gain_values)
                 
                 # Compute spatiotemporal gain for selected populations
                 k_values_st, omega_values, gain_matrix = self.compute_spatiotemporal_gain(preset, selected_pops)
-                spatiotemporal_fig = self.create_spatiotemporal_gain_figure(k_values_st, omega_values, gain_matrix, selected_pops)
+                spatiotemporal_fig = self.create_spatiotemporal_gain_figure(k_values_st, omega_values, gain_matrix)
                 
                 return static_fig, spatiotemporal_fig
                 
@@ -2586,6 +2751,22 @@ class DashboardApp:
                 updated_styles.append(style)
             
             return selected_pops, updated_styles
+        
+        # Update the selected populations display text
+        @self.app.callback(
+            Output('selected-populations-display', 'children'),
+            [Input('selected-populations', 'data')]
+        )
+        def update_selected_populations_display(selected_pops):
+            """Update the display showing which populations are selected for analysis."""
+            if not selected_pops or len(selected_pops) == 0:
+                return "Click heatmaps to select populations for analysis"
+            elif len(selected_pops) == 9:
+                return "Currently analysing: full network"
+            elif len(selected_pops) <= 4:
+                return f"Currently analysing: {' + '.join(selected_pops)}"
+            else:
+                return f"Currently analysing: {len(selected_pops)} populations"
     
     def create_parameter_sliders(self):
         """Create the neural parameter sliders section."""
