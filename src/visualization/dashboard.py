@@ -116,17 +116,21 @@ GRAPH_LAYOUT = {
     "height": 150,  # Reduced height
     "width": 150,  # Reduced width
     "dragmode": False,
+    "clickmode": "event",  # Enable click events
+    "hovermode": False,  # Disable hover to prevent cursor changes
     "xaxis": dict(
         showgrid=False,
         showticklabels=False,
         zeroline=False,
         scaleanchor="y",  # Force square aspect ratio
-        scaleratio=1
+        scaleratio=1,
+        fixedrange=True  # Disable zoom/pan interactions
     ),
     "yaxis": dict(
         showgrid=False,
         showticklabels=False,
-        zeroline=False
+        zeroline=False,
+        fixedrange=True  # Disable zoom/pan interactions
     )
 }
 
@@ -288,6 +292,22 @@ class DashboardApp:
                     .custom-slider .rc-slider-mark-text:last-child {
                         transform: translateX(-100%) !important;
                     }
+                    
+                    /* Force pointer cursor on clickable heatmaps */
+                    .clickable-heatmap,
+                    .clickable-heatmap * {
+                        cursor: pointer !important;
+                    }
+                    .clickable-heatmap .plotly,
+                    .clickable-heatmap .plotly *,
+                    .clickable-heatmap .main-svg,
+                    .clickable-heatmap .main-svg * {
+                        cursor: pointer !important;
+                    }
+                    .clickable-heatmap .nsewdrag,
+                    .clickable-heatmap .drag {
+                        cursor: pointer !important;
+                    }
                 </style>
             </head>
             <body>
@@ -382,6 +402,38 @@ class DashboardApp:
         
         return preset
     
+    def _get_population_indices(self, selected_pops: list) -> np.ndarray:
+        """
+        Map population IDs like 'L23_E' to 0-8 indices.
+        
+        Args:
+            selected_pops: List of population IDs (e.g., ['L23_E', 'L4_SST'])
+            
+        Returns:
+            Array of indices corresponding to the selected populations
+        """
+        all_pops = [f'{layer}_{cell}' for layer in LAYERS for cell in CELL_TYPES]
+        return np.array([all_pops.index(pop) for pop in selected_pops if pop in all_pops])
+    
+    def _format_population_title(self, selected_pops: Optional[list]) -> str:
+        """
+        Format a title suffix showing selected populations.
+        
+        Args:
+            selected_pops: List of population IDs or None for full network
+            
+        Returns:
+            Title string (e.g., " (Full Network)" or ": L23_E + L4_SST")
+        """
+        if selected_pops is None or len(selected_pops) == 9:
+            return " (Full Network)"
+        elif len(selected_pops) == 0:
+            return ""
+        elif len(selected_pops) <= 4:
+            return ": " + " + ".join(selected_pops)
+        else:
+            return f" ({len(selected_pops)} populations)"
+    
     def _extract_mean_rates_from_simulation(self) -> Optional[np.ndarray]:
         """
         Extract spatial mean rates from current simulation state with temporal averaging.
@@ -425,7 +477,7 @@ class DashboardApp:
             # Not enough history yet, use instantaneous
             return mean_rates
     
-    def compute_stability_spectrum(self, preset: dict) -> tuple:
+    def compute_stability_spectrum(self, preset: dict, selected_pops: Optional[list] = None) -> tuple:
         """
         Compute stability spectrum (max Re(λ) vs k) for current network state.
         
@@ -434,6 +486,8 @@ class DashboardApp:
         
         Args:
             preset: Preset dictionary with current network parameters
+            selected_pops: Optional list of population IDs to analyze (e.g., ['L23_E', 'L4_SST']).
+                          If None, analyzes full network. If provided, analyzes subset in isolation.
             
         Returns:
             Tuple of (k_values, max_real_eigenvalues) arrays
@@ -506,8 +560,17 @@ class DashboardApp:
                             else:
                                 J[i, j] = (analyzer.g_eff[i] * w_tilde) / network.tau[i]
                     
-                    # Compute eigenvalues
-                    eigenvalues = np.linalg.eigvals(J)
+                    # Extract subset if selected_pops is provided
+                    if selected_pops is not None and len(selected_pops) > 0:
+                        indices = self._get_population_indices(selected_pops)
+                        if len(indices) == 0:
+                            continue  # Skip if no valid populations
+                        J_subset = J[np.ix_(indices, indices)]
+                        eigenvalues = np.linalg.eigvals(J_subset)
+                    else:
+                        # Full network analysis
+                        eigenvalues = np.linalg.eigvals(J)
+                    
                     max_real = np.max(eigenvalues.real)
                     
                     # Store or update max real eigenvalue for this k
@@ -552,7 +615,7 @@ class DashboardApp:
         
         return B_k
     
-    def compute_static_gain(self, preset: dict) -> tuple:
+    def compute_static_gain(self, preset: dict, selected_pops: Optional[list] = None) -> tuple:
         """
         Compute static spatial gain curve G(k) = ||−J(k)^(−1) B(k)||.
         
@@ -560,6 +623,8 @@ class DashboardApp:
         
         Args:
             preset: Network preset dictionary
+            selected_pops: Optional list of population IDs to analyze (e.g., ['L23_E', 'L4_SST']).
+                          If None, analyzes full network. If provided, analyzes subset in isolation.
             
         Returns:
             (k_values, gain_values): Arrays of k and corresponding gains
@@ -624,14 +689,27 @@ class DashboardApp:
                     # Compute B(k) with thalamic spatial filtering
                     B_k = self.compute_B_fourier(network, k_squared, domain_length)
                     
+                    # Extract subset if selected_pops is provided
+                    if selected_pops is not None and len(selected_pops) > 0:
+                        indices = self._get_population_indices(selected_pops)
+                        if len(indices) == 0:
+                            continue  # Skip if no valid populations
+                        J_subset = J[np.ix_(indices, indices)]
+                        B_subset = B_k[indices]
+                        J_to_use = J_subset
+                        B_to_use = B_subset
+                    else:
+                        J_to_use = J
+                        B_to_use = B_k
+                    
                     # Check if B(k) is non-zero
-                    if np.linalg.norm(B_k) < 1e-10:
+                    if np.linalg.norm(B_to_use) < 1e-10:
                         continue
                     
                     # Compute gain: G(k) = ||−J(k)^(−1) B(k)||
                     try:
                         # Compute -J(k)^(-1) @ B(k)
-                        J_inv_B = np.linalg.solve(-J, B_k)
+                        J_inv_B = np.linalg.solve(-J_to_use, B_to_use)
                         # Spectral norm (largest singular value)
                         gain = np.linalg.norm(J_inv_B)
                         
@@ -657,7 +735,7 @@ class DashboardApp:
             print(f"Error computing static gain: {e}")
             return np.array([]), np.array([])
     
-    def compute_spatiotemporal_gain(self, preset: dict) -> tuple:
+    def compute_spatiotemporal_gain(self, preset: dict, selected_pops: Optional[list] = None) -> tuple:
         """
         Compute spatiotemporal amplification map A(k,ω) = ||(iωI − J(k))^(−1) B(k)||.
         
@@ -665,6 +743,8 @@ class DashboardApp:
         
         Args:
             preset: Network preset dictionary
+            selected_pops: Optional list of population IDs to analyze (e.g., ['L23_E', 'L4_SST']).
+                          If None, analyzes full network. If provided, analyzes subset in isolation.
             
         Returns:
             (k_values, omega_values, gain_matrix): Arrays of k, ω, and gain[k,ω]
@@ -741,8 +821,23 @@ class DashboardApp:
                 # Compute B(k) with thalamic spatial filtering
                 B_k = self.compute_B_fourier(network, k_squared, domain_length)
                 
+                # Extract subset if selected_pops is provided
+                if selected_pops is not None and len(selected_pops) > 0:
+                    indices = self._get_population_indices(selected_pops)
+                    if len(indices) == 0:
+                        continue  # Skip if no valid populations
+                    J_subset = J[np.ix_(indices, indices)]
+                    B_subset = B_k[indices]
+                    J_to_use = J_subset
+                    B_to_use = B_subset
+                    n_pops_subset = len(indices)
+                else:
+                    J_to_use = J
+                    B_to_use = B_k
+                    n_pops_subset = total_pops
+                
                 # Check if B(k) is non-zero
-                if np.linalg.norm(B_k) < 1e-10:
+                if np.linalg.norm(B_to_use) < 1e-10:
                     continue
                 
                 # For each temporal frequency ω
@@ -751,11 +846,11 @@ class DashboardApp:
                     omega_rad = 2 * np.pi * omega
                     
                     # Compute (iωI - J(k))
-                    M = 1j * omega_rad * np.eye(total_pops) - J
+                    M = 1j * omega_rad * np.eye(n_pops_subset) - J_to_use
                     
                     # Compute A(k,ω) = ||(iωI − J(k))^(−1) B(k)||
                     try:
-                        M_inv_B = np.linalg.solve(M, B_k)
+                        M_inv_B = np.linalg.solve(M, B_to_use)
                         # Spectral norm (use norm for complex vectors)
                         gain = np.linalg.norm(M_inv_B)
                         gain_matrix[k_idx, omega_idx] = gain
@@ -769,13 +864,15 @@ class DashboardApp:
             print(f"Error computing spatiotemporal gain: {e}")
             return np.array([]), np.array([]), np.array([])
     
-    def create_stability_spectrum_figure(self, k_values: np.ndarray, max_real_values: np.ndarray) -> go.Figure:
+    def create_stability_spectrum_figure(self, k_values: np.ndarray, max_real_values: np.ndarray, 
+                                        selected_pops: Optional[list] = None) -> go.Figure:
         """
         Create Plotly figure for stability spectrum (max Re(λ) vs k).
         
         Args:
             k_values: Array of k values (wave numbers)
             max_real_values: Array of max real eigenvalues for each k
+            selected_pops: Optional list of selected population IDs for title
             
         Returns:
             Plotly Figure object
@@ -849,7 +946,11 @@ class DashboardApp:
         from src.analysis.bifurcation.config import ANALYSIS_PARAMS
         n_modes = ANALYSIS_PARAMS['n_modes']
         
+        # Generate title with population info
+        title_text = "Stability Spectrum" + self._format_population_title(selected_pops)
+        
         fig.update_layout(
+            title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=12)),
             xaxis=dict(
                 title='Spatial freq k',
                 showgrid=True,
@@ -866,7 +967,7 @@ class DashboardApp:
                 zerolinewidth=1,
                 range=[y_min - y_padding, y_max + y_padding] if len(k_values) > 0 else [-0.5, 0.5]
             ),
-            margin=dict(l=45, r=20, t=12, b=35),
+            margin=dict(l=45, r=20, t=30, b=35),
             height=200,
             plot_bgcolor='white',
             paper_bgcolor='white',
@@ -876,13 +977,15 @@ class DashboardApp:
         
         return fig
     
-    def create_static_gain_figure(self, k_values: np.ndarray, gain_values: np.ndarray) -> go.Figure:
+    def create_static_gain_figure(self, k_values: np.ndarray, gain_values: np.ndarray,
+                                  selected_pops: Optional[list] = None) -> go.Figure:
         """
         Create Plotly figure for static spatial gain G(k).
         
         Args:
             k_values: Array of k values (wave numbers)
             gain_values: Array of gain values for each k
+            selected_pops: Optional list of selected population IDs for title
             
         Returns:
             Plotly Figure object
@@ -941,7 +1044,11 @@ class DashboardApp:
         from src.analysis.bifurcation.config import ANALYSIS_PARAMS
         n_modes = ANALYSIS_PARAMS['n_modes']
         
+        # Generate title with population info
+        title_text = "Static Gain" + self._format_population_title(selected_pops)
+        
         fig.update_layout(
+            title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=12)),
             xaxis=dict(
                 title=' k',
                 showgrid=True,
@@ -956,7 +1063,7 @@ class DashboardApp:
                 zeroline=False,
                 range=[y_min, y_max]
             ),
-            margin=dict(l=45, r=20, t=12, b=35),
+            margin=dict(l=45, r=20, t=30, b=35),
             height=200,
             plot_bgcolor='white',
             paper_bgcolor='white',
@@ -967,7 +1074,7 @@ class DashboardApp:
         return fig
     
     def create_spatiotemporal_gain_figure(self, k_values: np.ndarray, omega_values: np.ndarray, 
-                                         gain_matrix: np.ndarray) -> go.Figure:
+                                         gain_matrix: np.ndarray, selected_pops: Optional[list] = None) -> go.Figure:
         """
         Create Plotly figure for spatiotemporal amplification map A(k,ω).
         
@@ -975,6 +1082,7 @@ class DashboardApp:
             k_values: Array of spatial frequencies k
             omega_values: Array of temporal frequencies ω (Hz)
             gain_matrix: 2D array of gain values [k_idx, omega_idx]
+            selected_pops: Optional list of selected population IDs for title
             
         Returns:
             Plotly Figure object
@@ -1014,7 +1122,11 @@ class DashboardApp:
         from src.analysis.bifurcation.config import ANALYSIS_PARAMS
         n_modes = ANALYSIS_PARAMS['n_modes']
         
+        # Generate title with population info
+        title_text = "Spatiotemporal Gain" + self._format_population_title(selected_pops)
+        
         fig.update_layout(
+            title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=12)),
             xaxis=dict(
                 title='Spatial freq k',
                 showgrid=False,
@@ -1025,7 +1137,7 @@ class DashboardApp:
                 showgrid=False,
                 range=[0, 1]
             ),
-            margin=dict(l=45, r=20, t=12, b=35),
+            margin=dict(l=45, r=20, t=30, b=35),
             height=200,
             plot_bgcolor='white',
             paper_bgcolor='white'
@@ -1226,6 +1338,12 @@ class DashboardApp:
         # Store component for currently selected cell
         selected_cell = dcc.Store(id='selected-cell', data=None)
         
+        # Store component for selected populations for analysis
+        selected_populations = dcc.Store(
+            id='selected-populations',
+            data=['L23_E', 'L23_SST', 'L23_PV', 'L4_E', 'L4_SST', 'L4_PV', 'L5_E', 'L5_SST', 'L5_PV']
+        )
+        
         # Hidden button for resetting slider state
         reset_btn = html.Button(
             id='reset-slider-state-btn',
@@ -1238,6 +1356,7 @@ class DashboardApp:
             interval,
             spectrum_interval,
             selected_cell,
+            selected_populations,
             reset_btn,
             
             # Main content: three columns
@@ -1286,13 +1405,17 @@ class DashboardApp:
                 # Cell type columns
                 dbc.Col([
                     html.Div([
-                        html.Div(
+                        html.Div([
                             dcc.Graph(
-                                id=f'graph-{layer}-{cell_type}',
+                                id={'type': 'graph', 'id': f'{layer}_{cell_type}'},
                                 figure=self.figures[f'graph-{layer}-{cell_type}'],
-                                config=GRAPH_CONFIG
-                            ),
-                            style={"display": "inline-block"}
+                                config=GRAPH_CONFIG,
+                                className='clickable-heatmap'
+                            )
+                        ],
+                            id={'type': 'graph-container', 'id': f'{layer}_{cell_type}'},
+                            n_clicks=0,
+                            style={"display": "inline-block", "border": "3px solid #7f8c8d", "transition": "border-color 0.2s", "cursor": "pointer"}
                         ) for cell_type in ordered_cell_types
                     ], style={
                         "display": "flex",
@@ -1314,7 +1437,7 @@ class DashboardApp:
                 z=data,
                 colorscale=colorscale,
                 showscale=False,
-                hoverinfo='none',  # Disable hover info for performance
+                hoverinfo='skip',  # Disable hover tooltips but allow click events
                 zmin=HEATMAP_ZMIN,
                 zmax=HEATMAP_ZMAX
             )],
@@ -2137,7 +2260,7 @@ class DashboardApp:
         # Update the graphs with neural activity
         @self.app.callback(
             # Outputs: all graph figures
-            [Output(f'graph-{layer}-{cell_type}', 'figure')
+            [Output({'type': 'graph', 'id': f'{layer}_{cell_type}'}, 'figure')
              for layer in LAYERS
              for cell_type in CELL_TYPES] +
             [Output('graph-thalamus', 'figure')],
@@ -2283,6 +2406,7 @@ class DashboardApp:
         @self.app.callback(
             Output('stability-spectrum-graph', 'figure'),
             [Input('spectrum-interval', 'n_intervals'),
+             Input('selected-populations', 'data'),
              Input('tau-e-slider', 'value'),
              Input('tau-sst-slider', 'value'),
              Input('tau-pv-slider', 'value'),
@@ -2301,17 +2425,36 @@ class DashboardApp:
              Input('strength-scaling-thalamus-slider', 'value'),
              Input({'type': 'matrix-slider', 'id': ALL}, 'value')]
         )
-        def update_stability_spectrum(*args):  # pylint: disable=unused-argument
+        def update_stability_spectrum(n_intervals, selected_pops, *args):  # pylint: disable=unused-argument
             """Update the stability spectrum graph when parameters change or periodically."""
             try:
+                # Check if any populations are selected
+                if not selected_pops or len(selected_pops) == 0:
+                    # Return empty figure with message
+                    fig = go.Figure()
+                    fig.add_annotation(
+                        text="Select populations by clicking heatmaps",
+                        xref="paper", yref="paper",
+                        x=0.5, y=0.5,
+                        showarrow=False,
+                        font=dict(size=14, color='gray')
+                    )
+                    fig.update_layout(
+                        xaxis=dict(visible=False),
+                        yaxis=dict(visible=False),
+                        height=200,
+                        margin=dict(l=45, r=20, t=12, b=35)
+                    )
+                    return fig
+                
                 # Build preset from current simulation state
                 preset = self.build_current_preset()
                 
-                # Compute stability spectrum
-                k_values, max_real_values = self.compute_stability_spectrum(preset)
+                # Compute stability spectrum for selected populations
+                k_values, max_real_values = self.compute_stability_spectrum(preset, selected_pops)
                 
                 # Create and return figure
-                return self.create_stability_spectrum_figure(k_values, max_real_values)
+                return self.create_stability_spectrum_figure(k_values, max_real_values, selected_pops)
                 
             except Exception as e:
                 print(f"Error updating stability spectrum: {e}")
@@ -2323,6 +2466,7 @@ class DashboardApp:
             [Output('static-gain-graph', 'figure'),
              Output('spatiotemporal-gain-graph', 'figure')],
             [Input('spectrum-interval', 'n_intervals'),
+             Input('selected-populations', 'data'),
              Input('tau-e-slider', 'value'),
              Input('tau-sst-slider', 'value'),
              Input('tau-pv-slider', 'value'),
@@ -2341,19 +2485,38 @@ class DashboardApp:
              Input('strength-scaling-thalamus-slider', 'value'),
              Input({'type': 'matrix-slider', 'id': ALL}, 'value')]
         )
-        def update_forced_response(*args):  # pylint: disable=unused-argument
+        def update_forced_response(n_intervals, selected_pops, *args):  # pylint: disable=unused-argument
             """Update the forced response graphs when parameters change or periodically."""
             try:
+                # Check if any populations are selected
+                if not selected_pops or len(selected_pops) == 0:
+                    # Return empty figures with message
+                    fig = go.Figure()
+                    fig.add_annotation(
+                        text="Select populations by clicking heatmaps",
+                        xref="paper", yref="paper",
+                        x=0.5, y=0.5,
+                        showarrow=False,
+                        font=dict(size=14, color='gray')
+                    )
+                    fig.update_layout(
+                        xaxis=dict(visible=False),
+                        yaxis=dict(visible=False),
+                        height=200,
+                        margin=dict(l=45, r=20, t=12, b=35)
+                    )
+                    return fig, fig
+                
                 # Build preset from current simulation state
                 preset = self.build_current_preset()
                 
-                # Compute static gain
-                k_values_static, gain_values = self.compute_static_gain(preset)
-                static_fig = self.create_static_gain_figure(k_values_static, gain_values)
+                # Compute static gain for selected populations
+                k_values_static, gain_values = self.compute_static_gain(preset, selected_pops)
+                static_fig = self.create_static_gain_figure(k_values_static, gain_values, selected_pops)
                 
-                # Compute spatiotemporal gain
-                k_values_st, omega_values, gain_matrix = self.compute_spatiotemporal_gain(preset)
-                spatiotemporal_fig = self.create_spatiotemporal_gain_figure(k_values_st, omega_values, gain_matrix)
+                # Compute spatiotemporal gain for selected populations
+                k_values_st, omega_values, gain_matrix = self.compute_spatiotemporal_gain(preset, selected_pops)
+                spatiotemporal_fig = self.create_spatiotemporal_gain_figure(k_values_st, omega_values, gain_matrix, selected_pops)
                 
                 return static_fig, spatiotemporal_fig
                 
@@ -2363,6 +2526,66 @@ class DashboardApp:
                 empty_static = self.create_static_gain_figure(np.array([]), np.array([]))
                 empty_st = self.create_spatiotemporal_gain_figure(np.array([]), np.array([]), np.array([]))
                 return empty_static, empty_st
+        
+        # Handle heatmap clicks for population selection using n_clicks on containers
+        @self.app.callback(
+            [Output('selected-populations', 'data', allow_duplicate=True),
+             Output({'type': 'graph-container', 'id': ALL}, 'style')],
+            [Input({'type': 'graph-container', 'id': ALL}, 'n_clicks')],
+            [State('selected-populations', 'data'),
+             State({'type': 'graph-container', 'id': ALL}, 'id')],
+            prevent_initial_call=True
+        )
+        def toggle_population_selection(n_clicks_list, selected_pops, container_ids):  # pylint: disable=unused-argument
+            """Toggle population selection when clicking on heatmaps."""
+            # Find which container was clicked
+            ctx = dash.callback_context
+            if not ctx.triggered:
+                return dash.no_update, dash.no_update
+            
+            # Parse the triggered input to find which container was clicked
+            triggered_id = ctx.triggered[0]['prop_id']
+            if 'n_clicks' not in triggered_id:
+                return dash.no_update, dash.no_update
+            
+            # Extract the population ID from the triggered input
+            # Format: {"id":"L4_PV","type":"graph-container"}.n_clicks
+            try:
+                triggered_dict = json.loads(triggered_id.split('.')[0])
+                pop_id = triggered_dict['id']
+            except (KeyError, ValueError, json.JSONDecodeError):
+                return dash.no_update, dash.no_update
+            
+            # Toggle the population in the selection
+            selected_pops = list(selected_pops) if selected_pops else []
+            if pop_id in selected_pops:
+                selected_pops.remove(pop_id)
+            else:
+                selected_pops.append(pop_id)
+            
+            # Update styles for all graph containers
+            updated_styles = []
+            for container_id in container_ids:
+                pop_id_for_style = container_id['id']
+                if pop_id_for_style in selected_pops:
+                    # Selected: grey border
+                    style = {
+                        "display": "inline-block",
+                        "border": "3px solid #7f8c8d",
+                        "transition": "border-color 0.2s",
+                        "cursor": "pointer"
+                    }
+                else:
+                    # Not selected: transparent border
+                    style = {
+                        "display": "inline-block",
+                        "border": "3px solid transparent",
+                        "transition": "border-color 0.2s",
+                        "cursor": "pointer"
+                    }
+                updated_styles.append(style)
+            
+            return selected_pops, updated_styles
     
     def create_parameter_sliders(self):
         """Create the neural parameter sliders section."""
