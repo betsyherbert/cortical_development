@@ -14,7 +14,8 @@ from src.model.config import (
     LAYER_CONNECTIVITY_PARAMS, THALAMIC_ALPHA, CONNECTIONS,
     INITIAL_THALAMIC_WIDTHS, INITIAL_OUTGOING_WIDTHS, 
     INITIAL_TIME_CONSTANTS, CELL_ACTIVITY_COLORS,
-    INITIAL_STRENGTH_SCALING, INITIAL_BACKGROUND_INPUT
+    INITIAL_STRENGTH_SCALING, INITIAL_BACKGROUND_INPUT,
+    CELL_COLORS, LAYER_COLORS as MODEL_LAYER_COLORS
 )
 from src.model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
 from src.analysis.bifurcation.bifurcation_analysis import (
@@ -110,6 +111,21 @@ GRAPH_CONFIG = {'displayModeBar': False}
 # Heatmap scaling constants for fair comparison across all cell types
 HEATMAP_ZMIN = 0.0  # Minimum activity value
 HEATMAP_ZMAX = 1.0  # Maximum activity value (allows for some headroom)
+
+# Correlation plot constants
+CORRELATION_WINDOW_MS = 10000  # Rolling window: 10 seconds
+CORRELATION_DISPLAY_SECONDS = 10  # Display window: 10 seconds
+CORRELATION_UPDATE_INTERVAL = 3  # Update every 3 frames (~180ms)
+CORRELATION_HISTORY_LENGTH = int(CORRELATION_WINDOW_MS / UPDATE_INTERVAL)
+
+# Synchronous event tracking constants (reuse correlation timing)
+SYNCHRONOUS_EVENT_THRESHOLD = 0.2      # From descriptive analysis
+ACTIVITY_THRESHOLD = 0.3                # From descriptive analysis
+
+# Font size constants for consistent aesthetics
+TITLE_FONT_SIZE = 17  # Main section titles (H5 elements)
+SUBTITLE_FONT_SIZE = 14  # Plot titles and subtitles
+AXIS_FONT_SIZE = 13  # Axis titles, tick labels, and legend text
 
 GRAPH_LAYOUT = {
     "margin": dict(l=0, r=0, t=0, b=0),
@@ -329,6 +345,20 @@ class DashboardApp:
         self.activity_history = []  # List of recent mean_rates arrays
         self.history_length = 1    # How many snapshots to average over
         
+        # Correlation tracking
+        self.correlation_activity_buffer = []
+        self.correlation_time_series = {
+            'by_layer': {layer: [] for layer in LAYERS},
+            'by_celltype': {cell_type: [] for cell_type in CELL_TYPES}
+        }
+        self.simulation_time = 0.0
+        
+        # Synchronous event tracking
+        self.event_time_series = {
+            'by_layer': {layer: [] for layer in LAYERS},
+            'by_celltype': {cell_type: [] for cell_type in CELL_TYPES}
+        }
+        
         # Define common outputs for preset callbacks
         self._PRESET_OUTPUTS = [
             Output('tau-e-slider', 'value'),
@@ -476,6 +506,138 @@ class DashboardApp:
         else:
             # Not enough history yet, use instantaneous
             return mean_rates
+    
+    def _update_time_series_data(self, results, time_series_dict):
+        """Update time series data with new results and trim old data."""
+        if results is None:
+            return
+        cutoff_time = self.simulation_time - CORRELATION_DISPLAY_SECONDS
+        for group_key in ['by_layer', 'by_celltype']:
+            for item, value in results[group_key].items():
+                time_series_dict[group_key][item].append((self.simulation_time, value))
+                time_series_dict[group_key][item] = [
+                    (t, v) for t, v in time_series_dict[group_key][item] if t >= cutoff_time
+                ]
+    
+    def _update_time_series_figure(self, fig, items, group_key, time_series_dict):
+        """Update a time series figure with current data."""
+        with fig.batch_update():
+            for i, item in enumerate(items):
+                time_series = time_series_dict[group_key][item]
+                if time_series:
+                    times, values = zip(*time_series)
+                    fig.data[i]['x'] = times
+                    fig.data[i]['y'] = values
+            
+            x_max = max(self.simulation_time, CORRELATION_DISPLAY_SECONDS)
+            x_min = max(0, self.simulation_time - CORRELATION_DISPLAY_SECONDS)
+            fig.update_xaxes(range=[x_min, x_max])
+    
+    def _update_correlation_figures(self):
+        """Update correlation figures with current time series data."""
+        fig_layer = self.figures['correlation-by-layer']
+        fig_celltype = self.figures['correlation-by-celltype']
+        self._update_time_series_figure(fig_layer, LAYERS, 'by_layer', self.correlation_time_series)
+        self._update_time_series_figure(fig_celltype, CELL_TYPES, 'by_celltype', self.correlation_time_series)
+        return fig_layer, fig_celltype
+    
+    def _update_event_figures(self):
+        """Update synchronous event figures with current time series data."""
+        fig_layer = self.figures['events-by-layer']
+        fig_celltype = self.figures['events-by-celltype']
+        self._update_time_series_figure(fig_layer, LAYERS, 'by_layer', self.event_time_series)
+        self._update_time_series_figure(fig_celltype, CELL_TYPES, 'by_celltype', self.event_time_series)
+        return fig_layer, fig_celltype
+    
+    def _compute_group_correlation(self, corr_matrix, indices):
+        """Helper to compute average correlation for a group of cells."""
+        if len(indices) <= 1:
+            return 0.0
+        submatrix = corr_matrix[np.ix_(indices, indices)]
+        mask = np.triu(np.ones_like(submatrix, dtype=bool), k=1)
+        mean_corr = np.mean(submatrix[mask])
+        return 0.0 if not np.isfinite(mean_corr) else float(mean_corr)
+    
+    def _compute_rolling_correlations(self):
+        """Compute pairwise correlations over the rolling activity window."""
+        if len(self.correlation_activity_buffer) < CORRELATION_HISTORY_LENGTH:
+            return None
+        
+        # Collect cell timeseries
+        all_cells, layer_labels, celltype_labels = [], [], []
+        for snapshot in self.correlation_activity_buffer[-CORRELATION_HISTORY_LENGTH:]:
+            for layer in LAYERS:
+                for cell_type in CELL_TYPES:
+                    all_cells.append(snapshot[layer][cell_type].flatten())
+                    layer_labels.append(layer)
+                    celltype_labels.append(cell_type)
+        
+        all_cells = np.array(all_cells)
+        
+        # Return zeros if network inactive
+        if np.max(all_cells) < 1e-6:
+            return {
+                'by_layer': {layer: 0.0 for layer in LAYERS},
+                'by_celltype': {cell_type: 0.0 for cell_type in CELL_TYPES}
+            }
+        
+        # Compute correlation matrix with error suppression
+        with np.errstate(divide='ignore', invalid='ignore'):
+            corr_matrix = np.corrcoef(all_cells)
+        corr_matrix = np.nan_to_num(corr_matrix, nan=0.0, posinf=0.0, neginf=0.0)
+        
+        # Calculate grouped correlations
+        return {
+            'by_layer': {
+                layer: self._compute_group_correlation(
+                    corr_matrix, [i for i, l in enumerate(layer_labels) if l == layer]
+                ) for layer in LAYERS
+            },
+            'by_celltype': {
+                cell_type: self._compute_group_correlation(
+                    corr_matrix, [i for i, ct in enumerate(celltype_labels) if ct == cell_type]
+                ) for cell_type in CELL_TYPES
+            }
+        }
+    
+    def _compute_synchronous_events(self):
+        """Compute synchronous event rates over the rolling activity window."""
+        if len(self.correlation_activity_buffer) < CORRELATION_HISTORY_LENGTH:
+            return None
+        
+        # Build labels once (same for all snapshots)
+        layer_labels, celltype_labels = [], []
+        for layer in LAYERS:
+            for cell_type in CELL_TYPES:
+                layer_labels.append(layer)
+                celltype_labels.append(cell_type)
+        
+        # Collect cell data from buffer
+        all_cells = []
+        for snapshot in self.correlation_activity_buffer[-CORRELATION_HISTORY_LENGTH:]:
+            cells_at_t = []
+            for layer in LAYERS:
+                for cell_type in CELL_TYPES:
+                    cells_at_t.extend(snapshot[layer][cell_type].flatten())
+            all_cells.append(cells_at_t)
+        
+        all_cells = np.array(all_cells)
+        window_seconds = CORRELATION_WINDOW_MS / 1000.0
+        
+        def count_events(data):
+            return sum(1 for t in range(len(data))
+                      if np.mean(data[t] > ACTIVITY_THRESHOLD) > SYNCHRONOUS_EVENT_THRESHOLD) / window_seconds
+        
+        return {
+            'by_layer': {
+                layer: count_events(all_cells[:, np.array([i for i, l in enumerate(layer_labels) if l == layer])])
+                for layer in LAYERS
+            },
+            'by_celltype': {
+                cell_type: count_events(all_cells[:, np.array([i for i, ct in enumerate(celltype_labels) if ct == cell_type])])
+                for cell_type in CELL_TYPES
+            }
+        }
     
     def compute_stability_spectrum(self, preset: dict, selected_pops: Optional[list] = None) -> tuple:
         """
@@ -939,7 +1101,7 @@ class DashboardApp:
                 xref="paper", yref="paper",
                 x=0.5, y=0.5,
                 showarrow=False,
-                font=dict(size=14, color='gray')
+                font=dict(size=SUBTITLE_FONT_SIZE, color='gray')
             )
         
         # Add highlight marker if applicable
@@ -963,16 +1125,18 @@ class DashboardApp:
         title_text = "Stability Spectrum"
         
         fig.update_layout(
-            title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=12)),
+            title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=SUBTITLE_FONT_SIZE)),
             xaxis=dict(
-                title='Spatial frequency k',
+                title=dict(text='Spatial frequency k', font=dict(size=AXIS_FONT_SIZE)),
+                tickfont=dict(size=AXIS_FONT_SIZE),
                 showgrid=True,
                 gridcolor='#e0e0e0',
                 zeroline=False,
                 range=[0, n_modes] if len(k_values) > 0 else [0, 10]
             ),
             yaxis=dict(
-                title='max Re(λ)',
+                title=dict(text='max Re(λ)', font=dict(size=AXIS_FONT_SIZE)),
+                tickfont=dict(size=AXIS_FONT_SIZE),
                 showgrid=True,
                 gridcolor='#e0e0e0',
                 zeroline=True,
@@ -1047,7 +1211,7 @@ class DashboardApp:
                 xref="paper", yref="paper",
                 x=0.5, y=0.5,
                 showarrow=False,
-                font=dict(size=14, color='gray')
+                font=dict(size=SUBTITLE_FONT_SIZE, color='gray')
             )
         
         # Add k value annotation in top right corner (always show)
@@ -1057,7 +1221,7 @@ class DashboardApp:
             x=0.999, y=0.999,
             xanchor='right', yanchor='top',
             showarrow=False,
-            font=dict(size=10, color='black'),
+            font=dict(size=AXIS_FONT_SIZE, color='black'),
             bgcolor='rgba(220, 220, 220, 0.9)',  # Pale grey background
             bordercolor='rgba(180, 180, 180, 0.8)',
             borderwidth=1,
@@ -1068,9 +1232,10 @@ class DashboardApp:
         title_text = "Eigenvalue Spectrum"
         
         fig.update_layout(
-            title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=12)),
+            title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=SUBTITLE_FONT_SIZE)),
             xaxis=dict(
-                title='Re(λ)',
+                title=dict(text='Re(λ)', font=dict(size=AXIS_FONT_SIZE)),
+                tickfont=dict(size=AXIS_FONT_SIZE),
                 showgrid=True,
                 gridcolor='#e0e0e0',
                 zeroline=True,
@@ -1080,7 +1245,8 @@ class DashboardApp:
                 tickvals=[-0.4, 0, 0.4]
             ),
             yaxis=dict(
-                title='Im(λ)',
+                title=dict(text='Im(λ)', font=dict(size=AXIS_FONT_SIZE)),
+                tickfont=dict(size=AXIS_FONT_SIZE),
                 showgrid=True,
                 gridcolor='#e0e0e0',
                 zeroline=True,
@@ -1145,7 +1311,7 @@ class DashboardApp:
                 xref="paper", yref="paper",
                 x=0.5, y=0.5,
                 showarrow=False,
-                font=dict(size=14, color='gray')
+                font=dict(size=SUBTITLE_FONT_SIZE, color='gray')
             )
 
         # Add highlight marker if applicable
@@ -1169,16 +1335,18 @@ class DashboardApp:
         title_text = "Static Gain"
         
         fig.update_layout(
-            title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=12)),
+            title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=SUBTITLE_FONT_SIZE)),
             xaxis=dict(
-                title='Spatial frequency k',
+                title=dict(text='Spatial frequency k', font=dict(size=AXIS_FONT_SIZE)),
+                tickfont=dict(size=AXIS_FONT_SIZE),
                 showgrid=True,
                 gridcolor='#e0e0e0',
                 zeroline=False,
                 range=[0, n_modes] if len(k_values) > 0 else [0, 10]
             ),
             yaxis=dict(
-                title='Gain G(k)',
+                title=dict(text='Gain G(k)', font=dict(size=AXIS_FONT_SIZE)),
+                tickfont=dict(size=AXIS_FONT_SIZE),
                 showgrid=True,
                 gridcolor='#e0e0e0',
                 zeroline=False,
@@ -1222,8 +1390,9 @@ class DashboardApp:
                     title=dict(
                         text='Amplification',
                         side='right',
-                        font=dict(size=12)
+                        font=dict(size=AXIS_FONT_SIZE)
                     ),
+                    tickfont=dict(size=AXIS_FONT_SIZE),
                     len=1.0,
                     thickness=12
                 ),
@@ -1236,7 +1405,7 @@ class DashboardApp:
                 xref="paper", yref="paper",
                 x=0.5, y=0.5,
                 showarrow=False,
-                font=dict(size=14, color='gray')
+                font=dict(size=SUBTITLE_FONT_SIZE, color='gray')
             )
         
         # Configure layout
@@ -1247,14 +1416,16 @@ class DashboardApp:
         title_text = "Spatiotemporal Gain"
         
         fig.update_layout(
-            title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=12)),
+            title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=SUBTITLE_FONT_SIZE)),
             xaxis=dict(
-                title='Spatial freq k',
+                title=dict(text='Spatial freq k', font=dict(size=AXIS_FONT_SIZE)),
+                tickfont=dict(size=AXIS_FONT_SIZE),
                 showgrid=False,
                 range=[0, n_modes] if len(k_values) > 0 else [0, 10]
             ),
             yaxis=dict(
-                title='Temporal freq ω (Hz)',
+                title=dict(text='Temporal freq ω (Hz)', font=dict(size=AXIS_FONT_SIZE)),
+                tickfont=dict(size=AXIS_FONT_SIZE),
                 showgrid=False,
                 range=[0, 1]
             ),
@@ -1265,6 +1436,86 @@ class DashboardApp:
         )
         
         return fig
+    
+    def _create_correlation_figure(self, items, color_map):
+        """Create a correlation line plot figure."""
+        fig = go.Figure()
+        for item in items:
+            fig.add_trace(go.Scatter(
+                x=[0], y=[0], mode='lines', name=item,
+                line=dict(color=color_map[item], width=2)
+            ))
+        
+        fig.update_layout(
+            xaxis=dict(
+                title=dict(text='Time (s)', font=dict(size=AXIS_FONT_SIZE)),
+                tickfont=dict(size=AXIS_FONT_SIZE),
+                range=[0, CORRELATION_DISPLAY_SECONDS], 
+                showgrid=True, 
+                gridcolor='rgba(220, 220, 220, 0.5)'
+            ),
+            yaxis=dict(
+                title=dict(text='Correlation', font=dict(size=AXIS_FONT_SIZE)),
+                tickfont=dict(size=AXIS_FONT_SIZE),
+                range=[0, 1], 
+                showgrid=True, 
+                gridcolor='rgba(220, 220, 220, 0.5)'
+            ),
+            legend=dict(
+                x=0.98, y=0.98, xanchor='right', yanchor='top',
+                bgcolor='rgba(255, 255, 255, 0.9)',
+                bordercolor='rgba(0, 0, 0, 0.3)', borderwidth=1,
+                font=dict(size=AXIS_FONT_SIZE)
+            ),
+            margin=dict(l=60, r=15, t=15, b=40),
+            height=220,
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            showlegend=True
+        )
+        return fig
+    
+    def _initialize_correlation_figures(self):
+        """Initialize correlation line plot figures."""
+        self.figures['correlation-by-layer'] = self._create_correlation_figure(LAYERS, MODEL_LAYER_COLORS)
+        self.figures['correlation-by-celltype'] = self._create_correlation_figure(CELL_TYPES, CELL_COLORS)
+    
+    def _create_event_figure(self, items, color_map):
+        """Create a synchronous event rate line plot figure."""
+        fig = go.Figure()
+        for item in items:
+            fig.add_trace(go.Scatter(
+                x=[0], y=[0], mode='lines', name=item,
+                line=dict(color=color_map[item], width=2)
+            ))
+        
+        fig.update_layout(
+            xaxis=dict(
+                title=dict(text='Time (s)', font=dict(size=AXIS_FONT_SIZE)),
+                tickfont=dict(size=AXIS_FONT_SIZE),
+                range=[0, CORRELATION_DISPLAY_SECONDS], 
+                showgrid=True, 
+                gridcolor='rgba(220, 220, 220, 0.5)'
+            ),
+            yaxis=dict(
+                title=dict(text='Events/s', font=dict(size=AXIS_FONT_SIZE)),
+                tickfont=dict(size=AXIS_FONT_SIZE),
+                range=[0, 5], 
+                showgrid=True,
+                gridcolor='rgba(220, 220, 220, 0.5)'
+            ),
+            margin=dict(l=60, r=15, t=15, b=40),
+            height=220,
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            showlegend=False
+        )
+        return fig
+    
+    def _initialize_event_figures(self):
+        """Initialize synchronous event line plot figures."""
+        self.figures['events-by-layer'] = self._create_event_figure(LAYERS, MODEL_LAYER_COLORS)
+        self.figures['events-by-celltype'] = self._create_event_figure(CELL_TYPES, CELL_COLORS)
     
     def _initialize_figures(self):
         """Pre-create all heatmap figures for better performance."""
@@ -1279,6 +1530,12 @@ class DashboardApp:
         
         # Create thalamus figure
         self.figures['graph-thalamus'] = self.create_heatmap(empty_data, 'thalamus')
+        
+        # Create correlation figures
+        self._initialize_correlation_figures()
+        
+        # Create event figures
+        self._initialize_event_figures()
     
     def _create_preset_buttons(self):
         """Create the preset buttons row."""
@@ -1316,7 +1573,9 @@ class DashboardApp:
                         html.H6("Th",
                                style={
                                    "margin": "0",
-                                   "whiteSpace": "nowrap"  # Prevent text wrapping
+                                   "whiteSpace": "nowrap",  # Prevent text wrapping
+                                   "fontSize": f"{SUBTITLE_FONT_SIZE}px",
+                                   "fontWeight": "600"
                                })
                     ], style={
                         "display": "flex",
@@ -1330,11 +1589,13 @@ class DashboardApp:
                 # Thalamus heatmap
                 dbc.Col([
                     html.Div([
-                        dcc.Graph(
-                            id='graph-thalamus',
-                            figure=self.figures['graph-thalamus'],
-                            config=GRAPH_CONFIG
-                        )
+                        html.Div([
+                            dcc.Graph(
+                                id='graph-thalamus',
+                                figure=self.figures['graph-thalamus'],
+                                config=GRAPH_CONFIG
+                            )
+                        ], style={"display": "inline-block", "border": "3px solid #7f8c8d"})
                     ], style={"display": "flex", "justifyContent": "center"})
                 ], width=10)
             ], className="align-items-center")
@@ -1344,7 +1605,7 @@ class DashboardApp:
         """Create the activity visualization section."""
         return dbc.Col([
             # Add more top padding to shift visualization down
-            html.Div(style={"height": "20px"}),
+            html.Div(style={"height": "10px"}),
             
             # Preset Buttons
             self._create_preset_buttons(),
@@ -1367,18 +1628,102 @@ class DashboardApp:
                             children="Click heatmaps to select populations for analysis",
                             style={
                                 "textAlign": "center",
-                                "padding": "10px 16px",
+                                "padding": "8px 14px",
                                 "backgroundColor": "#e0e0e0",  # Light grey
                                 "borderColor": "#e0e0e0",
                                 "borderRadius": "4px",
-                                "fontSize": "15px",
+                                "fontSize": f"{SUBTITLE_FONT_SIZE}px",
                                 "color": "black",  # Black text
                                 "fontWeight": "500"
                             }
                         )
                     ], width=10)
                 ])
-            ], className="mt-3")
+            ], className="mt-2"),
+            
+            # Correlation plots
+            html.Div([
+                # Title
+                dbc.Row([
+                    dbc.Col(width=2),  # Empty column for alignment
+                    dbc.Col([
+                        html.H5("Pairwise Correlation",
+                                className="mb-2 text-center",
+                                style={
+                                    "textAlign": "center",
+                                    "marginTop": "20px",
+                                    "fontSize": f"{TITLE_FONT_SIZE}px",
+                                    "fontWeight": "600"
+                                })
+                    ], width=10)
+                ]),
+                # Plots row
+                dbc.Row([
+                    dbc.Col(width=2),  # Empty column for alignment
+                    dbc.Col([
+                        dbc.Row([
+                            dbc.Col([
+                                dcc.Graph(
+                                    id='correlation-by-layer',
+                                    figure=self.figures['correlation-by-layer'],
+                                    config=GRAPH_CONFIG,
+                                    style={"height": "100%"}
+                                )
+                            ], width=6),
+                            dbc.Col([
+                                dcc.Graph(
+                                    id='correlation-by-celltype',
+                                    figure=self.figures['correlation-by-celltype'],
+                                    config=GRAPH_CONFIG,
+                                    style={"height": "100%"}
+                                )
+                            ], width=6)
+                        ])
+                    ], width=10)
+                ])
+            ], className="mt-1"),
+            
+            # Synchronous event plots
+            html.Div([
+                # Title
+                dbc.Row([
+                    dbc.Col(width=2),  # Empty column for alignment
+                    dbc.Col([
+                        html.H5("Large Synchronous Events",
+                                className="mb-2 text-center",
+                                style={
+                                    "textAlign": "center",
+                                    "marginTop": "20px",
+                                    "fontSize": f"{TITLE_FONT_SIZE}px",
+                                    "fontWeight": "600"
+                                })
+                    ], width=10)
+                ]),
+                # Plots row
+                dbc.Row([
+                    dbc.Col(width=2),  # Empty column for alignment
+                    dbc.Col([
+                        dbc.Row([
+                            dbc.Col([
+                                dcc.Graph(
+                                    id='events-by-layer',
+                                    figure=self.figures['events-by-layer'],
+                                    config=GRAPH_CONFIG,
+                                    style={"height": "100%"}
+                                )
+                            ], width=6),
+                            dbc.Col([
+                                dcc.Graph(
+                                    id='events-by-celltype',
+                                    figure=self.figures['events-by-celltype'],
+                                    config=GRAPH_CONFIG,
+                                    style={"height": "100%"}
+                                )
+                            ], width=6)
+                        ])
+                    ], width=10)
+                ])
+            ], className="mt-1")
         ], width=4, className="px-4")
 
     def _create_connectivity_matrix(self):
@@ -1392,7 +1737,9 @@ class DashboardApp:
                            "textAlign": "center",
                            "width": "85%",  # Match matrix container width
                            "margin": "0 auto",  # Center the title
-                           "paddingLeft": "50px"  # Match matrix container padding
+                           "paddingLeft": "50px",  # Match matrix container padding
+                           "fontSize": f"{TITLE_FONT_SIZE}px",
+                           "fontWeight": "600"
                        }),
                 
                 # Connection Matrix Container
@@ -1423,7 +1770,9 @@ class DashboardApp:
                        style={
                            "textAlign": "center",
                            "width": "95%",
-                           "margin": "0 auto"
+                           "margin": "0 auto",
+                           "fontSize": f"{TITLE_FONT_SIZE}px",
+                           "fontWeight": "600"
                        }),
                 dbc.Row([
                     dbc.Col([
@@ -1452,7 +1801,9 @@ class DashboardApp:
                        style={
                            "textAlign": "center",
                            "width": "95%",
-                           "margin": "0 auto"
+                           "margin": "0 auto",
+                           "fontSize": f"{TITLE_FONT_SIZE}px",
+                           "fontWeight": "600"
                        }),
                 dbc.Row([
                     dbc.Col([
@@ -1549,7 +1900,9 @@ class DashboardApp:
                         html.H6(LAYER_NAMES[layer],
                                style={
                                    "margin": "0",
-                                   "whiteSpace": "nowrap"  # Prevent text wrapping
+                                   "whiteSpace": "nowrap",  # Prevent text wrapping
+                                   "fontSize": f"{SUBTITLE_FONT_SIZE}px",
+                                   "fontWeight": "600"
                                })
                     ], style={
                         "display": "flex",
@@ -1582,8 +1935,8 @@ class DashboardApp:
                         "width": "100%"
                     })
                 ], width=10)
-            ], className="align-items-center", style={"height": "118px"}),
-            className="mb-5"
+            ], className="align-items-center", style={"height": "155px"}),
+            className="mb-4"
         )
 
     def create_heatmap(self, data: np.ndarray, cell_type: str) -> go.Figure:
@@ -2421,7 +2774,11 @@ class DashboardApp:
             [Output({'type': 'graph', 'id': f'{layer}_{cell_type}'}, 'figure')
              for layer in LAYERS
              for cell_type in CELL_TYPES] +
-            [Output('graph-thalamus', 'figure')],
+            [Output('graph-thalamus', 'figure'),
+             Output('correlation-by-layer', 'figure'),
+             Output('correlation-by-celltype', 'figure'),
+             Output('events-by-layer', 'figure'),
+             Output('events-by-celltype', 'figure')],
             
             # Inputs: interval trigger, alpha slider, time constant sliders, connectivity width sliders
             [Input('interval-component', 'n_intervals'),
@@ -2447,9 +2804,14 @@ class DashboardApp:
             is_paused = pause_clicks is not None and pause_clicks % 2 == 1
             if is_paused:
                 # Return current figures without updating if paused
-                return [self.figures[f'graph-{layer}-{cell_type}'] 
+                return ([self.figures[f'graph-{layer}-{cell_type}'] 
                         for layer in LAYERS
-                        for cell_type in CELL_TYPES] + [self.figures['graph-thalamus']]
+                        for cell_type in CELL_TYPES] + 
+                        [self.figures['graph-thalamus'],
+                         self.figures['correlation-by-layer'],
+                         self.figures['correlation-by-celltype'],
+                         self.figures['events-by-layer'],
+                         self.figures['events-by-celltype']])
             
             # Update neuron parameters
             self.simulation.set_time_constant('E', tau_e)
@@ -2505,6 +2867,31 @@ class DashboardApp:
                 thal_fig.update_traces(zmin=HEATMAP_ZMIN, zmax=HEATMAP_ZMAX)
             
             updated_figures.append(thal_fig)
+            
+            # Update correlation tracking
+            self.simulation_time += UPDATE_INTERVAL / 1000.0
+            self.correlation_activity_buffer.append(activities)
+            if len(self.correlation_activity_buffer) > CORRELATION_HISTORY_LENGTH + 10:
+                self.correlation_activity_buffer.pop(0)
+            
+            # Compute correlations and events every N updates for efficiency
+            if n_intervals % CORRELATION_UPDATE_INTERVAL == 0:
+                self._update_time_series_data(
+                    self._compute_rolling_correlations(), 
+                    self.correlation_time_series
+                )
+                self._update_time_series_data(
+                    self._compute_synchronous_events(), 
+                    self.event_time_series
+                )
+            
+            # Update correlation figures (always, for smooth rendering)
+            corr_fig_layer, corr_fig_celltype = self._update_correlation_figures()
+            updated_figures.extend([corr_fig_layer, corr_fig_celltype])
+            
+            # Update event figures
+            event_fig_layer, event_fig_celltype = self._update_event_figures()
+            updated_figures.extend([event_fig_layer, event_fig_celltype])
             
             return updated_figures
         
@@ -2596,7 +2983,7 @@ class DashboardApp:
                         xref="paper", yref="paper",
                         x=0.5, y=0.5,
                         showarrow=False,
-                        font=dict(size=14, color='gray')
+                        font=dict(size=SUBTITLE_FONT_SIZE, color='gray')
                     )
                     fig.update_layout(
                         xaxis=dict(visible=False),
@@ -2662,7 +3049,7 @@ class DashboardApp:
                         xref="paper", yref="paper",
                         x=0.5, y=0.5,
                         showarrow=False,
-                        font=dict(size=14, color='gray')
+                        font=dict(size=SUBTITLE_FONT_SIZE, color='gray')
                     )
                     fig.update_layout(
                         xaxis=dict(visible=False),
@@ -2841,12 +3228,6 @@ class DashboardApp:
     def create_strength_scaling_sliders(self):
         """Create the connection strength scaling sliders section."""
         return html.Div([
-            # Headers row
-            dbc.Row([
-                dbc.Col("", width=1),
-                dbc.Col(html.Div("Strength Scaling", className="text-center"), width=11),
-            ], className="mb-1"),
-            
             # Strength scaling rows
             *[self._create_strength_scaling_row(cell_type) for cell_type in CELL_TYPES],
             
@@ -2909,23 +3290,27 @@ class DashboardApp:
         return html.Div([
             # Section: Neuron parameters
             html.Div([
-                html.H5("Neuron Parameters", className="text-center"),
+                html.H5("Neuron Parameters", className="text-center",
+                        style={"fontSize": f"{TITLE_FONT_SIZE}px", "fontWeight": "600"}),
                 self.create_parameter_sliders()
             ], className="mb-3"),
             
             # Section: Connectivity widths
             html.Div([
-                html.H5("Connection Widths", className="text-center"),
+                html.H5("Connection Widths", className="text-center",
+                        style={"fontSize": f"{TITLE_FONT_SIZE}px", "fontWeight": "600"}),
                 self.create_connectivity_sliders(),
                 
                 # Section for strength scaling
                 html.Div([html.Hr()], className="my-3"),
-                html.H5("Strength Scaling", className="text-center"),
+                html.H5("Strength Scaling", className="text-center",
+                        style={"fontSize": f"{TITLE_FONT_SIZE}px", "fontWeight": "600"}),
                 self.create_strength_scaling_sliders(),
                 
                 # Section for thalamic input balance
                 html.Div([html.Hr()], className="my-3"),
-                html.H5("Thalamic Input", className="text-center"),
+                html.H5("Thalamic Input", className="text-center",
+                        style={"fontSize": f"{TITLE_FONT_SIZE}px", "fontWeight": "600"}),
                 self.create_input_controls()
             ], className="mb-3"),
             
