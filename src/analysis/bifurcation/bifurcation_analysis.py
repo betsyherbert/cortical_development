@@ -276,8 +276,8 @@ class SteadyStateFinder:
         else:
             external_input = self.network.mu + thalamic_input
         
-        # Damping parameter for stability near criticality
-        alpha = 0.25
+        # Conservative fixed damping for stability near criticality
+        alpha = 0.05  # Small fixed step size for stable convergence
         
         for _ in range(self.max_iters):
             # Compute input: A @ r + external_input
@@ -287,15 +287,13 @@ class SteadyStateFinder:
             
             # Check for divergence
             if np.any(r_new_raw > 1e10):
-                # Network is diverging - return zero state with clear status
                 return np.zeros(n), 'diverged'
             
-            # Apply damping for stability near criticality: r ← (1-α)r + αr_new
+            # Apply damping: r ← (1-α)r + αr_new
             r_new = (1 - alpha) * r + alpha * r_new_raw
             
-            # Check convergence (strict criterion)
-            change = np.abs(r_new - r)
-            if np.all(change < self.tol):
+            # Check convergence
+            if np.all(np.abs(r_new - r) < self.tol):
                 return r_new, 'converged'
             
             r = r_new
@@ -559,3 +557,100 @@ class StabilityAnalyzer:
             'gain_profile': gain_profile,
             'max_real_profile': max_real_profile
         }
+
+
+def extract_mean_driven_state(preset: Dict, duration: float = 10.0, 
+                               burn_in: float = 2.0, seed: Optional[int] = None) -> np.ndarray:
+    """
+    Extract time-averaged mean firing rates from a simulation run.
+    
+    This function runs a simulation with the given preset parameters and thalamic input,
+    then computes the temporal average of spatial mean firing rates over the last
+    (duration - burn_in) seconds. This provides a representative operating point for
+    linearization in stability analysis.
+    
+    Args:
+        preset: Developmental preset dictionary containing all network parameters
+        duration: Total simulation duration in seconds (default: 10.0)
+        burn_in: Initial period to discard in seconds (default: 2.0)
+        seed: Random seed for reproducibility (if None, uses default from config)
+        
+    Returns:
+        Array of shape (9,) containing spatial mean firing rates for all populations:
+        [L23_E, L23_SST, L23_PV, L4_E, L4_SST, L4_PV, L5_E, L5_SST, L5_PV]
+    """
+    from src.model.neurons import CorticalCircuit
+    from src.model.thalamus import ThalamicInput
+    from src.model.config import GRID_SIZE, DT, seed_random
+    
+    # Set random seed for reproducibility
+    if seed is not None:
+        seed_random(seed)
+    else:
+        seed_random()  # Uses default seed from config
+    
+    # Initialize circuit with preset parameters
+    circuit = CorticalCircuit(grid_size=GRID_SIZE)
+    
+    # Apply preset parameters
+    for cell_type in ['E', 'SST', 'PV']:
+        # Set time constants
+        tau = preset['time_constants'][cell_type]
+        circuit.set_time_constant(cell_type, tau)
+        
+        # Set gains
+        gain = preset['gains'][cell_type]
+        circuit.set_gain(cell_type, gain)
+        
+        # Set background inputs
+        bg_input = preset['background_input'][cell_type]
+        circuit.set_background_input(cell_type, bg_input)
+    
+    # Set connectivity parameters
+    circuit.connectivity.strength_scaling = preset['strength_scaling'].copy()
+    circuit.connectivity.update_weights()
+    
+    # Initialize thalamus
+    thalamus = ThalamicInput(grid_size=GRID_SIZE)
+    
+    # Get thalamic alpha parameter
+    thalamic_alpha = preset.get('thalamic_alpha', 0.5)
+    
+    # Calculate number of time steps
+    n_steps = int(duration * 1000 / DT)  # Convert seconds to milliseconds, divide by DT
+    burn_in_steps = int(burn_in * 1000 / DT)
+    
+    # Accumulators for time-averaged rates
+    accumulated_rates = np.zeros(9)  # 3 layers × 3 cell types
+    n_accumulated = 0
+    
+    # Integration steps per update (from config)
+    from src.model.config import INTEGRATION_STEPS
+    
+    # Run simulation
+    for step in range(n_steps):
+        # Update thalamic input
+        circuit.thalamus = thalamus.update(thalamic_alpha, n_steps=INTEGRATION_STEPS)
+        
+        # Update circuit
+        circuit.update(n_steps=INTEGRATION_STEPS)
+        
+        # After burn-in, accumulate spatial mean rates
+        if step >= burn_in_steps:
+            activities = circuit.get_layer_activities()
+            idx = 0
+            for layer in ['L23', 'L4', 'L5']:
+                for cell_type in ['E', 'SST', 'PV']:
+                    spatial_mean = activities[layer][cell_type].mean()
+                    accumulated_rates[idx] += spatial_mean
+                    idx += 1
+            n_accumulated += 1
+    
+    # Compute temporal average
+    if n_accumulated > 0:
+        mean_rates = accumulated_rates / n_accumulated
+    else:
+        # Fallback if no steps accumulated (shouldn't happen with valid parameters)
+        mean_rates = np.zeros(9)
+    
+    return mean_rates

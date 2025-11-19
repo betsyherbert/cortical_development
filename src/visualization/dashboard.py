@@ -115,7 +115,7 @@ HEATMAP_ZMAX = 1.0  # Maximum activity value (allows for some headroom)
 # Correlation plot constants
 CORRELATION_WINDOW_MS = 10000  # Rolling window: 10 seconds
 CORRELATION_DISPLAY_SECONDS = 10  # Display window: 10 seconds
-CORRELATION_UPDATE_INTERVAL = 3  # Update every 3 frames (~180ms)
+CORRELATION_UPDATE_INTERVAL = 5  # Update every 5 frames (~300ms) to reduce computational load
 CORRELATION_HISTORY_LENGTH = int(CORRELATION_WINDOW_MS / UPDATE_INTERVAL)
 
 # Synchronous event tracking constants (reuse correlation timing)
@@ -251,6 +251,10 @@ class DashboardApp:
         """
         self.simulation = simulation
         self.update_interval = update_interval
+        
+        # Flags to prevent concurrent expensive computations
+        self._computing_stability = False
+        self._computing_forced_response = False
         
         # Initialize the Dash app with light theme
         self.app = dash.Dash(
@@ -1839,7 +1843,7 @@ class DashboardApp:
         # Add slower interval for stability spectrum updates
         spectrum_interval = dcc.Interval(
             id='spectrum-interval',
-            interval=200,  # How often to update spectrum
+            interval=1000,  # How often to update spectrum (1 second for expensive computations)
             n_intervals=0,
             disabled=False
         )
@@ -2780,26 +2784,26 @@ class DashboardApp:
              Output('events-by-layer', 'figure'),
              Output('events-by-celltype', 'figure')],
             
-            # Inputs: interval trigger, alpha slider, time constant sliders, connectivity width sliders
-            [Input('interval-component', 'n_intervals'),
-             Input('alpha-slider', 'value'),
-             Input('tau-e-slider', 'value'),
-             Input('tau-sst-slider', 'value'),
-             Input('tau-pv-slider', 'value'),
-             Input('thalamic-width-e-slider', 'value'),
-             Input('thalamic-width-sst-slider', 'value'),
-             Input('thalamic-width-pv-slider', 'value'),
-             Input('outgoing-width-e-slider', 'value'),
-             Input('outgoing-width-sst-slider', 'value'),
-             Input('outgoing-width-pv-slider', 'value')],
+            # Input: only interval trigger (parameter sliders update state via separate callbacks)
+            [Input('interval-component', 'n_intervals')],
             
-            # States: pause button state
-            [State('pause-button', 'n_clicks')]
+            # States: all parameters and pause button state
+            [State('alpha-slider', 'value'),
+             State('tau-e-slider', 'value'),
+             State('tau-sst-slider', 'value'),
+             State('tau-pv-slider', 'value'),
+             State('thalamic-width-e-slider', 'value'),
+             State('thalamic-width-sst-slider', 'value'),
+             State('thalamic-width-pv-slider', 'value'),
+             State('outgoing-width-e-slider', 'value'),
+             State('outgoing-width-sst-slider', 'value'),
+             State('outgoing-width-pv-slider', 'value'),
+             State('pause-button', 'n_clicks')]
         )
         def update_graphs(n_intervals, alpha, tau_e, tau_sst, tau_pv, # pylint: disable=unused-argument
                          sigma_thal_e, sigma_thal_sst, sigma_thal_pv, 
                          sigma_e_out, sigma_sst_out, sigma_pv_out, pause_clicks):  
-            """Update all graphs based on current slider values."""
+            """Update all graphs based on current simulation state."""
             # Check if simulation is paused
             is_paused = pause_clicks is not None and pause_clicks % 2 == 1
             if is_paused:
@@ -2871,8 +2875,11 @@ class DashboardApp:
             # Update correlation tracking
             self.simulation_time += UPDATE_INTERVAL / 1000.0
             self.correlation_activity_buffer.append(activities)
-            if len(self.correlation_activity_buffer) > CORRELATION_HISTORY_LENGTH + 10:
-                self.correlation_activity_buffer.pop(0)
+            # Keep buffer size limited to prevent memory issues
+            max_buffer_size = CORRELATION_HISTORY_LENGTH + 10
+            if len(self.correlation_activity_buffer) > max_buffer_size:
+                # Remove oldest entries to maintain buffer size
+                self.correlation_activity_buffer = self.correlation_activity_buffer[-max_buffer_size:]
             
             # Compute correlations and events every N updates for efficiency
             if n_intervals % CORRELATION_UPDATE_INTERVAL == 0:
@@ -2947,33 +2954,23 @@ class DashboardApp:
             # Return unchanged intervals to not disrupt the update loop
             return [n_intervals]
         
-        # Update stability spectrum and eigenvalue spectrum when parameters change or periodically
+        # Update stability spectrum and eigenvalue spectrum periodically only
+        # Remove parameter inputs to prevent multiple rapid firings on preset changes
         @self.app.callback(
             [Output('stability-spectrum-graph', 'figure'),
              Output('eigenvalue-spectrum-graph', 'figure')],
             [Input('spectrum-interval', 'n_intervals'),
-             Input('selected-populations', 'data'),
-             Input('tau-e-slider', 'value'),
-             Input('tau-sst-slider', 'value'),
-             Input('tau-pv-slider', 'value'),
-             Input('background-input-e-slider', 'value'),
-             Input('background-input-sst-slider', 'value'),
-             Input('background-input-pv-slider', 'value'),
-             Input('thalamic-width-e-slider', 'value'),
-             Input('thalamic-width-sst-slider', 'value'),
-             Input('thalamic-width-pv-slider', 'value'),
-             Input('outgoing-width-e-slider', 'value'),
-             Input('outgoing-width-sst-slider', 'value'),
-             Input('outgoing-width-pv-slider', 'value'),
-             Input('strength-scaling-e-slider', 'value'),
-             Input('strength-scaling-sst-slider', 'value'),
-             Input('strength-scaling-pv-slider', 'value'),
-             Input('strength-scaling-thalamus-slider', 'value'),
-             Input({'type': 'matrix-slider', 'id': ALL}, 'value')]
+             Input('selected-populations', 'data')]
         )
-        def update_stability_spectrum(n_intervals, selected_pops, *args):  # pylint: disable=unused-argument
-            """Update the stability spectrum and eigenvalue spectrum graphs when parameters change or periodically."""
+        def update_stability_spectrum(n_intervals, selected_pops):  # pylint: disable=unused-argument
+            """Update the stability spectrum and eigenvalue spectrum graphs periodically."""
+            # Prevent concurrent computation
+            if self._computing_stability:
+                return dash.no_update, dash.no_update
+            
             try:
+                self._computing_stability = True
+                
                 # Check if any populations are selected
                 if not selected_pops or len(selected_pops) == 0:
                     # Return empty figures with message
@@ -3012,34 +3009,26 @@ class DashboardApp:
                 empty_stability = self.create_stability_spectrum_figure(np.array([]), np.array([]))
                 empty_eigenvalue = self.create_eigenvalue_spectrum_figure(np.array([]), 0.0)
                 return empty_stability, empty_eigenvalue
+            finally:
+                self._computing_stability = False
         
-        # Update forced response graphs when parameters change or periodically
+        # Update forced response graphs periodically only
+        # Remove parameter inputs to prevent multiple rapid firings on preset changes
         @self.app.callback(
             [Output('static-gain-graph', 'figure'),
              Output('spatiotemporal-gain-graph', 'figure')],
             [Input('spectrum-interval', 'n_intervals'),
-             Input('selected-populations', 'data'),
-             Input('tau-e-slider', 'value'),
-             Input('tau-sst-slider', 'value'),
-             Input('tau-pv-slider', 'value'),
-             Input('background-input-e-slider', 'value'),
-             Input('background-input-sst-slider', 'value'),
-             Input('background-input-pv-slider', 'value'),
-             Input('thalamic-width-e-slider', 'value'),
-             Input('thalamic-width-sst-slider', 'value'),
-             Input('thalamic-width-pv-slider', 'value'),
-             Input('outgoing-width-e-slider', 'value'),
-             Input('outgoing-width-sst-slider', 'value'),
-             Input('outgoing-width-pv-slider', 'value'),
-             Input('strength-scaling-e-slider', 'value'),
-             Input('strength-scaling-sst-slider', 'value'),
-             Input('strength-scaling-pv-slider', 'value'),
-             Input('strength-scaling-thalamus-slider', 'value'),
-             Input({'type': 'matrix-slider', 'id': ALL}, 'value')]
+             Input('selected-populations', 'data')]
         )
-        def update_forced_response(n_intervals, selected_pops, *args):  # pylint: disable=unused-argument
-            """Update the forced response graphs when parameters change or periodically."""
+        def update_forced_response(n_intervals, selected_pops):  # pylint: disable=unused-argument
+            """Update the forced response graphs periodically."""
+            # Prevent concurrent computation
+            if self._computing_forced_response:
+                return dash.no_update, dash.no_update
+            
             try:
+                self._computing_forced_response = True
+                
                 # Check if any populations are selected
                 if not selected_pops or len(selected_pops) == 0:
                     # Return empty figures with message
@@ -3078,6 +3067,8 @@ class DashboardApp:
                 empty_static = self.create_static_gain_figure(np.array([]), np.array([]))
                 empty_st = self.create_spatiotemporal_gain_figure(np.array([]), np.array([]), np.array([]))
                 return empty_static, empty_st
+            finally:
+                self._computing_forced_response = False
         
         # Handle heatmap clicks for population selection using n_clicks on containers
         @self.app.callback(
