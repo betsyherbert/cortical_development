@@ -1,21 +1,80 @@
-"""Core bifurcation analysis implementation.
+"""Core infrastructure for bifurcation analysis.
 
-This module implements linear stability analysis for network models,
-computing steady states and determining network stability through eigenvalue analysis.
+This module provides the fundamental classes and utilities for network stability
+and gain analysis, including network parameter extraction, steady state finding,
+and stability computation through eigenvalue analysis.
 """
 
 import numpy as np
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, List
 
 from .config import ANALYSIS_PARAMS
 
+
+# ============================================================================
+# Utility Functions
+# ============================================================================
+
+def set_nested_value(d: Dict, path: List[str], value: float) -> None:
+    """Set nested dictionary value via path.
+    
+    Args:
+        d: Dictionary to modify
+        path: List of keys representing path (e.g., ['time_constants', 'E'])
+        value: Value to set
+    """
+    for key in path[:-1]:
+        d = d[key]
+    d[path[-1]] = value
+
+
+def get_nested_value(d: Dict, path: List[str]) -> float:
+    """Get nested dictionary value via path.
+    
+    Args:
+        d: Dictionary to access
+        path: List of keys representing path
+        
+    Returns:
+        Value at the specified path
+    """
+    for key in path:
+        d = d[key]
+    return d
+
+
+def compute_B_fourier(network: 'NetworkModel', k_squared: float, domain_length: float) -> np.ndarray:
+    """Compute thalamic input B(k) in Fourier space with Gaussian spatial filtering.
+    
+    Args:
+        network: NetworkModel instance containing thalamic parameters
+        k_squared: Square of the wavenumber k
+        domain_length: Domain length for normalization
+        
+    Returns:
+        B(k): Thalamic input vector in Fourier space (length = number of populations)
+    """
+    total_pops = len(network.thalamic_strengths)
+    B_k = np.zeros(total_pops)
+    
+    for i in range(total_pops):
+        # Normalize thalamic width by domain length
+        sigma_thal_i = network.thalamic_widths[i] / domain_length
+        # Apply Gaussian spatial filtering: B[i] = strength * exp(-2π²k²σ²)
+        B_k[i] = network.thalamic_strengths[i] * np.exp(-2 * np.pi**2 * k_squared * sigma_thal_i**2)
+    
+    return B_k
+
+
+# ============================================================================
+# Core Classes
+# ============================================================================
 
 class NetworkModel:
     """Handles network dynamics for single or multiple layers with E-SST-PV populations."""
     
     def __init__(self, preset: Dict, layers: list = None):
-        """
-        Initialize network from preset.
+        """Initialize network from preset.
         
         Args:
             preset: Developmental preset dictionary (e.g., P4_PRESET)
@@ -65,8 +124,7 @@ class NetworkModel:
         self.gain = np.tile(gain_per_layer, len(self.layers))
     
     def _extract_connection_strengths(self):
-        """
-        Extract connection strengths for all layer pairs, building block-structured matrix.
+        """Extract connection strengths for all layer pairs, building block-structured matrix.
         
         Strength scaling is applied column-wise (per source cell type).
         Connection strengths from presets include signs (inhibitory = negative).
@@ -97,8 +155,7 @@ class NetworkModel:
     
     def _extract_layer_pair_block(self, layer_src: str, layer_tgt: str, 
                                    scaling_e: float, scaling_sst: float, scaling_pv: float) -> np.ndarray:
-        """
-        Extract connection strength block for one layer pair.
+        """Extract connection strength block for one layer pair.
         
         Connection strengths are read directly from preset with signs included.
         Inhibitory connections (SST→*, PV→*) should be negative in presets.
@@ -197,8 +254,7 @@ class NetworkModel:
         self.thalamic_widths = np.tile(thalamic_widths_per_layer, len(self.layers))
     
     def compute_thalamic_input(self, input_magnitude: float) -> np.ndarray:
-        """
-        Compute spatially-averaged thalamic drive.
+        """Compute spatially-averaged thalamic drive.
         
         Args:
             input_magnitude: Scalar magnitude of thalamic input
@@ -237,8 +293,7 @@ class SteadyStateFinder:
     """Finds the spatially uniform steady state of the network."""
     
     def __init__(self, network: NetworkModel, tol: float = None, max_iters: int = None):
-        """
-        Initialize steady state finder.
+        """Initialize steady state finder.
         
         Args:
             network: NetworkModel instance
@@ -250,8 +305,7 @@ class SteadyStateFinder:
         self.max_iters = max_iters if max_iters is not None else ANALYSIS_PARAMS['max_iters']
     
     def find_steady_state(self, thalamic_input: Optional[np.ndarray] = None) -> Tuple[np.ndarray, str]:
-        """
-        Find the spatially uniform steady state.
+        """Find the spatially uniform steady state.
         
         For thalamic-driven mode, this computes the spatially uniform mean firing rate
         during thalamic input epochs. This captures the mean depolarization but not
@@ -308,8 +362,7 @@ class StabilityAnalyzer:
     
     def __init__(self, network: NetworkModel, steady_state: np.ndarray, 
                  n_modes: int = None, threshold: float = 1e-10):
-        """
-        Initialize stability analyzer.
+        """Initialize stability analyzer.
         
         Args:
             network: NetworkModel instance
@@ -328,8 +381,7 @@ class StabilityAnalyzer:
         self.g_eff = self._compute_effective_gains()
     
     def _compute_effective_gains(self) -> np.ndarray:
-        """
-        Compute effective gains based on operating point.
+        """Compute effective gains based on operating point.
         
         For ReLU nonlinearity, the linearization around an operating point
         has gain equal to the slope only for active units.
@@ -343,8 +395,7 @@ class StabilityAnalyzer:
         return g_eff
     
     def build_jacobian(self, n1: int, n2: int) -> np.ndarray:
-        """
-        Build n×n Jacobian matrix for Fourier mode (n1, n2).
+        """Build n×n Jacobian matrix for Fourier mode (n1, n2).
         
         Args:
             n1: Fourier mode index in first dimension
@@ -355,7 +406,7 @@ class StabilityAnalyzer:
         """
         k_squared = n1**2 + n2**2
         grid_size = ANALYSIS_PARAMS['grid_size']
-        domain_length = ANALYSIS_PARAMS.get('domain_length', grid_size)  # Use grid_size as fallback for backward compatibility
+        domain_length = ANALYSIS_PARAMS.get('domain_length', grid_size)
         
         # Total number of populations (all layers)
         n = len(self.network.tau)
@@ -385,8 +436,7 @@ class StabilityAnalyzer:
         return J
     
     def compute_stability(self, verbose: bool = False) -> Tuple[float, Tuple[int, int], float, float]:
-        """
-        Compute stability by finding maximum real part of eigenvalues.
+        """Compute stability by finding maximum real part of eigenvalues.
         
         Args:
             verbose: If True, print diagnostic information
@@ -433,224 +483,4 @@ class StabilityAnalyzer:
             print(f"  [Stability] Distance to instability: {distance_to_instability:.6f}")
         
         return distance_to_instability, critical_mode, critical_k, wavelength
-    
-    def compute_forced_response(self, B: np.ndarray, verbose: bool = False) -> Dict:
-        """
-        Compute forced response gain by finding the Fourier mode with maximum static gain.
-        
-        The forced response gain is computed as ||J(k)⁻¹ @ B_norm||, where B_norm is
-        the normalized thalamic input vector and J(k) is the Jacobian for Fourier mode k.
-        
-        Args:
-            B: Thalamic input vector (array of connection strengths)
-            verbose: If True, print diagnostic information
-        
-        Returns:
-            Dictionary containing forced response diagnostics:
-            - 'max_gain': Maximum forced response gain across all modes
-            - 'critical_mode': (n₁, n₂) tuple of the mode with maximum gain
-            - 'critical_k': k value (sqrt(n₁² + n₂²)) of the critical mode
-            - 'max_condition': Maximum condition number encountered
-            - 'k_values': Sorted array of unique k magnitudes evaluated
-            - 'gain_profile': Gain for each k (maximum across degenerate modes)
-            - 'max_real_profile': Max real part of eigenvalues for each k
-        """
-        # Normalize B once per analysis call
-        B_norm_vec = np.linalg.norm(B)
-        if B_norm_vec < 1e-10:
-            # Zero thalamic input - return NaN values
-            if verbose:
-                print(f"  [ForcedResponse] Zero thalamic input (||B||={B_norm_vec:.2e}), skipping analysis")
-            return {
-                'max_gain': np.nan,
-                'critical_mode': (0, 0),
-                'critical_k': 0.0,
-                'max_condition': np.nan,
-                'k_values': np.array([]),
-                'gain_profile': np.array([]),
-                'max_real_profile': np.array([])
-            }
-        
-        B_norm = B / B_norm_vec
-        
-        # Clamp mode scan range based on domain_length (same as compute_stability)
-        domain_length = ANALYSIS_PARAMS.get('domain_length', ANALYSIS_PARAMS['grid_size'])
-        n_modes_effective = min(self.n_modes, int(0.6 * domain_length))
-        
-        if verbose:
-            print(f"  [ForcedResponse] Scanning modes from -{n_modes_effective} to +{n_modes_effective}")
-            print(f"  [ForcedResponse] B norm: {B_norm_vec:.6f}, normalized B shape: {B_norm.shape}")
-        
-        max_gain = -np.inf
-        critical_mode = (0, 0)
-        critical_k = 0.0
-        max_condition = 0.0
 
-        # Aggregate results per k^2 (to handle degeneracy of Fourier modes sharing same magnitude)
-        profile_by_k2: Dict[int, Dict[str, float]] = {}
-        
-        # Scan Fourier modes (clamped range)
-        for n1 in range(-n_modes_effective, n_modes_effective + 1):
-            for n2 in range(-n_modes_effective, n_modes_effective + 1):
-                # Build Jacobian for this mode
-                Jk = self.build_jacobian(n1, n2)
-                
-                # Compute condition number for diagnostics
-                cond_Jk = np.linalg.cond(Jk)
-                if cond_Jk > max_condition:
-                    max_condition = cond_Jk
-                
-                # Compute J(k)⁻¹ @ B_norm using pseudo-inverse (handles singular matrices)
-                try:
-                    eigenvalues = np.linalg.eigvals(Jk)
-                    max_real_mode = np.max(eigenvalues.real)
-
-                    Jk_inv_B = np.linalg.pinv(Jk) @ B_norm
-                    gain_k = np.linalg.norm(Jk_inv_B)
-
-                    if gain_k > max_gain:
-                        max_gain = gain_k
-                        critical_mode = (n1, n2)
-                        critical_k = np.sqrt(n1**2 + n2**2)
-
-                    k_squared = n1**2 + n2**2
-                    if k_squared not in profile_by_k2:
-                        profile_by_k2[k_squared] = {
-                            'k': np.sqrt(k_squared),
-                            'gain': gain_k,
-                            'max_real': max_real_mode
-                        }
-                    else:
-                        profile_entry = profile_by_k2[k_squared]
-                        profile_entry['gain'] = max(profile_entry['gain'], gain_k)
-                        profile_entry['max_real'] = max(profile_entry['max_real'], max_real_mode)
-                except np.linalg.LinAlgError:
-                    # If pseudo-inverse fails, skip this mode
-                    if verbose:
-                        print(f"  [ForcedResponse] Warning: Failed to compute pseudo-inverse for mode ({n1}, {n2})")
-                    continue
-        
-        # Sort profiles by k magnitude
-        if profile_by_k2:
-            sorted_items = sorted(profile_by_k2.values(), key=lambda item: item['k'])
-            k_values = np.array([item['k'] for item in sorted_items])
-            gain_profile = np.array([item['gain'] for item in sorted_items])
-            max_real_profile = np.array([item['max_real'] for item in sorted_items])
-        else:
-            k_values = np.array([])
-            gain_profile = np.array([])
-            max_real_profile = np.array([])
-
-        if verbose:
-            print(f"  [ForcedResponse] Critical mode: {critical_mode}, k={critical_k:.4f}")
-            print(f"  [ForcedResponse] Max gain: {max_gain:.6f}")
-            print(f"  [ForcedResponse] Max condition number: {max_condition:.2e}")
-            if k_values.size > 0:
-                print(f"  [ForcedResponse] Evaluated {k_values.size} unique k values")
-
-        return {
-            'max_gain': max_gain,
-            'critical_mode': critical_mode,
-            'critical_k': critical_k,
-            'max_condition': max_condition,
-            'k_values': k_values,
-            'gain_profile': gain_profile,
-            'max_real_profile': max_real_profile
-        }
-
-
-def extract_mean_driven_state(preset: Dict, duration: float = 10.0, 
-                               burn_in: float = 2.0, seed: Optional[int] = None) -> np.ndarray:
-    """
-    Extract time-averaged mean firing rates from a simulation run.
-    
-    This function runs a simulation with the given preset parameters and thalamic input,
-    then computes the temporal average of spatial mean firing rates over the last
-    (duration - burn_in) seconds. This provides a representative operating point for
-    linearization in stability analysis.
-    
-    Args:
-        preset: Developmental preset dictionary containing all network parameters
-        duration: Total simulation duration in seconds (default: 10.0)
-        burn_in: Initial period to discard in seconds (default: 2.0)
-        seed: Random seed for reproducibility (if None, uses default from config)
-        
-    Returns:
-        Array of shape (9,) containing spatial mean firing rates for all populations:
-        [L23_E, L23_SST, L23_PV, L4_E, L4_SST, L4_PV, L5_E, L5_SST, L5_PV]
-    """
-    from src.model.neurons import CorticalCircuit
-    from src.model.thalamus import ThalamicInput
-    from src.model.config import GRID_SIZE, DT, seed_random
-    
-    # Set random seed for reproducibility
-    if seed is not None:
-        seed_random(seed)
-    else:
-        seed_random()  # Uses default seed from config
-    
-    # Initialize circuit with preset parameters
-    circuit = CorticalCircuit(grid_size=GRID_SIZE)
-    
-    # Apply preset parameters
-    for cell_type in ['E', 'SST', 'PV']:
-        # Set time constants
-        tau = preset['time_constants'][cell_type]
-        circuit.set_time_constant(cell_type, tau)
-        
-        # Set gains
-        gain = preset['gains'][cell_type]
-        circuit.set_gain(cell_type, gain)
-        
-        # Set background inputs
-        bg_input = preset['background_input'][cell_type]
-        circuit.set_background_input(cell_type, bg_input)
-    
-    # Set connectivity parameters
-    circuit.connectivity.strength_scaling = preset['strength_scaling'].copy()
-    circuit.connectivity.update_weights()
-    
-    # Initialize thalamus
-    thalamus = ThalamicInput(grid_size=GRID_SIZE)
-    
-    # Get thalamic alpha parameter
-    thalamic_alpha = preset.get('thalamic_alpha', 0.5)
-    
-    # Calculate number of time steps
-    n_steps = int(duration * 1000 / DT)  # Convert seconds to milliseconds, divide by DT
-    burn_in_steps = int(burn_in * 1000 / DT)
-    
-    # Accumulators for time-averaged rates
-    accumulated_rates = np.zeros(9)  # 3 layers × 3 cell types
-    n_accumulated = 0
-    
-    # Integration steps per update (from config)
-    from src.model.config import INTEGRATION_STEPS
-    
-    # Run simulation
-    for step in range(n_steps):
-        # Update thalamic input
-        circuit.thalamus = thalamus.update(thalamic_alpha, n_steps=INTEGRATION_STEPS)
-        
-        # Update circuit
-        circuit.update(n_steps=INTEGRATION_STEPS)
-        
-        # After burn-in, accumulate spatial mean rates
-        if step >= burn_in_steps:
-            activities = circuit.get_layer_activities()
-            idx = 0
-            for layer in ['L23', 'L4', 'L5']:
-                for cell_type in ['E', 'SST', 'PV']:
-                    spatial_mean = activities[layer][cell_type].mean()
-                    accumulated_rates[idx] += spatial_mean
-                    idx += 1
-            n_accumulated += 1
-    
-    # Compute temporal average
-    if n_accumulated > 0:
-        mean_rates = accumulated_rates / n_accumulated
-    else:
-        # Fallback if no steps accumulated (shouldn't happen with valid parameters)
-        mean_rates = np.zeros(9)
-    
-    return mean_rates
