@@ -69,8 +69,7 @@ def compute_stability_for_point(preset: Dict, verbose: bool = False) -> Tuple[fl
     # Get analysis parameters
     n_modes = ANALYSIS_PARAMS['n_modes']
     grid_size = ANALYSIS_PARAMS['grid_size']
-    domain_length = ANALYSIS_PARAMS.get('domain_length', grid_size)
-    n_modes_effective = min(n_modes, int(0.6 * domain_length))
+    n_modes_effective = min(n_modes, int(0.6 * grid_size))
     
     total_pops = len(network.tau)
     
@@ -86,7 +85,7 @@ def compute_stability_for_point(preset: Dict, verbose: bool = False) -> Tuple[fl
         exp_cache[k_squared] = np.zeros((total_pops, total_pops))
         for i in range(total_pops):
             for j in range(total_pops):
-                sigma_ij = network.sigma[i, j] / domain_length
+                sigma_ij = network.sigma[i, j] / grid_size
                 exp_cache[k_squared][i, j] = np.exp(
                     -2 * np.pi**2 * k_squared * sigma_ij**2
                 )

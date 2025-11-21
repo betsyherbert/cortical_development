@@ -8,13 +8,8 @@ ANALYSIS_PARAMS = {
     'n_modes': 10,                  # Number of Fourier modes to scan in each direction
     'tolerance': 1e-6,              # Convergence tolerance for steady state finder
     'max_iters': 2000,              # Maximum iterations for steady state finder
-    'grid_size': 20,                # Standard grid size for spatial scaling
-    'domain_length': 20.0,          # Domain length (must equal grid_size): σ values in presets are in grid cells, normalize by grid_size to get physical units
+    'grid_size': 20,                # Standard grid size for spatial scaling and Fourier normalization
 }
-
-# Parameter sanity check: domain_length must equal grid_size for consistent spatial units
-assert ANALYSIS_PARAMS['domain_length'] == ANALYSIS_PARAMS['grid_size'], \
-    f"domain_length ({ANALYSIS_PARAMS['domain_length']}) must equal grid_size ({ANALYSIS_PARAMS['grid_size']}) for consistent spatial units"
 
 # Output - standardized relative path from project root
 OUTPUT_DIR = 'outputs/bifurcation'

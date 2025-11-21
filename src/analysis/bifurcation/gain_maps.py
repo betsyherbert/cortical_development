@@ -82,8 +82,7 @@ def compute_gain_for_point(preset: Dict, verbose: bool = False) -> Tuple[float, 
     # Get analysis parameters
     n_modes = ANALYSIS_PARAMS['n_modes']
     grid_size = ANALYSIS_PARAMS['grid_size']
-    domain_length = ANALYSIS_PARAMS.get('domain_length', grid_size)
-    n_modes_effective = min(n_modes, int(0.6 * domain_length))
+    n_modes_effective = min(n_modes, int(0.6 * grid_size))
     
     total_pops = len(network.tau)
     
@@ -99,7 +98,7 @@ def compute_gain_for_point(preset: Dict, verbose: bool = False) -> Tuple[float, 
         exp_cache[k_squared] = np.zeros((total_pops, total_pops))
         for i in range(total_pops):
             for j in range(total_pops):
-                sigma_ij = network.sigma[i, j] / domain_length
+                sigma_ij = network.sigma[i, j] / grid_size
                 exp_cache[k_squared][i, j] = np.exp(
                     -2 * np.pi**2 * k_squared * sigma_ij**2
                 )
@@ -130,7 +129,7 @@ def compute_gain_for_point(preset: Dict, verbose: bool = False) -> Tuple[float, 
                         J[i, j] = (analyzer.g_eff[i] * w_tilde) / network.tau[i]
             
             # Compute B(k) with thalamic spatial filtering
-            B_k = compute_B_fourier(network, k_squared, domain_length)
+            B_k = compute_B_fourier(network, k_squared, grid_size)
             
             # Check if B(k) is non-zero
             if np.linalg.norm(B_k) < 1e-10:
@@ -437,7 +436,6 @@ def compute_gain_spectrum(preset: Dict, k_values: np.ndarray, verbose: bool = Fa
     
     # Get analysis parameters
     grid_size = ANALYSIS_PARAMS['grid_size']
-    domain_length = ANALYSIS_PARAMS.get('domain_length', grid_size)
     total_pops = len(network.tau)
     
     # Pre-compute exponential cache for all k values
@@ -447,7 +445,7 @@ def compute_gain_spectrum(preset: Dict, k_values: np.ndarray, verbose: bool = Fa
         exp_cache[k_squared] = np.zeros((total_pops, total_pops))
         for i in range(total_pops):
             for j in range(total_pops):
-                sigma_ij = network.sigma[i, j] / domain_length
+                sigma_ij = network.sigma[i, j] / grid_size
                 exp_cache[k_squared][i, j] = np.exp(
                     -2 * np.pi**2 * k_squared * sigma_ij**2
                 )
@@ -472,7 +470,7 @@ def compute_gain_spectrum(preset: Dict, k_values: np.ndarray, verbose: bool = Fa
                     J[i, j] = (analyzer.g_eff[i] * w_tilde) / network.tau[i]
         
         # Compute B(k) with thalamic spatial filtering
-        B_k = compute_B_fourier(network, k_squared, domain_length)
+        B_k = compute_B_fourier(network, k_squared, grid_size)
         
         # Check if B(k) is non-zero
         if np.linalg.norm(B_k) < 1e-10:
@@ -498,8 +496,7 @@ def get_k_values() -> np.ndarray:
     """
     n_modes = ANALYSIS_PARAMS['n_modes']
     grid_size = ANALYSIS_PARAMS['grid_size']
-    domain_length = ANALYSIS_PARAMS.get('domain_length', grid_size)
-    n_modes_effective = min(n_modes, int(0.6 * domain_length))
+    n_modes_effective = min(n_modes, int(0.6 * grid_size))
     
     # Generate unique k values from (n1, n2) grid
     k_squared_set = set()

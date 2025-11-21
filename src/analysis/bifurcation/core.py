@@ -43,13 +43,13 @@ def get_nested_value(d: Dict, path: List[str]) -> float:
     return d
 
 
-def compute_B_fourier(network: 'NetworkModel', k_squared: float, domain_length: float) -> np.ndarray:
+def compute_B_fourier(network: 'NetworkModel', k_squared: float, grid_size: float) -> np.ndarray:
     """Compute thalamic input B(k) in Fourier space with Gaussian spatial filtering.
     
     Args:
         network: NetworkModel instance containing thalamic parameters
         k_squared: Square of the wavenumber k
-        domain_length: Domain length for normalization
+        grid_size: Grid size for normalization
         
     Returns:
         B(k): Thalamic input vector in Fourier space (length = number of populations)
@@ -58,8 +58,8 @@ def compute_B_fourier(network: 'NetworkModel', k_squared: float, domain_length: 
     B_k = np.zeros(total_pops)
     
     for i in range(total_pops):
-        # Normalize thalamic width by domain length
-        sigma_thal_i = network.thalamic_widths[i] / domain_length
+        # Normalize thalamic width by grid size
+        sigma_thal_i = network.thalamic_widths[i] / grid_size
         # Apply Gaussian spatial filtering: B[i] = strength * exp(-2π²k²σ²)
         B_k[i] = network.thalamic_strengths[i] * np.exp(-2 * np.pi**2 * k_squared * sigma_thal_i**2)
     
@@ -406,7 +406,6 @@ class StabilityAnalyzer:
         """
         k_squared = n1**2 + n2**2
         grid_size = ANALYSIS_PARAMS['grid_size']
-        domain_length = ANALYSIS_PARAMS.get('domain_length', grid_size)
         
         # Total number of populations (all layers)
         n = len(self.network.tau)
@@ -418,7 +417,7 @@ class StabilityAnalyzer:
                 # σ values in presets are in grid cells (e.g., 2-3 cells on a 20×20 grid)
                 # Normalize by grid_size to convert to physical units: σ_phys = σ_cells / grid_size
                 # For Fourier transform: exp(-2π²k²σ_phys²) with k = sqrt(n1²+n2²)
-                sigma_ij = self.network.sigma[i, j] / domain_length
+                sigma_ij = self.network.sigma[i, j] / grid_size
                 
                 # Fourier transform of Gaussian connectivity
                 # For domain [0,L]², wave number k corresponds to exp(2πi k·x / L)
@@ -443,11 +442,11 @@ class StabilityAnalyzer:
         
         Returns:
             (distance_to_instability, critical_mode, critical_k, wavelength) tuple
-            wavelength = domain_length / critical_k (or inf if k=0)
+            wavelength = grid_size / critical_k (or inf if k=0)
         """
-        # Clamp mode scan range based on domain_length (Nyquist limit)
-        domain_length = ANALYSIS_PARAMS.get('domain_length', ANALYSIS_PARAMS['grid_size'])
-        n_modes_effective = min(self.n_modes, int(0.6 * domain_length))
+        # Clamp mode scan range based on grid_size (Nyquist limit)
+        grid_size = ANALYSIS_PARAMS['grid_size']
+        n_modes_effective = min(self.n_modes, int(0.6 * grid_size))
         
         if verbose:
             print(f"  [Stability] Scanning modes from -{n_modes_effective} to +{n_modes_effective} (clamped from {self.n_modes})")
@@ -475,7 +474,7 @@ class StabilityAnalyzer:
         distance_to_instability = -max_real_eigenvalue
         
         # Compute wavelength: λ* = L / k
-        wavelength = domain_length / critical_k if critical_k > 0 else np.inf
+        wavelength = grid_size / critical_k if critical_k > 0 else np.inf
         
         if verbose:
             print(f"  [Stability] Critical mode: {critical_mode}, k={critical_k:.4f}, λ*={wavelength:.4f}")
