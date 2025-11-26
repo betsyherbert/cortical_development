@@ -93,17 +93,23 @@ CONNECTIONS = [
 # Thalamic Input Parameters
 #------------------------------------------------------------------------------
 
-# Intrinsic burst parameters
-THALAMIC_INTRINSIC_SIGMA = 100.0  # Mean spatial spread of intrinsic bursts (μm)
-THALAMIC_INTRINSIC_DURATION = 30.0  # Mean duration of intrinsic bursts (ms)
-THALAMIC_INTRINSIC_INTERVAL = 20.0  # Mean interval between intrinsic bursts (ms)
-THALAMIC_INTRINSIC_AMP = 3.0  # Mean amplitude of intrinsic bursts
+# Fixed amplitude parameters
+THALAMIC_INTRINSIC_AMP = 1.0  # Fixed amplitude of intrinsic bursts
+THALAMIC_SENSORY_AMP = 1.0  # Fixed amplitude of sensory bursts
 
-# Sensory burst parameters
-THALAMIC_SENSORY_SIGMA = 25.0  # Spatial spread of sensory inputs (μm)
-THALAMIC_SENSORY_DURATION = 10.0  # Duration of sensory bursts (ms)
-THALAMIC_SENSORY_INTERVAL = 10.0  # Mean interval between sensory bursts (ms)
-THALAMIC_SENSORY_AMP = 1.0  # Mean amplitude of sensory bursts
+# Module lattice parameters for spatial organization
+THALAMIC_N_MODULES_PER_DIM = 4  # Number of modules per dimension (creates 4x4 grid)
+THALAMIC_JITTER_FACTOR = 0.4  # Jitter factor for module centers (× module spacing)
+
+# DEPRECATED: The following parameters are now specified per developmental stage in presets
+# Spatial scales (sigma), durations, and intervals are now in preset['thalamic_spatial_scales']
+# and preset['thalamic_temporal_scales'] for each developmental stage (P0, P5, P10, P15)
+THALAMIC_INTRINSIC_SIGMA = 100.0  # DEPRECATED - use preset parameters
+THALAMIC_INTRINSIC_DURATION = 30.0  # DEPRECATED - use preset parameters
+THALAMIC_INTRINSIC_INTERVAL = 20.0  # DEPRECATED - use preset parameters
+THALAMIC_SENSORY_SIGMA = 25.0  # DEPRECATED - use preset parameters
+THALAMIC_SENSORY_DURATION = 10.0  # DEPRECATED - use preset parameters
+THALAMIC_SENSORY_INTERVAL = 10.0  # DEPRECATED - use preset parameters
 
 #------------------------------------------------------------------------------
 # Initial Network Parameters

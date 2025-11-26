@@ -6,20 +6,36 @@ from src.model.neurons import CorticalCircuit
 from src.model.thalamus import ThalamicInput
 from src.visualization.dashboard import DashboardApp
 from src.model.config import GRID_SIZE, INTEGRATION_STEPS, THALAMIC_ALPHA, seed_random
+from src.model.presets import P0_PRESET
 
 
 class CorticalSimulation:
     """Main simulation class that integrates thalamic input with the cortical circuit."""
     
-    def __init__(self, grid_size: int = GRID_SIZE):
+    def __init__(self, grid_size: int = GRID_SIZE, preset: dict = None):
         """Initialize the cortical simulation.
         
         Args:
             grid_size: Size of the square grid
+            preset: Developmental preset dictionary (defaults to P0_PRESET)
         """
         self.grid_size = grid_size
+        
+        # Store preset (default to P0)
+        if preset is None:
+            preset = P0_PRESET
+        self.preset = preset
+        
+        # Initialize circuit
         self.circuit = CorticalCircuit(grid_size)
-        self.thalamus = ThalamicInput(grid_size)
+        
+        # Initialize thalamus with developmental parameters from preset
+        self.thalamus = ThalamicInput(
+            grid_size=grid_size,
+            thalamic_spatial_scales=preset.get('thalamic_spatial_scales'),
+            thalamic_temporal_scales=preset.get('thalamic_temporal_scales'),
+            thalamic_modules=preset.get('thalamic_modules')
+        )
         
         # Set the random seed for reproducibility
         seed_random()
@@ -155,6 +171,20 @@ class CorticalSimulation:
             value: Background input value
         """
         self.circuit.set_background_input(cell_type, value)
+    
+    def update_thalamic_params(self, preset: dict) -> None:
+        """
+        Update thalamic parameters from a new developmental preset.
+        
+        Args:
+            preset: Developmental preset dictionary with thalamic parameters
+        """
+        self.preset = preset
+        self.thalamus.update_developmental_params(
+            thalamic_spatial_scales=preset.get('thalamic_spatial_scales'),
+            thalamic_temporal_scales=preset.get('thalamic_temporal_scales'),
+            thalamic_modules=preset.get('thalamic_modules')
+        )
 
 
 def parse_arguments():

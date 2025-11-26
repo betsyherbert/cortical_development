@@ -45,6 +45,26 @@ P0_PRESET = {
     # Thalamic alpha: ratio between sensory-driven vs. intrinsic input.
     'thalamic_alpha': 0.1,
     
+    # Thalamic spatial scales: developmental burst spatial spreads (μm)
+    'thalamic_spatial_scales': {
+        'intrinsic_sigma_range': (100.0, 150.0),
+        'sensory_sigma_range': (100.0, 150.0)
+    },
+    
+    # Thalamic temporal scales: developmental burst timing (ms)
+    'thalamic_temporal_scales': {
+        'intrinsic_duration_range': (200.0, 300.0),
+        'intrinsic_interval_range': (400.0, 800.0), # shorter ranges used for visualization; actual ranges are (4000.0, 8000.0)
+        'sensory_duration_range': (150.0, 250.0),
+        'sensory_interval_range': (400.0, 800.0), # shorter ranges used for visualization; actual ranges are (4000.0, 8000.0)
+    },
+    
+    # Thalamic modules: spatial organization of burst centers
+    'thalamic_modules': {
+        'n_modules_per_dim': 4,
+        'jitter_factor': 0.2
+    },
+    
     'connection_strengths': {
 
             # ---------- L2/3 (within L2/3) ----------
@@ -186,6 +206,26 @@ P5_PRESET = {
     },
 
     'thalamic_alpha': 0.3,
+    
+    # Thalamic spatial scales: developmental burst spatial spreads (μm)
+    'thalamic_spatial_scales': {
+        'intrinsic_sigma_range': (100.0, 150.0),
+        'sensory_sigma_range': (100.0, 150.0)
+    },
+    
+    # Thalamic temporal scales: developmental burst timing (ms)
+    'thalamic_temporal_scales': {
+        'intrinsic_duration_range': (200.0, 300.0),
+        'intrinsic_interval_range': (300.0, 600.0), # shorter ranges used for visualization; actual ranges are (3000.0, 6000.0)
+        'sensory_duration_range': (150.0, 250.0),
+        'sensory_interval_range': (300.0, 600.0), # shorter ranges used for visualization; actual ranges are (3000.0, 6000.0)
+    },
+    
+    # Thalamic modules: spatial organization of burst centers
+    'thalamic_modules': {
+        'n_modules_per_dim': 4,
+        'jitter_factor': 0.2
+    },
         
     'connection_strengths': {
 
@@ -321,12 +361,32 @@ P10_PRESET = {
         'thalamus': 3.0
     },
 
-    'thalamic_alpha': 0.6, 
+    'thalamic_alpha': 0.7, 
     
     'background_input': {
         'E': 0.0,
         'SST': 0.0,
         'PV': 0.0
+    },
+    
+    # Thalamic spatial scales: developmental burst spatial spreads (μm)
+    'thalamic_spatial_scales': {
+        'intrinsic_sigma_range': (100.0, 150.0),
+        'sensory_sigma_range': (50.0, 100.0)
+    },
+    
+    # Thalamic temporal scales: developmental burst timing (ms)
+    'thalamic_temporal_scales': {
+        'intrinsic_duration_range': (300.0, 500.0),
+        'intrinsic_interval_range': (100.0, 300.0), # shorter ranges used for visualization; actual ranges are (1000.0, 3000.0),
+        'sensory_duration_range': (100.0, 200.0),
+        'sensory_interval_range': (100.0, 300.0), # shorter ranges used for visualization; actual ranges are (1000.0, 3000.0),
+    },
+    
+    # Thalamic modules: spatial organization of burst centers
+    'thalamic_modules': {
+        'n_modules_per_dim': 4,
+        'jitter_factor': 0.3
     },
 
     'connection_strengths': {
@@ -464,12 +524,32 @@ P15_PRESET = {
         'thalamus': 4.0
     },
 
-    'thalamic_alpha': 0.8,
+    'thalamic_alpha': 0.9,
     
     'background_input': {
         'E': 0.1,
         'SST': 0.0,
         'PV': 0.0
+    },
+    
+    # Thalamic spatial scales: developmental burst spatial spreads (μm)
+    'thalamic_spatial_scales': {
+        'intrinsic_sigma_range': (100.0, 200.0),
+        'sensory_sigma_range': (30.0, 100.0)
+    },
+    
+    # Thalamic temporal scales: developmental burst timing (ms)
+    'thalamic_temporal_scales': {
+        'intrinsic_duration_range': (100.0, 200.0),
+        'intrinsic_interval_range': (500.0, 1000.0), # shorter ranges used for visualization; actual ranges are (5000.0, 10000.0),
+        'sensory_duration_range': (100.0, 200.0),
+        'sensory_interval_range': (100.0, 300.0), # shorter ranges used for visualization; actual ranges are (1000.0, 3000.0),
+    },
+    
+    # Thalamic modules: spatial organization of burst centers
+    'thalamic_modules': {
+        'n_modules_per_dim': 4,
+        'jitter_factor': 0.4
     },
 
     'connection_strengths': {

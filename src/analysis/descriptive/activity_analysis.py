@@ -47,6 +47,7 @@ class DescriptiveAnalysis:
         self._update_background_input(preset)
         self._update_thalamic_widths(preset)
         self._update_outgoing_widths(preset)
+        self._update_thalamic_params(preset)
 
     def _update_connection_strengths(self, preset: Dict[str, Any]) -> None:
         """Update connection strengths from preset."""
@@ -90,6 +91,10 @@ class DescriptiveAnalysis:
                     'thalamus', None, target_layer, cell_type, sigma
                 )
 
+    def _update_thalamic_params(self, preset: Dict[str, Any]) -> None:
+        """Update thalamic developmental parameters."""
+        self.simulation.update_thalamic_params(preset)
+    
     def _update_outgoing_widths(self, preset: Dict[str, Any]) -> None:
         """Update outgoing connection widths (sigma values for lateral connections)."""
         if 'outgoing_widths' not in preset:

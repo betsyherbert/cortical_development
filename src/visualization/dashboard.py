@@ -2141,6 +2141,9 @@ class DashboardApp:
         if 'background_input' in preset:
             for cell_type, value in preset['background_input'].items():
                 self.simulation.set_background_input(cell_type, value)
+        
+        # Update thalamic developmental parameters
+        self.simulation.update_thalamic_params(preset)
                 
     def get_connection_key(self, source_layer, source_cell, target_layer, target_cell):
         """Generate a connection key based on source and target information."""

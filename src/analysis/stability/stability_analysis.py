@@ -107,6 +107,9 @@ class StabilityAnalysis:
         for cell_type in CELL_TYPES:
             if cell_type in preset['time_constants']:
                 self.simulation.set_time_constant(cell_type, preset['time_constants'][cell_type])
+        
+        # Update thalamic developmental parameters
+        self.simulation.update_thalamic_params(preset)
     
     def _capture_current_state(self, frame_idx: int, thalamic_sum: float, thalamic_input: np.ndarray) -> Dict:
         """Capture current network state for analysis."""
