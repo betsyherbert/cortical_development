@@ -36,6 +36,14 @@ class BifurcationVisualizer:
     
     def __init__(self):
         """Initialize visualizer with default style settings."""
+        # Configure matplotlib font settings
+        plt.rcParams.update({
+            'font.family': 'sans-serif',
+            'font.sans-serif': ['Latin Modern Sans', 'Arial', 'DejaVu Sans', 'Helvetica'],
+            'mathtext.fontset': 'cm',
+            'axes.unicode_minus': False
+        })
+        
         # Figure dimensions
         self.fig_width = 13.7
         self.fig_height_per_row = 3.5

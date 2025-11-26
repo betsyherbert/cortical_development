@@ -205,9 +205,9 @@ class DashboardApp:
     
     TIME_CONSTANT_PARAMS = {
         "min_val": 1.0,
-        "max_val": 40.0,
+        "max_val": 60.0,
         "step": 1.0,
-        "marks": {1: "1", 10: "10", 20: "20", 30: "30", 40: "40"}
+        "marks": {1: "1", 20: "20", 40: "40", 60: "60"}
     }
     
     GAIN_PARAMS = {
@@ -227,9 +227,9 @@ class DashboardApp:
     
     STRENGTH_SCALING_PARAMS = {
         "min_val": 0.0,
-        "max_val": 5.0,
+        "max_val": 10.0,
         "step": 0.1,
-        "marks": {i: f"{i}" for i in range(0, 6)}
+        "marks": {i: f"{i}" for i in range(0, 11, 2)}
     }
     
     BACKGROUND_INPUT_PARAMS = {

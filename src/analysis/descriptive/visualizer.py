@@ -32,7 +32,7 @@ class ActivityVisualizer:
         """Configure matplotlib style for consistent poster-format plots."""
         plt.rcParams.update({
             'font.family': 'sans-serif',
-            'font.sans-serif': ['Arial', 'Latin Modern Sans', 'DejaVu Sans', 'Helvetica'],
+            'font.sans-serif': ['Latin Modern Sans', 'Arial', 'DejaVu Sans', 'Helvetica'],
             'font.size': FONT_SIZES['tick_labels'],
             'axes.titlesize': FONT_SIZES['ylabel'],
             'axes.labelsize': FONT_SIZES['ylabel'],
@@ -212,10 +212,14 @@ class ActivityVisualizer:
                 ax.tick_params(left=False)
 
     def _format_time_axis(self, ax: plt.Axes, time: np.ndarray, row: int, num_rows: int) -> None:
-        """Format x-axis for time-based plots."""
+        """Format x-axis for time-based plots with consistent range."""
+        # Use configured simulation duration for consistent x-axis across all plots
+        max_time = ANALYSIS_PARAMS['simulation_duration']
+        ax.set_xlim(0, max_time)
+        
         if row == num_rows - 1:  # Bottom row
             ax.set_xlabel('Time (s)')
-            tick_values, tick_labels = self._format_minimal_ticks(time, is_time=True)
+            tick_values, tick_labels = self._format_minimal_ticks([0, max_time], is_time=True)
             ax.set_xticks(tick_values)
             ax.set_xticklabels(tick_labels)
         else:
@@ -252,8 +256,9 @@ class ActivityVisualizer:
                     ax.set_xlabel('Time (s)')
                     n_timepoints = heatmap_data.shape[1]
                     max_time = ANALYSIS_PARAMS['simulation_duration']
+                    ax.set_xlim(-0.5, n_timepoints-0.5)  # Proper heatmap pixel boundaries
                     ax.set_xticks([0, n_timepoints-1])
-                    ax.set_xticklabels(['0', f'{max_time:.0f}'])
+                    ax.set_xticklabels(['0', f'{int(max_time)}'])
                 else:
                     ax.set_xticks([])
         
@@ -384,15 +389,21 @@ class ActivityVisualizer:
         # Collect all correlation values for consistent y-axis
         all_correlation_values = self._collect_correlation_values(results)
         
-        # Calculate consistent y-axis limits
-        max_val = max(all_correlation_values)
-        y_buffer = max_val * 0.1
-        correlation_ylim = [-y_buffer * 0.5, max_val + y_buffer]
-        correlation_tick_values, correlation_tick_labels = self._format_zero_max_ticks(all_correlation_values)
+        # Calculate consistent y-axis limits (handle case with no valid values)
+        if all_correlation_values:
+            max_val = max(all_correlation_values)
+            y_buffer = max_val * 0.1
+            correlation_ylim = [-y_buffer * 0.5, max_val + y_buffer]
+            correlation_tick_values, correlation_tick_labels = self._format_zero_max_ticks(all_correlation_values)
+        else:
+            # Fallback if all values are NaN
+            correlation_ylim = [0, 1]
+            correlation_tick_values = [0, 1]
+            correlation_tick_labels = ['0', '1']
         
         # Plot 1: By cell type
         for cell_type in POSTER_CELL_TYPES:
-            means = [results[stage]['correlations']['by_celltype'].get(cell_type, 0) 
+            means = [results[stage]['correlations']['by_celltype'].get(cell_type, np.nan) 
                     for stage in DEVELOPMENTAL_STAGES]
             self._plot_trend_with_errorbars(axes[0], x_pos, means, CELL_COLORS[cell_type], cell_type)
         
@@ -401,7 +412,7 @@ class ActivityVisualizer:
         
         # Plot 2: By layer
         for layer in LAYERS:
-            means = [results[stage]['correlations']['by_layer'].get(layer, 0) 
+            means = [results[stage]['correlations']['by_layer'].get(layer, np.nan) 
                     for stage in DEVELOPMENTAL_STAGES]
             self._plot_trend_with_errorbars(axes[1], x_pos, means, LAYER_COLORS[layer], layer)
         
@@ -422,7 +433,7 @@ class ActivityVisualizer:
         self._save_plot('correlation_trends.svg')
 
     def _collect_correlation_values(self, results: Dict[str, Any]) -> List[float]:
-        """Collect all correlation values for consistent scaling."""
+        """Collect all correlation values for consistent scaling (excluding NaN)."""
         all_values = []
         
         for cell_type in POSTER_CELL_TYPES:
@@ -438,7 +449,8 @@ class ActivityVisualizer:
         total_values = [results[stage]['correlations']['total'] for stage in DEVELOPMENTAL_STAGES]
         all_values.extend(total_values)
         
-        return all_values
+        # Filter out NaN values
+        return [v for v in all_values if not np.isnan(v)]
 
     def create_synchronous_event_trends(self, results: Dict[str, Any]) -> None:
         """Create developmental trends in synchronous events."""

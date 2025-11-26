@@ -33,7 +33,7 @@ REGIME_LABELS = [
 
 # Publication-quality styling
 FONT_CONFIG = {
-    'font_family': 'Arial',
+    'font_family': 'Latin Modern Sans',
     'font_sizes': {
         'title': 18,
         'ylabel': 16,
@@ -87,16 +87,14 @@ STANDARD_COLORS = {
 
 # Configure matplotlib for publication styling
 plt.rcParams['font.family'] = 'sans-serif'
-plt.rcParams['font.sans-serif'] = ['Arial', 'DejaVu Sans']
+plt.rcParams['font.sans-serif'] = ['Latin Modern Sans', 'Arial', 'DejaVu Sans', 'Helvetica']
 plt.rcParams['font.size'] = FONT_CONFIG['font_sizes']['tick_labels']
 plt.rcParams['axes.labelsize'] = FONT_CONFIG['font_sizes']['tick_labels']
 plt.rcParams['xtick.labelsize'] = FONT_CONFIG['font_sizes']['tick_labels']
 plt.rcParams['ytick.labelsize'] = FONT_CONFIG['font_sizes']['tick_labels']
 plt.rcParams['legend.fontsize'] = FONT_CONFIG['font_sizes']['colorbar']
-plt.rcParams['mathtext.fontset'] = 'custom'
-plt.rcParams['mathtext.rm'] = 'Arial'
-plt.rcParams['mathtext.it'] = 'Arial:italic'
-plt.rcParams['mathtext.bf'] = 'Arial:bold'
+plt.rcParams['mathtext.fontset'] = 'cm'
+plt.rcParams['axes.unicode_minus'] = False
 
 # Inhibition effectiveness plot constants
 EFFECTIVENESS_FIGSIZE = (8, 6)

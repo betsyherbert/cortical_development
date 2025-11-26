@@ -25,13 +25,15 @@ class DescriptiveAnalysis:
         # Calculate sampling parameters
         self._setup_sampling_parameters()
         
-        print(f"Analysis setup: {self._get_duration_ms()}ms duration, "
+        print(f"Analysis setup: {self.warmup_ms}ms warmup + {self._get_duration_ms()}ms duration, "
               f"{self.n_timepoints} timepoints, sampling every {self.sampling_interval}ms")
 
     def _setup_sampling_parameters(self) -> None:
         """Set up timing and sampling parameters."""
         duration_ms = self._get_duration_ms()
+        self.warmup_ms = ANALYSIS_PARAMS['warmup_duration'] * 1000
         self.sampling_interval = ANALYSIS_PARAMS['sampling_interval']
+        self.n_warmup_steps = int(self.warmup_ms / self.sampling_interval)
         self.n_timepoints = int(duration_ms / self.sampling_interval)
         self.steps_per_sample = int(self.sampling_interval / self.dt)
     
@@ -153,8 +155,17 @@ class DescriptiveAnalysis:
 
     def _collect_timeseries_data(self, timeseries: Dict[str, Any], alpha: float) -> None:
         """Collect timeseries data by running simulation."""
+        # Warmup period: let network settle to equilibrium
+        if self.n_warmup_steps > 0:
+            for _ in tqdm(range(self.n_warmup_steps), 
+                         desc=f"  {timeseries['stage']} warmup", 
+                         unit="steps", 
+                         leave=False):
+                self.simulation.update(alpha=alpha)
+        
+        # Data collection period
         for t_idx in tqdm(range(self.n_timepoints), 
-                         desc=f"  {timeseries['stage']} simulation", 
+                         desc=f"  {timeseries['stage']} recording", 
                          unit="steps", 
                          leave=False):
             # Update simulation
@@ -226,13 +237,22 @@ class DescriptiveAnalysis:
         # Collect all cell timeseries for correlation analysis
         all_cells, cell_labels, layer_labels, celltype_labels = self._collect_all_cells(processed_data)
         
-        # Calculate correlation matrix
-        corr_matrix = np.corrcoef(all_cells.T)
+        # Filter to active periods only (exclude timepoints where network is mostly silent)
+        threshold = ANALYSIS_PARAMS['correlation_activity_threshold']
+        active_timepoints = np.mean(all_cells, axis=1) > threshold
+        all_cells_active = all_cells[active_timepoints, :]
+        
+        # Calculate correlation matrix (only on active periods)
+        if all_cells_active.shape[0] > 1:
+            corr_matrix = np.corrcoef(all_cells_active.T)
+        else:
+            # Fallback: if no active periods, return NaN correlations
+            corr_matrix = np.full((all_cells.shape[1], all_cells.shape[1]), np.nan)
         
         # Calculate correlations
         correlations = self._calculate_correlations(corr_matrix, celltype_labels, layer_labels)
         
-        # Calculate synchronous events
+        # Calculate synchronous events (use full data)
         sync_events = self._calculate_synchronous_events(all_cells, celltype_labels, layer_labels)
         
         return {

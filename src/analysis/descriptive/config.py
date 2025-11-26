@@ -7,15 +7,17 @@ from src.analysis.common import DEVELOPMENTAL_STAGES, PRESETS, ERROR_BAR_ALPHA, 
 
 # Analysis parameters
 ANALYSIS_PARAMS = {
-    'simulation_duration': 11.0,               # Simulation duration (seconds)
-    'activity_threshold': 0.3,                # Firing rate threshold for "active" cells
-    'synchronous_event_threshold': 0.2,       # Fraction of cells for "large synchronous events" 
-    'sampling_interval': 10.0,                # Sampling interval (ms)
+    'warmup_duration': 2.0,                   # Warmup time before data collection (seconds)
+    'simulation_duration': 50.0,               # Simulation duration (seconds)
+    'activity_threshold': 0.1,                # Firing rate threshold for "active" cells
+    'synchronous_event_threshold': 0.1,       # Fraction of cells for "large synchronous events"
+    'correlation_activity_threshold': 0.00,    # Min network activity for correlation calculation
+    'sampling_interval': 20.0,                # Sampling interval (ms) 
     'output_dir': 'outputs/descriptive'
 }
 
 # Visualization constants
-FIGSIZE_TIMESERIES = (6, 4)                  # Optimized for 3x4 subplot layout
+FIGSIZE_TIMESERIES = (10, 4)                 # Optimized for 3x4 subplot layout (wider for better readability)
 
 # Font sizes for poster format - optimized for readability
 FONT_SIZES = {
@@ -31,7 +33,7 @@ POSTER_CELL_TYPES = ['SST', 'E', 'PV']       # Reordered for poster layout
 
 # Heatmap visualization settings
 HEATMAP_VMIN = 0
-HEATMAP_VMAX = 0.5
+HEATMAP_VMAX = 0.1
 
 # Plot layout constants
 SUBPLOT_PADDING = {
