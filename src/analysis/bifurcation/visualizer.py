@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib.gridspec import GridSpec
+from matplotlib.ticker import MaxNLocator
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -26,6 +27,7 @@ from .config import (
     GAIN_OPACITY_MIN,
     GAIN_OPACITY_MAX,
     SPECTRUM_LOG_SCALE,
+    SPECTRUM_Y_MARGIN,
 )
 
 
@@ -91,7 +93,7 @@ class BifurcationVisualizer:
         gs = GridSpec(n_rows, n_stages, figure=fig,
                      hspace=self.hspace, wspace=self.wspace,
                      left=self.left_margin, right=0.88,
-                     top=0.92, bottom=0.08)
+                     top=0.80, bottom=0.08)
         
         # Determine global k range for consistent colormap across all rows
         all_k_values = []
@@ -122,18 +124,23 @@ class BifurcationVisualizer:
             pair_results = results[param_pair]
             
             # Determine consistent axis limits across all stages in this row
-            x_limits_all = []
-            y_limits_all = []
+            # Use INTERSECTION of ranges (max of mins, min of maxs) to avoid white space
+            # This ensures all stages have data for the entire displayed range
+            x_mins, x_maxs = [], []
+            y_mins, y_maxs = [], []
             for stage in stages:
                 if stage in pair_results:
                     x_vals = pair_results[stage]['param_x_values']
                     y_vals = pair_results[stage]['param_y_values']
-                    x_limits_all.extend([x_vals[0], x_vals[-1]])
-                    y_limits_all.extend([y_vals[0], y_vals[-1]])
+                    x_mins.append(x_vals[0])
+                    x_maxs.append(x_vals[-1])
+                    y_mins.append(y_vals[0])
+                    y_maxs.append(y_vals[-1])
             
-            if x_limits_all and y_limits_all:
-                x_lim = (min(x_limits_all), max(x_limits_all))
-                y_lim = (min(y_limits_all), max(y_limits_all))
+            if x_mins and y_mins:
+                # Intersection: range covered by ALL stages
+                x_lim = (max(x_mins), min(x_maxs))
+                y_lim = (max(y_mins), min(y_maxs))
             else:
                 x_lim = (0, 1)
                 y_lim = (0, 1)
@@ -151,142 +158,195 @@ class BifurcationVisualizer:
                 flatness_matrix = stage_result.get('flatness_matrix', None)
                 
                 ax = fig.add_subplot(gs[row_idx, stage_idx])
-            
-            # Transpose matrices (swap axes: x=first param, y=second param)
-            k_matrix_T = k_matrix.T
-            stability_matrix_T = stability_matrix.T
-            flatness_matrix_T = flatness_matrix.T if flatness_matrix is not None else None
-            
-            # Compute alpha values based on stability
-            alpha_matrix = np.zeros_like(stability_matrix_T)
-            alpha_matrix[stability_matrix_T < STABILITY_THRESHOLD] = OPACITY_STABLE_FAR
-            alpha_matrix[(stability_matrix_T >= STABILITY_THRESHOLD) & (stability_matrix_T < 0)] = OPACITY_STABLE_NEAR
-            alpha_matrix[stability_matrix_T >= 0] = OPACITY_UNSTABLE
-            
-            # Create RGBA image (grey for flat spectra, colormap otherwise)
-            rgba_image = np.zeros((*k_matrix_T.shape, 4))
-            grey_color = (0.5, 0.5, 0.5)
-            for i in range(k_matrix_T.shape[0]):
-                for j in range(k_matrix_T.shape[1]):
-                    if flatness_matrix_T is not None and flatness_matrix_T[i, j]:
-                        color_rgb = grey_color
-                    else:
-                        color_rgb = cmap(norm(k_matrix_T[i, j]))[:3]
-                    rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
-            
-            # Display image
-            extent = [x_values[0], x_values[-1], y_values[0], y_values[-1]]
-            ax.imshow(rgba_image, origin='lower', extent=extent, interpolation='nearest')
-            
-            # Add stability boundary contour
-            try:
-                ax.contour(x_values, y_values, stability_matrix_T,
-                          levels=[0], colors='white', linewidths=1.5, linestyles='--', alpha=0.8)
-            except (ValueError, RuntimeError):
-                pass
-            
-            # Mark preset point
-            preset_x = stage_result['preset_x_value']
-            preset_y = stage_result['preset_y_value']
-            ax.scatter(preset_x, preset_y,
-                      marker='o', s=120, edgecolor='black', linewidth=1.5,
-                      facecolor='white', zorder=10)
-            
-            # Apply consistent axis limits for this row
-            ax.set_xlim(x_lim)
-            ax.set_ylim(y_lim)
-            ax.set_aspect('auto')
-            ax.locator_params(axis='x', nbins=4)
-            ax.locator_params(axis='y', nbins=5)
-            
-            # Primary axes spines
-            ax.spines['bottom'].set_linewidth(primary_width)
-            ax.spines['left'].set_linewidth(primary_width)
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            
-            # Axis labels
-            if stage_idx == 0:
-                ax.set_ylabel(param_y_spec.get_axis_label(absolute=False), 
-                            fontsize=self.label_fontsize, labelpad=8)
-            else:
-                ax.set_ylabel('')
-            
-            # Only show x-labels on bottom row
-            if row_idx == n_rows - 1:
-                ax.set_xlabel(param_x_spec.get_axis_label(absolute=False),
-                             fontsize=self.label_fontsize, labelpad=8)
-            else:
-                ax.set_xlabel('')
-            
-            ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.5)
-            
-            # Secondary axes (absolute values)
-            # Get reference values for ratio conversion
-            if param_y_spec.use_ratio and param_y_spec.reference_param:
-                ref_spec_y = SCANNABLE_PARAMETERS[param_y_spec.reference_param]
-                ref_value_y = get_nested_value(preset, ref_spec_y.path)
-            else:
-                ref_value_y = 1.0
-            
-            ax2 = ax.secondary_yaxis('right', functions=(
-                lambda x, rv=ref_value_y: x * rv,
-                lambda x, rv=ref_value_y: x / rv
-            ))
-            if stage_idx == n_stages - 1:
-                ax2.set_ylabel(param_y_spec.get_axis_label(absolute=True),
-                             fontsize=self.secondary_label_fontsize, labelpad=8)
-                ax2.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
-            else:
-                ax2.set_ylabel('')
-                ax2.tick_params(labelright=False, length=0)
-            ax2.spines['right'].set_linewidth(secondary_width)
-            for spine_name in ['left', 'top', 'bottom']:
-                ax2.spines[spine_name].set_visible(False)
-            
-            # Top axis - only show on top row
-            if param_x_spec.use_ratio and param_x_spec.reference_param:
-                ref_spec_x = SCANNABLE_PARAMETERS[param_x_spec.reference_param]
-                ref_value_x = get_nested_value(preset, ref_spec_x.path)
-            else:
-                ref_value_x = 1.0
-            
-            ax3 = ax.secondary_xaxis('top', functions=(
-                lambda x, rv=ref_value_x: x * rv,
-                lambda x, rv=ref_value_x: x / rv
-            ))
-            if row_idx == 0:
-                ax3.set_xlabel(param_x_spec.get_axis_label(absolute=True),
-                              fontsize=self.secondary_label_fontsize, labelpad=8)
-                ax3.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
-            else:
-                ax3.set_xlabel('')
-                ax3.tick_params(labeltop=False, length=0)
-            ax3.spines['top'].set_linewidth(secondary_width)
-            for spine_name in ['bottom', 'left', 'right']:
-                ax3.spines[spine_name].set_visible(False)
-            
-            # Stage label - only on top row
-            if row_idx == 0:
-                ax.set_title(stage_name, fontsize=self.subtitle_fontsize, 
-                            fontweight='bold', pad=21)
+                
+                # Transpose matrices (swap axes: x=first param, y=second param)
+                k_matrix_T = k_matrix.T
+                stability_matrix_T = stability_matrix.T
+                flatness_matrix_T = flatness_matrix.T if flatness_matrix is not None else None
+                
+                # Compute alpha values based on stability
+                alpha_matrix = np.zeros_like(stability_matrix_T)
+                alpha_matrix[stability_matrix_T < STABILITY_THRESHOLD] = OPACITY_STABLE_FAR
+                alpha_matrix[(stability_matrix_T >= STABILITY_THRESHOLD) & (stability_matrix_T < 0)] = OPACITY_STABLE_NEAR
+                alpha_matrix[stability_matrix_T >= 0] = OPACITY_UNSTABLE
+                
+                # Create RGBA image (grey for flat spectra, colormap otherwise)
+                rgba_image = np.zeros((*k_matrix_T.shape, 4))
+                grey_color = (0.5, 0.5, 0.5)
+                for i in range(k_matrix_T.shape[0]):
+                    for j in range(k_matrix_T.shape[1]):
+                        if flatness_matrix_T is not None and flatness_matrix_T[i, j]:
+                            color_rgb = grey_color
+                        else:
+                            color_rgb = cmap(norm(k_matrix_T[i, j]))[:3]
+                        rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
+                
+                # Display image
+                extent = [x_values[0], x_values[-1], y_values[0], y_values[-1]]
+                ax.imshow(rgba_image, origin='lower', extent=extent, interpolation='nearest')
+                
+                # Add stability boundary contour
+                try:
+                    ax.contour(x_values, y_values, stability_matrix_T,
+                              levels=[0], colors='white', linewidths=1.5, linestyles='--', alpha=0.8)
+                except (ValueError, RuntimeError):
+                    pass
+                
+                # Mark preset point
+                preset_x = stage_result['preset_x_value']
+                preset_y = stage_result['preset_y_value']
+                ax.scatter(preset_x, preset_y,
+                          marker='o', s=120, edgecolor='black', linewidth=1.5,
+                          facecolor='white', zorder=10)
+                
+                # Apply consistent axis limits for this row
+                ax.set_xlim(x_lim)
+                ax.set_ylim(y_lim)
+                ax.set_aspect('auto')
+                ax.locator_params(axis='x', nbins=4)
+                ax.locator_params(axis='y', nbins=5)
+                
+                # Primary axes spines
+                ax.spines['bottom'].set_linewidth(primary_width)
+                ax.spines['left'].set_linewidth(primary_width)
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                
+                # Axis labels
+                if stage_idx == 0:
+                    ax.set_ylabel(param_y_spec.get_axis_label(absolute=False), 
+                                fontsize=self.label_fontsize, labelpad=8)
+                else:
+                    ax.set_ylabel('')
+                
+                # Only show x-labels on bottom row
+                if row_idx == n_rows - 1:
+                    ax.set_xlabel(param_x_spec.get_axis_label(absolute=False),
+                                 fontsize=self.label_fontsize, labelpad=8)
+                else:
+                    ax.set_xlabel('')
+                
+                ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.5)
+                
+                # Secondary axes (absolute values)
+                # Get reference values for ratio conversion
+                if param_y_spec.use_ratio and param_y_spec.reference_param:
+                    ref_spec_y = SCANNABLE_PARAMETERS[param_y_spec.reference_param]
+                    ref_value_y = get_nested_value(preset, ref_spec_y.path)
+                else:
+                    ref_value_y = 1.0
+                
+                ax2 = ax.secondary_yaxis('right', functions=(
+                    lambda x, rv=ref_value_y: x * rv,
+                    lambda x, rv=ref_value_y: x / rv
+                ))
+                # Reduce number of ticks on secondary y-axis to allow 1 d.p. formatting
+                ax2.yaxis.set_major_locator(MaxNLocator(nbins=4))
+                if stage_idx == n_stages - 1:
+                    ax2.set_ylabel(param_y_spec.get_axis_label(absolute=True),
+                                 fontsize=self.secondary_label_fontsize, labelpad=8)
+                    ax2.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
+                else:
+                    ax2.set_ylabel('')
+                    ax2.tick_params(labelright=False, length=0)
+                ax2.spines['right'].set_linewidth(secondary_width)
+                for spine_name in ['left', 'top', 'bottom']:
+                    ax2.spines[spine_name].set_visible(False)
+                
+                # Top axis - only show on top row
+                if param_x_spec.use_ratio and param_x_spec.reference_param:
+                    ref_spec_x = SCANNABLE_PARAMETERS[param_x_spec.reference_param]
+                    ref_value_x = get_nested_value(preset, ref_spec_x.path)
+                else:
+                    ref_value_x = 1.0
+                
+                ax3 = ax.secondary_xaxis('top', functions=(
+                    lambda x, rv=ref_value_x: x * rv,
+                    lambda x, rv=ref_value_x: x / rv
+                ))
+                if row_idx == 0:
+                    ax3.set_xlabel(param_x_spec.get_axis_label(absolute=True),
+                                  fontsize=self.secondary_label_fontsize, labelpad=8)
+                    ax3.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
+                else:
+                    ax3.set_xlabel('')
+                    ax3.tick_params(labeltop=False, length=0)
+                ax3.spines['top'].set_linewidth(secondary_width)
+                for spine_name in ['bottom', 'left', 'right']:
+                    ax3.spines[spine_name].set_visible(False)
+                
+                # Stage label - only on top row
+                if row_idx == 0:
+                    ax.set_title(stage_name, fontsize=self.subtitle_fontsize, 
+                                fontweight='bold', pad=21)
         
-        # Add shared colorbar spanning all rows
-        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-        sm.set_array([])
-        # Position colorbar to span full height of plots
-        cbar_bottom = 0.08 + 0.05
-        cbar_top = 0.92 - 0.05
+        # Add 2D opacity legend (replacing colorbar)
+        # Position to span full height of plots (moved right to avoid overlap)
+        # Start above the grey legend box (which is at 0.09-0.12 + text below)
+        cbar_bottom = 0.14
+        cbar_top = 0.80
         cbar_height = cbar_top - cbar_bottom
-        cbar_ax = fig.add_axes([0.905, cbar_bottom, 0.015, cbar_height])
-        cbar = fig.colorbar(sm, cax=cbar_ax, orientation='vertical')
-        cbar.set_label('Spatial freq. w/ max Re($\\lambda$)', 
-                      fontsize=self.label_fontsize, labelpad=18)
-        cbar.ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.6)
+        cbar_width = 0.05  # Wider to accommodate 3 columns and rotated labels
+        cbar_ax = fig.add_axes([0.94, cbar_bottom, cbar_width, cbar_height])
         
-        # Add grey legend at bottom of colorbar
+        # Create 2D opacity legend: 3 columns for the three opacity levels
+        # Each column shows the full viridis colormap, with only opacity varying
+        n_ticks = 100  # High resolution for smooth colormap gradient
+        opacity_legend = np.zeros((n_ticks, 3, 4))  # RGBA array
+        
+        # Fill each row with colors from the full colormap (varying by row)
+        # Each column has the same color but different opacity
+        k_values_for_legend = np.linspace(k_min, k_max, n_ticks)
+        for i, k_val in enumerate(k_values_for_legend):
+            color_rgb = cmap(norm(k_val))[:3]
+            # Left column: stable far (0.3), middle: stable near (0.6), right: unstable (1.0)
+            opacity_legend[i, 0, :3] = color_rgb
+            opacity_legend[i, 0, 3] = OPACITY_STABLE_FAR
+            opacity_legend[i, 1, :3] = color_rgb
+            opacity_legend[i, 1, 3] = OPACITY_STABLE_NEAR
+            opacity_legend[i, 2, :3] = color_rgb
+            opacity_legend[i, 2, 3] = OPACITY_UNSTABLE
+        
+        # Display the 2D legend
+        cbar_ax.imshow(opacity_legend, origin='lower', aspect='auto', interpolation='nearest')
+        
+        # Set up axes
+        cbar_ax.set_xlim(-0.5, 2.5)
+        cbar_ax.set_ylim(0, n_ticks - 1)
+        
+        # X-axis labels for the three lambda ranges (on TOP)
+        cbar_ax.set_xticks([0, 1, 2])
+        cbar_ax.set_xticklabels([
+            'Stable (far)',
+            'Stable (near)',
+            'Unstable',
+        ], fontsize=self.secondary_tick_fontsize, rotation=45, ha='left')
+        cbar_ax.xaxis.set_label_position('top')
+        cbar_ax.xaxis.tick_top()
+        cbar_ax.tick_params(axis='x', bottom=False, top=True, labelsize=self.secondary_tick_fontsize)
+        
+        # Y-axis: show k values (spatial frequency) with ticks and label on RIGHT
+        k_tick_positions = np.linspace(0, n_ticks - 1, 6)  # 6 ticks
+        k_tick_values = np.linspace(k_min, k_max, 6)
+        cbar_ax.set_yticks(k_tick_positions)
+        cbar_ax.set_yticklabels([f'{k:.0f}' for k in k_tick_values], 
+                               fontsize=self.tick_fontsize)
+        cbar_ax.set_ylabel('Spatial freq. w/ max Re($\\lambda$)', 
+                          fontsize=self.label_fontsize, labelpad=18)
+        cbar_ax.yaxis.set_label_position('right')
+        cbar_ax.yaxis.tick_right()
+        cbar_ax.tick_params(axis='y', left=False, right=True, labelsize=self.tick_fontsize)
+        
+        # Style the axes - black border all around
+        cbar_ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.6)
+        for spine in cbar_ax.spines.values():
+            spine.set_visible(True)
+            spine.set_edgecolor('black')
+            spine.set_linewidth(1.0)
+        
+        # Add grey legend at bottom of colorbar (aligned with 2D legend, full width)
         grey_legend_bottom = 0.08 + 0.01
-        stable_ax = fig.add_axes([0.905, grey_legend_bottom, 0.015, 0.03])
+        stable_ax = fig.add_axes([0.94, grey_legend_bottom, cbar_width, 0.03])
         stable_ax.imshow(np.full((10, 1), 0.5), cmap='Greys', vmin=0, vmax=1,
                         origin='lower', aspect='auto')
         stable_ax.set_xticks([])
@@ -298,9 +358,9 @@ class BifurcationVisualizer:
                       transform=stable_ax.transAxes, fontsize=self.secondary_label_fontsize,
                       rotation=0, va='top', ha='center')
         
-        # Overall title
-        title = f'Stability Landscapes: {mode.replace("_", " ").title()} Mode'
-        fig.suptitle(title, fontsize=self.title_fontsize, fontweight='bold', y=0.96)
+        # Overall title (positioned above stage titles)
+        title = f'Stability Landscapes: {mode.replace("_", " ").title()} Values'
+        fig.suptitle(title, fontsize=self.title_fontsize, fontweight='bold', y=0.995)
         
         return fig
     
@@ -337,7 +397,7 @@ class BifurcationVisualizer:
         gs = GridSpec(n_rows, n_stages, figure=fig,
                      hspace=self.hspace, wspace=self.wspace,
                      left=self.left_margin, right=0.88,
-                     top=0.92, bottom=0.08)
+                     top=0.80, bottom=0.08)
         
         # Determine global k range across all rows
         all_k_values = []
@@ -368,18 +428,23 @@ class BifurcationVisualizer:
             pair_results = results[param_pair]
             
             # Determine consistent axis limits across all stages in this row
-            x_limits_all = []
-            y_limits_all = []
+            # Use INTERSECTION of ranges (max of mins, min of maxs) to avoid white space
+            # This ensures all stages have data for the entire displayed range
+            x_mins, x_maxs = [], []
+            y_mins, y_maxs = [], []
             for stage in stages:
                 if stage in pair_results:
                     x_vals = pair_results[stage]['param_x_values']
                     y_vals = pair_results[stage]['param_y_values']
-                    x_limits_all.extend([x_vals[0], x_vals[-1]])
-                    y_limits_all.extend([y_vals[0], y_vals[-1]])
+                    x_mins.append(x_vals[0])
+                    x_maxs.append(x_vals[-1])
+                    y_mins.append(y_vals[0])
+                    y_maxs.append(y_vals[-1])
             
-            if x_limits_all and y_limits_all:
-                x_lim = (min(x_limits_all), max(x_limits_all))
-                y_lim = (min(y_limits_all), max(y_limits_all))
+            if x_mins and y_mins:
+                # Intersection: range covered by ALL stages
+                x_lim = (max(x_mins), min(x_maxs))
+                y_lim = (max(y_mins), min(y_maxs))
             else:
                 x_lim = (0, 1)
                 y_lim = (0, 1)
@@ -397,36 +462,36 @@ class BifurcationVisualizer:
                 flatness_matrix = stage_result.get('flatness_matrix', None)
                 
                 ax = fig.add_subplot(gs[row_idx, stage_idx])
-            
-            # Transpose matrices
-            k_matrix_T = k_matrix.T
-            gain_matrix_T = gain_matrix.T
-            flatness_matrix_T = flatness_matrix.T if flatness_matrix is not None else None
-            
-            # Compute alpha values based on gain (log-scale)
-            gain_valid = np.where(np.isnan(gain_matrix_T), 1.0, gain_matrix_T)
-            gain_clipped = np.clip(gain_valid, 1.0, GAIN_CLIP_MAX)
-            log_gain = np.log10(gain_clipped)
-            
-            log_min = np.log10(1.0)
-            log_max = np.log10(GAIN_CLIP_MAX)
-            normalized = (log_gain - log_min) / (log_max - log_min)
-            normalized = np.clip(normalized, 0, 1)
-            
-            alpha_matrix = GAIN_OPACITY_MIN + normalized * (GAIN_OPACITY_MAX - GAIN_OPACITY_MIN)
-            alpha_matrix = np.where(np.isnan(gain_matrix_T), 0.1, alpha_matrix)
-            
-            # Create RGBA image
-            rgba_image = np.zeros((*k_matrix_T.shape, 4))
-            grey_color = (0.5, 0.5, 0.5)
-            for i in range(k_matrix_T.shape[0]):
-                for j in range(k_matrix_T.shape[1]):
-                    if flatness_matrix_T is not None and flatness_matrix_T[i, j]:
-                        color_rgb = grey_color
-                    else:
-                        color_rgb = cmap(norm(k_matrix_T[i, j]))[:3]
-                    rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
-            
+                
+                # Transpose matrices
+                k_matrix_T = k_matrix.T
+                gain_matrix_T = gain_matrix.T
+                flatness_matrix_T = flatness_matrix.T if flatness_matrix is not None else None
+                
+                # Compute alpha values based on gain (log-scale)
+                gain_valid = np.where(np.isnan(gain_matrix_T), 1.0, gain_matrix_T)
+                gain_clipped = np.clip(gain_valid, 1.0, GAIN_CLIP_MAX)
+                log_gain = np.log10(gain_clipped)
+                
+                log_min = np.log10(1.0)
+                log_max = np.log10(GAIN_CLIP_MAX)
+                normalized = (log_gain - log_min) / (log_max - log_min)
+                normalized = np.clip(normalized, 0, 1)
+                
+                alpha_matrix = GAIN_OPACITY_MIN + normalized * (GAIN_OPACITY_MAX - GAIN_OPACITY_MIN)
+                alpha_matrix = np.where(np.isnan(gain_matrix_T), 0.1, alpha_matrix)
+                
+                # Create RGBA image
+                rgba_image = np.zeros((*k_matrix_T.shape, 4))
+                grey_color = (0.5, 0.5, 0.5)
+                for i in range(k_matrix_T.shape[0]):
+                    for j in range(k_matrix_T.shape[1]):
+                        if flatness_matrix_T is not None and flatness_matrix_T[i, j]:
+                            color_rgb = grey_color
+                        else:
+                            color_rgb = cmap(norm(k_matrix_T[i, j]))[:3]
+                        rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
+                
                 # Display image
                 extent = [x_values[0], x_values[-1], y_values[0], y_values[-1]]
                 ax.imshow(rgba_image, origin='lower', extent=extent, interpolation='nearest')
@@ -477,6 +542,8 @@ class BifurcationVisualizer:
                     lambda x, rv=ref_value_y: x * rv,
                     lambda x, rv=ref_value_y: x / rv
                 ))
+                # Reduce number of ticks on secondary y-axis to allow 1 d.p. formatting
+                ax2.yaxis.set_major_locator(MaxNLocator(nbins=4))
                 if stage_idx == n_stages - 1:
                     ax2.set_ylabel(param_y_spec.get_axis_label(absolute=True),
                                  fontsize=self.secondary_label_fontsize, labelpad=8)
@@ -518,11 +585,12 @@ class BifurcationVisualizer:
         # Add shared colorbar spanning all rows
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
         sm.set_array([])
-        # Position colorbar to span full height of plots
-        cbar_bottom = 0.08 + 0.05
-        cbar_top = 0.92 - 0.05
+        # Position colorbar to span full height of plots (moved right to avoid overlap)
+        # Start above the grey legend box (which is at 0.09-0.12 + text below)
+        cbar_bottom = 0.14
+        cbar_top = 0.80
         cbar_height = cbar_top - cbar_bottom
-        cbar_ax = fig.add_axes([0.905, cbar_bottom, 0.015, cbar_height])
+        cbar_ax = fig.add_axes([0.92, cbar_bottom, 0.015, cbar_height])
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='vertical')
         cbar.set_label('Spatial freq. w/ max gain',
                       fontsize=self.label_fontsize, labelpad=18)
@@ -530,7 +598,7 @@ class BifurcationVisualizer:
         
         # Add grey legend at bottom of colorbar
         grey_legend_bottom = 0.08 + 0.01
-        stable_ax = fig.add_axes([0.905, grey_legend_bottom, 0.015, 0.03])
+        stable_ax = fig.add_axes([0.92, grey_legend_bottom, 0.015, 0.03])
         stable_ax.imshow(np.full((10, 1), 0.5), cmap='Greys', vmin=0, vmax=1,
                         origin='lower', aspect='auto')
         stable_ax.set_xticks([])
@@ -542,9 +610,9 @@ class BifurcationVisualizer:
                       transform=stable_ax.transAxes, fontsize=self.secondary_label_fontsize,
                       rotation=0, va='top', ha='center')
         
-        # Overall title
+        # Overall title (positioned above stage titles)
         title = f'Gain Landscapes: {mode.replace("_", " ").title()} Mode'
-        fig.suptitle(title, fontsize=self.title_fontsize, fontweight='bold', y=0.96)
+        fig.suptitle(title, fontsize=self.title_fontsize, fontweight='bold', y=0.995)
         
         return fig
     
@@ -614,25 +682,18 @@ class BifurcationVisualizer:
             
             param_results = results[param_key]
             
-            # Determine consistent axis limits across all stages in this row
-            all_param_values = []
+            # Determine consistent k-axis limits across all stages in this row
             all_k_values = []
             for stage in stages:
                 if stage in param_results:
-                    all_param_values.extend([
-                        param_results[stage]['param_values'][0],
-                        param_results[stage]['param_values'][-1]
-                    ])
                     all_k_values.extend([
                         param_results[stage]['k_values'][0],
                         param_results[stage]['k_values'][-1]
                     ])
             
-            if all_param_values and all_k_values:
-                param_lim = (min(all_param_values), max(all_param_values))
+            if all_k_values:
                 k_lim = (min(all_k_values), max(all_k_values))
             else:
-                param_lim = (0, 1)
                 k_lim = (0, 10)
             
             for stage_idx, stage_name in enumerate(stages):
@@ -660,9 +721,13 @@ class BifurcationVisualizer:
                               aspect='auto', cmap=cmap, norm=norm,
                               interpolation='nearest')
                 
-                # Apply consistent axis limits for this row
+                # Apply axis limits: k-axis consistent across row, y-axis adaptive per stage
                 ax.set_xlim(k_lim)
-                ax.set_ylim(param_lim)
+                
+                # Set y-axis limits based on preset value with fixed margin
+                param_lim_min = preset_value * SPECTRUM_Y_MARGIN[0]
+                param_lim_max = preset_value * SPECTRUM_Y_MARGIN[1]
+                ax.set_ylim(param_lim_min, param_lim_max)
                 
                 # Mark preset parameter value
                 ax.axhline(preset_value, color='white', linestyle='--',
@@ -687,17 +752,17 @@ class BifurcationVisualizer:
                     ax.set_title(stage_name, fontsize=self.subtitle_fontsize, fontweight='bold')
                 
                 ax.tick_params(labelsize=self.tick_fontsize)
-        
-        # Add shared colorbar spanning all rows
-        cbar_ax = fig.add_subplot(gs[:, n_stages])
-        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-        sm.set_array([])
-        cbar = fig.colorbar(sm, cax=cbar_ax)
-        if SPECTRUM_LOG_SCALE:
-            cbar.set_label('log₁₀(Gain)', fontsize=self.secondary_label_fontsize)
-        else:
-            cbar.set_label('Gain', fontsize=self.secondary_label_fontsize)
-        cbar.ax.tick_params(labelsize=self.secondary_tick_fontsize)
+            
+            # Add colorbar for this row (same limits across all rows)
+            cbar_ax = fig.add_subplot(gs[row_idx, n_stages])
+            sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+            sm.set_array([])
+            cbar = fig.colorbar(sm, cax=cbar_ax)
+            if SPECTRUM_LOG_SCALE:
+                cbar.set_label('log₁₀(Gain)', fontsize=self.secondary_label_fontsize)
+            else:
+                cbar.set_label('Gain', fontsize=self.secondary_label_fontsize)
+            cbar.ax.tick_params(labelsize=self.secondary_tick_fontsize)
         
         # Overall title
         title = 'Gain Spectra: Parameter Sweeps'

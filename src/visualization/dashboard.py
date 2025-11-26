@@ -18,7 +18,7 @@ from src.model.config import (
     CELL_COLORS, LAYER_COLORS as MODEL_LAYER_COLORS
 )
 from src.model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
-from src.analysis.bifurcation.bifurcation_analysis import (
+from src.analysis.bifurcation import (
     NetworkModel, StabilityAnalyzer
 )
 

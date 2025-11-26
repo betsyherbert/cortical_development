@@ -190,7 +190,7 @@ FIXED_RATIO_SIGMA_MAX = 4.0  # Maximum sigma ratio to scan
 #   - fixed_absolute mode: computed dynamically per stage from TAU_MIN/MAX and SIGMA_MIN/MAX
 #     tau_ratio ∈ [TAU_MIN/τ_E, TAU_MAX/τ_E], sigma_ratio ∈ [SIGMA_MIN/σ_E, SIGMA_MAX/σ_E]
 #   - fixed_ratio mode: uses FIXED_RATIO_* constants directly
-GRID_RESOLUTION = 20             # Number of points per axis (40×40 = 1600 points per map)
+GRID_RESOLUTION = 50             # Number of points per axis
 MEAN_STATE_SEED = RANDOM_SEED    # Random seed for SteadyStateFinder reproducibility
 
 # Visualization parameters
@@ -222,3 +222,6 @@ SPECTRUM_PARAM_RESOLUTION = 20           # Number of parameter values
 SPECTRUM_K_MAX = 10.0                    # Maximum k value for spectrum
 SPECTRUM_COLORMAP = 'inferno'            # Colormap for gain values
 SPECTRUM_LOG_SCALE = True                # Use log10(gain) for colormap
+
+# Visualization parameters
+SPECTRUM_Y_MARGIN = (0.5, 2.0)           # Y-axis range per stage (relative to preset: 0.5x to 2x)
