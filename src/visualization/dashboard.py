@@ -17,7 +17,7 @@ from src.model.config import (
     INITIAL_STRENGTH_SCALING, INITIAL_BACKGROUND_INPUT,
     CELL_COLORS, LAYER_COLORS as MODEL_LAYER_COLORS
 )
-from src.model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
+from src.model.presets import P0_PRESET, P5_PRESET, P10_PRESET, P15_PRESET
 from src.analysis.bifurcation import (
     NetworkModel, StabilityAnalyzer
 )
@@ -239,13 +239,6 @@ class DashboardApp:
             0.2: "0.2",
             0.4: "0.4"
         }
-    }
-    
-    CONSTANT_DRIVE_PARAMS = {
-        "min_val": 0.0,
-        "max_val": 10.0,
-        "step": 0.1,
-        "marks": {0: "0", 5: "5", 10: "10"}
     }
     
     def __init__(self, simulation, update_interval: int = UPDATE_INTERVAL):
@@ -1557,16 +1550,16 @@ class DashboardApp:
                 # Buttons container
                 dbc.Col([
                     html.Div([
-                        dbc.Button("P4", id="p4-preset-button", color="dark", 
+                        dbc.Button("P0", id="P0-preset-button", color="dark", 
                                 className="mx-2 px-3", 
                                 style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
-                        dbc.Button("P8", id="p8-preset-button", color="dark", 
+                        dbc.Button("P5", id="P5-preset-button", color="dark", 
                                 className="mx-2 px-3", 
                                 style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
-                        dbc.Button("P12", id="p12-preset-button", color="dark", 
+                        dbc.Button("P10", id="P10-preset-button", color="dark", 
                                  className="mx-2 px-3", 
                                  style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"}),
-                        dbc.Button("P16", id="p16-preset-button", color="dark", 
+                        dbc.Button("P15", id="P15-preset-button", color="dark", 
                                  className="mx-2 px-3", 
                                  style={"backgroundColor": "#2c3e50", "borderColor": "#2c3e50"})
                     ], style={"display": "flex", "justifyContent": "center"})
@@ -2018,7 +2011,7 @@ class DashboardApp:
         max_magnitude = 0.0
         
         # Check all developmental presets
-        for preset in [P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET]:
+        for preset in [P0_PRESET, P5_PRESET, P10_PRESET, P15_PRESET]:
             for conn_key, raw_strength in preset['connection_strengths'].items():
                 # Parse to get source cell type
                 parts = conn_key.split('_to_')
@@ -2469,10 +2462,10 @@ class DashboardApp:
     def setup_callbacks(self):
         """Set up the dashboard callbacks for interactivity."""
         # Add callbacks for preset buttons
-        self._create_preset_callback('p4', P4_PRESET)
-        self._create_preset_callback('p8', P8_PRESET, allow_duplicate=True)
-        self._create_preset_callback('p12', P12_PRESET, allow_duplicate=True)
-        self._create_preset_callback('p16', P16_PRESET, allow_duplicate=True)
+        self._create_preset_callback('P0', P0_PRESET)
+        self._create_preset_callback('P5', P5_PRESET, allow_duplicate=True)
+        self._create_preset_callback('P10', P10_PRESET, allow_duplicate=True)
+        self._create_preset_callback('P15', P15_PRESET, allow_duplicate=True)
         
         # Initialize slider container (hidden)
         @self.app.callback(
@@ -3153,24 +3146,6 @@ class DashboardApp:
             else:
                 return f"Currently analysing: {len(selected_pops)} populations"
         
-        # Add callback for updating constant drive parameters
-        @self.app.callback(
-            [Output('interval-component', 'n_intervals', allow_duplicate=True)],
-            [Input('constant-drive-e-slider', 'value'),
-             Input('constant-drive-sst-slider', 'value'),
-             Input('constant-drive-pv-slider', 'value')],
-            [State('interval-component', 'n_intervals')],
-            prevent_initial_call=True
-        )
-        def update_constant_drives(drive_e, drive_sst, drive_pv, n_intervals):
-            """Update constant background drive parameters in the simulation."""
-            self.simulation.set_constant_drive('E', drive_e)
-            self.simulation.set_constant_drive('SST', drive_sst)
-            self.simulation.set_constant_drive('PV', drive_pv)
-            
-            # Return unchanged intervals to not disrupt the update loop
-            return [n_intervals]
-    
     def create_parameter_sliders(self):
         """Create the neural parameter sliders section."""
         return html.Div([
@@ -3301,33 +3276,6 @@ class DashboardApp:
             ])
         ])
 
-    def create_constant_drive_sliders(self):
-        """Create the constant background drive sliders section."""
-        return html.Div([
-            # Headers row
-            dbc.Row([
-                dbc.Col("", width=1),
-                dbc.Col(html.Div("Background Drive", className="text-center"), width=11),
-            ], className="mb-1"),
-            
-            # Constant drive rows
-            *[self._create_constant_drive_row(cell_type) for cell_type in CELL_TYPES]
-        ])
-
-    def _create_constant_drive_row(self, cell_type):
-        """Create a row for a cell type's constant drive parameter."""
-        return dbc.Row([
-            # Cell type label
-            dbc.Col(html.Strong(cell_type), width=1, className="d-flex align-items-center"),
-            # Constant drive slider
-            dbc.Col(self._create_slider(
-                id_prefix='constant-drive',
-                cell_type=cell_type,
-                initial_value=0.0,
-                **self.CONSTANT_DRIVE_PARAMS
-            ), width=11)
-        ], className="mb-1")
-
     def create_control_panel(self):
         """Create the control panel with all sliders and controls."""
         return html.Div([
@@ -3356,11 +3304,6 @@ class DashboardApp:
                         style={"fontSize": f"{TITLE_FONT_SIZE}px", "fontWeight": "600"}),
                 self.create_input_controls()
             ], className="mb-3"),
-            
-            # Section for constant background drive
-            html.Div([html.Hr()], className="my-3"),
-            html.H5("Constant Background Drive", className="text-center"),
-            self.create_constant_drive_sliders(),
             
             # Pause/Play control
             html.Div([

@@ -5,16 +5,16 @@ import time
 from pathlib import Path
 from typing import Any, Optional, Dict
 
-from src.model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
+from src.model.presets import P0_PRESET, P5_PRESET, P10_PRESET, P15_PRESET
 from src import PICKLE_FORMAT_VERSION, __version__
 
 # Developmental stages - used by all analysis modules
-DEVELOPMENTAL_STAGES = ['P4', 'P8', 'P12', 'P16']
+DEVELOPMENTAL_STAGES = ['P0', 'P5', 'P10', 'P15']
 PRESETS = {
-    'P4': P4_PRESET,
-    'P8': P8_PRESET, 
-    'P12': P12_PRESET,
-    'P16': P16_PRESET
+    'P0': P0_PRESET,
+    'P5': P5_PRESET, 
+    'P10': P10_PRESET,
+    'P15': P15_PRESET
 }
 
 # Statistical visualization constants

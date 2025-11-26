@@ -274,7 +274,7 @@ def compute_gain_maps_single_stage(
     """Compute gain maps for a single developmental stage.
     
     Args:
-        stage_name: Developmental stage ('P4', 'P8', 'P12', 'P16')
+        stage_name: Developmental stage ('P0', 'P5', 'P10', 'P15')
         parameter_pairs: List of (param_x_key, param_y_key) tuples
         mode: Range mode ('fixed_absolute' or 'fixed_ratio')
         n_processes: Number of processes for parallelization
@@ -368,7 +368,7 @@ def compute_gain_maps_all_stages(
     
     Args:
         parameter_pairs: List of (param_x_key, param_y_key) tuples to scan
-        stages: List of developmental stages (default: ['P4', 'P8', 'P12', 'P16'])
+        stages: List of developmental stages (default: ['P0', 'P5', 'P10', 'P15'])
         mode: Range mode ('fixed_absolute' or 'fixed_ratio')
         n_processes: Number of processes for parallelization
         
@@ -376,7 +376,7 @@ def compute_gain_maps_all_stages(
         Nested dict: {param_pair: {stage: results}}
     """
     if stages is None:
-        stages = ['P4', 'P8', 'P12', 'P16']
+        stages = ['P0', 'P5', 'P10', 'P15']
     
     print("\n" + "="*70)
     print(f"  GAIN MAPS - Computing All Stages ({mode})")
@@ -604,7 +604,7 @@ def compute_gain_spectra_single_stage(
     """Compute gain spectra for a single developmental stage.
     
     Args:
-        stage_name: Developmental stage ('P4', 'P8', 'P12', 'P16')
+        stage_name: Developmental stage ('P0', 'P5', 'P10', 'P15')
         parameter_keys: List of parameter keys to sweep
         n_processes: Number of processes for parallelization
         
@@ -652,14 +652,14 @@ def compute_gain_spectra_all_stages(
     
     Args:
         parameter_keys: List of parameter keys to sweep
-        stages: List of developmental stages (default: ['P4', 'P8', 'P12', 'P16'])
+        stages: List of developmental stages (default: ['P0', 'P5', 'P10', 'P15'])
         n_processes: Number of processes for parallelization
         
     Returns:
         Nested dict: {param_key: {stage: results}}
     """
     if stages is None:
-        stages = ['P4', 'P8', 'P12', 'P16']
+        stages = ['P0', 'P5', 'P10', 'P15']
     
     print("\n" + "="*70)
     print("  GAIN SPECTRA - Computing All Stages")

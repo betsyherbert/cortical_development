@@ -155,26 +155,6 @@ class CorticalSimulation:
             value: Background input value
         """
         self.circuit.set_background_input(cell_type, value)
-    
-    def set_constant_drive(self, cell_type: str, value: float) -> None:
-        """Set constant background drive for a specific cell type.
-        
-        Args:
-            cell_type: The cell type to update ('E', 'SST', or 'PV')
-            value: Constant background drive value
-        """
-        self.circuit.set_constant_drive(cell_type, value)
-
-    def get_constant_drive(self, cell_type: str) -> float:
-        """Get current constant background drive for a specific cell type.
-        
-        Args:
-            cell_type: The cell type to query ('E', 'SST', or 'PV')
-            
-        Returns:
-            Current constant background drive value
-        """
-        return self.circuit.get_constant_drive(cell_type)
 
 
 def parse_arguments():

@@ -374,7 +374,7 @@ class StabilityVisualizer:
         
         # Column positions (with age group separations)
         col_positions = []
-        for age_group in range(4):  # P4, P8, P12, P16
+        for age_group in range(4):  # P0, P5, P10, P15
             base_x = left_start + age_group * (4 * col_spacing + 0.02)  # Small gap between age groups
             for condition in range(4):  # Full, E-only, Diff, Regime
                 col_positions.append(base_x + condition * col_spacing)

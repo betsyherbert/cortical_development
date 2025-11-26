@@ -1,7 +1,7 @@
 """Developmental parameter presets for the cortical circuit simulation, updated."""
 
-# ----------------- P4 PRESET (Early 1st Week) -----------------
-P4_PRESET = {
+# ----------------- P0 PRESET (Early 1st Week) -----------------
+P0_PRESET = {
     # Approximate time constants (ms). 
     'time_constants': {
         'E': 15.0,    # excitatory cells slower than adult
@@ -153,8 +153,8 @@ P4_PRESET = {
         }
 }
 
-# ----------------- P8 PRESET (Late 1st Week) -----------------
-P8_PRESET = {
+# ----------------- P5 PRESET (Late 1st Week) -----------------
+P5_PRESET = {
     'time_constants': {
         'E': 14.0,
         'SST': 20.0,
@@ -298,8 +298,8 @@ P8_PRESET = {
         }
 }
 
-# ----------------- P12 PRESET (Mid 2nd Week) -----------------
-P12_PRESET = {
+# ----------------- P10 PRESET (Mid 2nd Week) -----------------
+P10_PRESET = {
     'time_constants': {
         'E': 7.0,  
         'SST': 20.0,
@@ -445,8 +445,8 @@ P12_PRESET = {
 
 }
 
-# ----------------- P16 PRESET (Late 2nd Week) -----------------
-P16_PRESET = {
+# ----------------- P15 PRESET (Late 2nd Week) -----------------
+P15_PRESET = {
     'time_constants': {
         'E': 9.0,  
         'SST': 10.0,

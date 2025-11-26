@@ -1,7 +1,7 @@
 """Descriptive analysis module for cortical network activity patterns.
 
 This module provides comprehensive analysis and visualization of cortical circuit
-activity across developmental stages (P4, P8, P12, P16).
+activity across developmental stages (P0, P5, P10, P15).
 """
 
 from .activity_analysis import DescriptiveAnalysis

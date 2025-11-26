@@ -1,25 +1,25 @@
 """Tests for developmental presets."""
 
 import pytest
-from src.model.presets import P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET
+from src.model.presets import P0_PRESET, P5_PRESET, P10_PRESET, P15_PRESET
 from src.model.config import CELL_TYPES, LAYERS
 
 
 def test_all_presets_exist():
     """Test all expected presets are defined."""
-    assert P4_PRESET is not None
-    assert P8_PRESET is not None
-    assert P12_PRESET is not None
-    assert P16_PRESET is not None
+    assert P0_PRESET is not None
+    assert P5_PRESET is not None
+    assert P10_PRESET is not None
+    assert P15_PRESET is not None
 
 
-def test_preset_structure(preset_name='P4'):
+def test_preset_structure(preset_name='P0'):
     """Test preset has required structure."""
     presets = {
-        'P4': P4_PRESET,
-        'P8': P8_PRESET,
-        'P12': P12_PRESET,
-        'P16': P16_PRESET
+        'P0': P0_PRESET,
+        'P5': P5_PRESET,
+        'P10': P10_PRESET,
+        'P15': P15_PRESET
     }
     
     preset = presets[preset_name]
@@ -38,7 +38,7 @@ def test_preset_structure(preset_name='P4'):
 
 def test_preset_time_constants():
     """Test preset time constants are valid."""
-    preset = P4_PRESET
+    preset = P0_PRESET
     
     assert 'time_constants' in preset
     
@@ -51,7 +51,7 @@ def test_preset_time_constants():
 
 def test_preset_gains():
     """Test preset gains are valid."""
-    preset = P4_PRESET
+    preset = P0_PRESET
     
     assert 'gains' in preset
     
@@ -64,7 +64,7 @@ def test_preset_gains():
 
 def test_preset_noise_params():
     """Test preset noise parameters are valid."""
-    preset = P4_PRESET
+    preset = P0_PRESET
     
     assert 'noise_params' in preset
     
@@ -85,7 +85,7 @@ def test_preset_noise_params():
 
 def test_preset_connection_strengths():
     """Test preset connection strengths structure."""
-    preset = P4_PRESET
+    preset = P0_PRESET
     
     assert 'connection_strengths' in preset
     
@@ -96,10 +96,10 @@ def test_preset_connection_strengths():
 
 def test_all_presets_have_same_structure():
     """Test all presets have the same structure."""
-    presets = [P4_PRESET, P8_PRESET, P12_PRESET, P16_PRESET]
+    presets = [P0_PRESET, P5_PRESET, P10_PRESET, P15_PRESET]
     
     # Get keys from first preset
-    base_keys = set(P4_PRESET.keys())
+    base_keys = set(P0_PRESET.keys())
     
     for preset in presets[1:]:
         preset_keys = set(preset.keys())
@@ -109,10 +109,10 @@ def test_all_presets_have_same_structure():
 def test_preset_thalamic_alpha():
     """Test preset thalamic alpha is in valid range."""
     presets = {
-        'P4': P4_PRESET,
-        'P8': P8_PRESET,
-        'P12': P12_PRESET,
-        'P16': P16_PRESET
+        'P0': P0_PRESET,
+        'P5': P5_PRESET,
+        'P10': P10_PRESET,
+        'P15': P15_PRESET
     }
     
     for name, preset in presets.items():
@@ -122,14 +122,14 @@ def test_preset_thalamic_alpha():
         assert 0 <= alpha <= 1  # Alpha should be in [0, 1]
 
 
-@pytest.mark.parametrize("preset_name", ['P4', 'P8', 'P12', 'P16'])
+@pytest.mark.parametrize("preset_name", ['P0', 'P5', 'P10', 'P15'])
 def test_preset_valid_structure(preset_name):
     """Parametrized test for all presets."""
     presets = {
-        'P4': P4_PRESET,
-        'P8': P8_PRESET,
-        'P12': P12_PRESET,
-        'P16': P16_PRESET
+        'P0': P0_PRESET,
+        'P5': P5_PRESET,
+        'P10': P10_PRESET,
+        'P15': P15_PRESET
     }
     
     preset = presets[preset_name]

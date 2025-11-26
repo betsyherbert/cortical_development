@@ -780,7 +780,7 @@ class BifurcationVisualizer:
         output_dir = Path(OUTPUT_DIR)
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        stages = ['P4', 'P8', 'P12', 'P16']
+        stages = ['P0', 'P5', 'P10', 'P15']
         
         # Generate stability map figures (one figure with all parameter pairs)
         if 'stability' in results:

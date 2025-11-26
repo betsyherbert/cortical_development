@@ -247,7 +247,7 @@ def compute_stability_maps_single_stage(
     """Compute stability maps for a single developmental stage.
     
     Args:
-        stage_name: Developmental stage ('P4', 'P8', 'P12', 'P16')
+        stage_name: Developmental stage ('P0', 'P5', 'P10', 'P15')
         parameter_pairs: List of (param_x_key, param_y_key) tuples
         mode: Range mode ('fixed_absolute' or 'fixed_ratio')
         n_processes: Number of processes for parallelization
@@ -344,7 +344,7 @@ def compute_stability_maps_all_stages(
     
     Args:
         parameter_pairs: List of (param_x_key, param_y_key) tuples to scan
-        stages: List of developmental stages (default: ['P4', 'P8', 'P12', 'P16'])
+        stages: List of developmental stages (default: ['P0', 'P5', 'P10', 'P15'])
         mode: Range mode ('fixed_absolute' or 'fixed_ratio')
         n_processes: Number of processes for parallelization
         
@@ -352,7 +352,7 @@ def compute_stability_maps_all_stages(
         Nested dict: {param_pair: {stage: results}}
     """
     if stages is None:
-        stages = ['P4', 'P8', 'P12', 'P16']
+        stages = ['P0', 'P5', 'P10', 'P15']
     
     print("\n" + "="*70)
     print(f"  STABILITY MAPS - Computing All Stages ({mode})")

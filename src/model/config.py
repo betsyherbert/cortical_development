@@ -8,7 +8,7 @@ This module contains all the key parameters for:
 """
 
 import numpy as np
-from .presets import P4_PRESET
+from .presets import P0_PRESET
 
 #------------------------------------------------------------------------------
 # Core Simulation Parameters
@@ -56,13 +56,13 @@ THALAMIC_SENSORY_AMP = 1.0  # Mean amplitude of sensory bursts
 #------------------------------------------------------------------------------
 # Initial Network Parameters
 #------------------------------------------------------------------------------
-INITIAL_THALAMIC_WIDTHS = P4_PRESET['thalamic_widths']
-INITIAL_OUTGOING_WIDTHS = P4_PRESET['outgoing_widths']
-INITIAL_STRENGTH_SCALING = P4_PRESET['strength_scaling']
-INITIAL_TIME_CONSTANTS = P4_PRESET['time_constants']
-INITIAL_GAINS = P4_PRESET['gains']
-INITIAL_BACKGROUND_INPUT = P4_PRESET['background_input']  
-THALAMIC_ALPHA = P4_PRESET['thalamic_alpha']  # Balance between intrinsic (0) and sensory (1) thalamic activity
+INITIAL_THALAMIC_WIDTHS = P0_PRESET['thalamic_widths']
+INITIAL_OUTGOING_WIDTHS = P0_PRESET['outgoing_widths']
+INITIAL_STRENGTH_SCALING = P0_PRESET['strength_scaling']
+INITIAL_TIME_CONSTANTS = P0_PRESET['time_constants']
+INITIAL_GAINS = P0_PRESET['gains']
+INITIAL_BACKGROUND_INPUT = P0_PRESET['background_input']  
+THALAMIC_ALPHA = P0_PRESET['thalamic_alpha']  # Balance between intrinsic (0) and sensory (1) thalamic activity
 
 #------------------------------------------------------------------------------
 # Visualization Settings
@@ -117,125 +117,125 @@ LAYER_CONNECTIVITY_PARAMS = {
     # -----------------------------------------------------
     # L2/3 -> L2/3 connections
     # -----------------------------------------------------
-    'L23_E_to_L23_E': {'amplitude': P4_PRESET['connection_strengths']['L23_E_to_L23_E'], 'sigma': 2.0},
-    'L23_E_to_L23_SST': {'amplitude': P4_PRESET['connection_strengths']['L23_E_to_L23_SST'], 'sigma': 2.0},
-    'L23_E_to_L23_PV': {'amplitude': P4_PRESET['connection_strengths']['L23_E_to_L23_PV'], 'sigma': 2.0},
-    'L23_SST_to_L23_E': {'amplitude': P4_PRESET['connection_strengths']['L23_SST_to_L23_E'], 'sigma': 3.0},
-    'L23_SST_to_L23_PV': {'amplitude': P4_PRESET['connection_strengths']['L23_SST_to_L23_PV'], 'sigma': 3.0},
-    'L23_PV_to_L23_E': {'amplitude': P4_PRESET['connection_strengths']['L23_PV_to_L23_E'], 'sigma': 1.5},
-    'L23_PV_to_L23_SST': {'amplitude': P4_PRESET['connection_strengths']['L23_PV_to_L23_SST'], 'sigma': 1.5},
-    'L23_PV_to_L23_PV': {'amplitude': P4_PRESET['connection_strengths']['L23_PV_to_L23_PV'], 'sigma': 1.5},
+    'L23_E_to_L23_E': {'amplitude': P0_PRESET['connection_strengths']['L23_E_to_L23_E'], 'sigma': 2.0},
+    'L23_E_to_L23_SST': {'amplitude': P0_PRESET['connection_strengths']['L23_E_to_L23_SST'], 'sigma': 2.0},
+    'L23_E_to_L23_PV': {'amplitude': P0_PRESET['connection_strengths']['L23_E_to_L23_PV'], 'sigma': 2.0},
+    'L23_SST_to_L23_E': {'amplitude': P0_PRESET['connection_strengths']['L23_SST_to_L23_E'], 'sigma': 3.0},
+    'L23_SST_to_L23_PV': {'amplitude': P0_PRESET['connection_strengths']['L23_SST_to_L23_PV'], 'sigma': 3.0},
+    'L23_PV_to_L23_E': {'amplitude': P0_PRESET['connection_strengths']['L23_PV_to_L23_E'], 'sigma': 1.5},
+    'L23_PV_to_L23_SST': {'amplitude': P0_PRESET['connection_strengths']['L23_PV_to_L23_SST'], 'sigma': 1.5},
+    'L23_PV_to_L23_PV': {'amplitude': P0_PRESET['connection_strengths']['L23_PV_to_L23_PV'], 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L2/3 -> L4 connections
     # -----------------------------------------------------
-    'L23_E_to_L4_E': {'amplitude': P4_PRESET['connection_strengths']['L23_E_to_L4_E'], 'sigma': 2.5},
-    'L23_E_to_L4_SST': {'amplitude': P4_PRESET['connection_strengths']['L23_E_to_L4_SST'], 'sigma': 2.5},
-    'L23_E_to_L4_PV': {'amplitude': P4_PRESET['connection_strengths']['L23_E_to_L4_PV'], 'sigma': 2.5},
-    'L23_SST_to_L4_E': {'amplitude': P4_PRESET['connection_strengths']['L23_SST_to_L4_E'], 'sigma': 3.0},
-    'L23_SST_to_L4_PV': {'amplitude': P4_PRESET['connection_strengths']['L23_SST_to_L4_PV'], 'sigma': 3.0},
-    'L23_PV_to_L4_E': {'amplitude': P4_PRESET['connection_strengths']['L23_PV_to_L4_E'], 'sigma': 1.5},
-    'L23_PV_to_L4_SST': {'amplitude': P4_PRESET['connection_strengths']['L23_PV_to_L4_SST'], 'sigma': 1.5},
-    'L23_PV_to_L4_PV': {'amplitude': P4_PRESET['connection_strengths']['L23_PV_to_L4_PV'], 'sigma': 1.5},
+    'L23_E_to_L4_E': {'amplitude': P0_PRESET['connection_strengths']['L23_E_to_L4_E'], 'sigma': 2.5},
+    'L23_E_to_L4_SST': {'amplitude': P0_PRESET['connection_strengths']['L23_E_to_L4_SST'], 'sigma': 2.5},
+    'L23_E_to_L4_PV': {'amplitude': P0_PRESET['connection_strengths']['L23_E_to_L4_PV'], 'sigma': 2.5},
+    'L23_SST_to_L4_E': {'amplitude': P0_PRESET['connection_strengths']['L23_SST_to_L4_E'], 'sigma': 3.0},
+    'L23_SST_to_L4_PV': {'amplitude': P0_PRESET['connection_strengths']['L23_SST_to_L4_PV'], 'sigma': 3.0},
+    'L23_PV_to_L4_E': {'amplitude': P0_PRESET['connection_strengths']['L23_PV_to_L4_E'], 'sigma': 1.5},
+    'L23_PV_to_L4_SST': {'amplitude': P0_PRESET['connection_strengths']['L23_PV_to_L4_SST'], 'sigma': 1.5},
+    'L23_PV_to_L4_PV': {'amplitude': P0_PRESET['connection_strengths']['L23_PV_to_L4_PV'], 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L2/3 -> L5 connections
     # -----------------------------------------------------
-    'L23_E_to_L5_E': {'amplitude': P4_PRESET['connection_strengths']['L23_E_to_L5_E'], 'sigma': 3.0},
-    'L23_E_to_L5_SST': {'amplitude': P4_PRESET['connection_strengths']['L23_E_to_L5_SST'], 'sigma': 3.0},
-    'L23_E_to_L5_PV': {'amplitude': P4_PRESET['connection_strengths']['L23_E_to_L5_PV'], 'sigma': 3.0},
-    'L23_SST_to_L5_E': {'amplitude': P4_PRESET['connection_strengths']['L23_SST_to_L5_E'], 'sigma': 3.0},
-    'L23_SST_to_L5_PV': {'amplitude': P4_PRESET['connection_strengths']['L23_SST_to_L5_PV'], 'sigma': 3.0},
-    'L23_PV_to_L5_E': {'amplitude': P4_PRESET['connection_strengths']['L23_PV_to_L5_E'], 'sigma': 1.5},
-    'L23_PV_to_L5_SST': {'amplitude': P4_PRESET['connection_strengths']['L23_PV_to_L5_SST'], 'sigma': 1.5},
-    'L23_PV_to_L5_PV': {'amplitude': P4_PRESET['connection_strengths']['L23_PV_to_L5_PV'], 'sigma': 1.5},
+    'L23_E_to_L5_E': {'amplitude': P0_PRESET['connection_strengths']['L23_E_to_L5_E'], 'sigma': 3.0},
+    'L23_E_to_L5_SST': {'amplitude': P0_PRESET['connection_strengths']['L23_E_to_L5_SST'], 'sigma': 3.0},
+    'L23_E_to_L5_PV': {'amplitude': P0_PRESET['connection_strengths']['L23_E_to_L5_PV'], 'sigma': 3.0},
+    'L23_SST_to_L5_E': {'amplitude': P0_PRESET['connection_strengths']['L23_SST_to_L5_E'], 'sigma': 3.0},
+    'L23_SST_to_L5_PV': {'amplitude': P0_PRESET['connection_strengths']['L23_SST_to_L5_PV'], 'sigma': 3.0},
+    'L23_PV_to_L5_E': {'amplitude': P0_PRESET['connection_strengths']['L23_PV_to_L5_E'], 'sigma': 1.5},
+    'L23_PV_to_L5_SST': {'amplitude': P0_PRESET['connection_strengths']['L23_PV_to_L5_SST'], 'sigma': 1.5},
+    'L23_PV_to_L5_PV': {'amplitude': P0_PRESET['connection_strengths']['L23_PV_to_L5_PV'], 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L4 -> L2/3 connections
     # -----------------------------------------------------
-    'L4_E_to_L23_E': {'amplitude': P4_PRESET['connection_strengths']['L4_E_to_L23_E'], 'sigma': 2.5},
-    'L4_E_to_L23_SST': {'amplitude': P4_PRESET['connection_strengths']['L4_E_to_L23_SST'], 'sigma': 2.5},
-    'L4_E_to_L23_PV': {'amplitude': P4_PRESET['connection_strengths']['L4_E_to_L23_PV'], 'sigma': 2.5},
-    'L4_SST_to_L23_E': {'amplitude': P4_PRESET['connection_strengths']['L4_SST_to_L23_E'], 'sigma': 3.0},
-    'L4_SST_to_L23_PV': {'amplitude': P4_PRESET['connection_strengths']['L4_SST_to_L23_PV'], 'sigma': 3.0},
-    'L4_PV_to_L23_E': {'amplitude': P4_PRESET['connection_strengths']['L4_PV_to_L23_E'], 'sigma': 1.5},
-    'L4_PV_to_L23_SST': {'amplitude': P4_PRESET['connection_strengths']['L4_PV_to_L23_SST'], 'sigma': 1.5},
-    'L4_PV_to_L23_PV': {'amplitude': P4_PRESET['connection_strengths']['L4_PV_to_L23_PV'], 'sigma': 1.5},
+    'L4_E_to_L23_E': {'amplitude': P0_PRESET['connection_strengths']['L4_E_to_L23_E'], 'sigma': 2.5},
+    'L4_E_to_L23_SST': {'amplitude': P0_PRESET['connection_strengths']['L4_E_to_L23_SST'], 'sigma': 2.5},
+    'L4_E_to_L23_PV': {'amplitude': P0_PRESET['connection_strengths']['L4_E_to_L23_PV'], 'sigma': 2.5},
+    'L4_SST_to_L23_E': {'amplitude': P0_PRESET['connection_strengths']['L4_SST_to_L23_E'], 'sigma': 3.0},
+    'L4_SST_to_L23_PV': {'amplitude': P0_PRESET['connection_strengths']['L4_SST_to_L23_PV'], 'sigma': 3.0},
+    'L4_PV_to_L23_E': {'amplitude': P0_PRESET['connection_strengths']['L4_PV_to_L23_E'], 'sigma': 1.5},
+    'L4_PV_to_L23_SST': {'amplitude': P0_PRESET['connection_strengths']['L4_PV_to_L23_SST'], 'sigma': 1.5},
+    'L4_PV_to_L23_PV': {'amplitude': P0_PRESET['connection_strengths']['L4_PV_to_L23_PV'], 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L4 -> L4 connections
     # -----------------------------------------------------
-    'L4_E_to_L4_E': {'amplitude': P4_PRESET['connection_strengths']['L4_E_to_L4_E'], 'sigma': 2.0},
-    'L4_E_to_L4_SST': {'amplitude': P4_PRESET['connection_strengths']['L4_E_to_L4_SST'], 'sigma': 2.0},
-    'L4_E_to_L4_PV': {'amplitude': P4_PRESET['connection_strengths']['L4_E_to_L4_PV'], 'sigma': 2.0},
-    'L4_SST_to_L4_E': {'amplitude': P4_PRESET['connection_strengths']['L4_SST_to_L4_E'], 'sigma': 3.0},
-    'L4_SST_to_L4_PV': {'amplitude': P4_PRESET['connection_strengths']['L4_SST_to_L4_PV'], 'sigma': 3.0},
-    'L4_PV_to_L4_E': {'amplitude': P4_PRESET['connection_strengths']['L4_PV_to_L4_E'], 'sigma': 1.5},
-    'L4_PV_to_L4_SST': {'amplitude': P4_PRESET['connection_strengths']['L4_PV_to_L4_SST'], 'sigma': 1.5},
-    'L4_PV_to_L4_PV': {'amplitude': P4_PRESET['connection_strengths']['L4_PV_to_L4_PV'], 'sigma': 1.5},
+    'L4_E_to_L4_E': {'amplitude': P0_PRESET['connection_strengths']['L4_E_to_L4_E'], 'sigma': 2.0},
+    'L4_E_to_L4_SST': {'amplitude': P0_PRESET['connection_strengths']['L4_E_to_L4_SST'], 'sigma': 2.0},
+    'L4_E_to_L4_PV': {'amplitude': P0_PRESET['connection_strengths']['L4_E_to_L4_PV'], 'sigma': 2.0},
+    'L4_SST_to_L4_E': {'amplitude': P0_PRESET['connection_strengths']['L4_SST_to_L4_E'], 'sigma': 3.0},
+    'L4_SST_to_L4_PV': {'amplitude': P0_PRESET['connection_strengths']['L4_SST_to_L4_PV'], 'sigma': 3.0},
+    'L4_PV_to_L4_E': {'amplitude': P0_PRESET['connection_strengths']['L4_PV_to_L4_E'], 'sigma': 1.5},
+    'L4_PV_to_L4_SST': {'amplitude': P0_PRESET['connection_strengths']['L4_PV_to_L4_SST'], 'sigma': 1.5},
+    'L4_PV_to_L4_PV': {'amplitude': P0_PRESET['connection_strengths']['L4_PV_to_L4_PV'], 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L4 -> L5 connections
     # -----------------------------------------------------
-    'L4_E_to_L5_E': {'amplitude': P4_PRESET['connection_strengths']['L4_E_to_L5_E'], 'sigma': 2.5},
-    'L4_E_to_L5_SST': {'amplitude': P4_PRESET['connection_strengths']['L4_E_to_L5_SST'], 'sigma': 2.5},
-    'L4_E_to_L5_PV': {'amplitude': P4_PRESET['connection_strengths']['L4_E_to_L5_PV'], 'sigma': 2.5},
-    'L4_SST_to_L5_E': {'amplitude': P4_PRESET['connection_strengths']['L4_SST_to_L5_E'], 'sigma': 3.0},
-    'L4_SST_to_L5_PV': {'amplitude': P4_PRESET['connection_strengths']['L4_SST_to_L5_PV'], 'sigma': 3.0},
-    'L4_PV_to_L5_E': {'amplitude': P4_PRESET['connection_strengths']['L4_PV_to_L5_E'], 'sigma': 1.5},
-    'L4_PV_to_L5_SST': {'amplitude': P4_PRESET['connection_strengths']['L4_PV_to_L5_SST'], 'sigma': 1.5},
-    'L4_PV_to_L5_PV': {'amplitude': P4_PRESET['connection_strengths']['L4_PV_to_L5_PV'], 'sigma': 1.5},
+    'L4_E_to_L5_E': {'amplitude': P0_PRESET['connection_strengths']['L4_E_to_L5_E'], 'sigma': 2.5},
+    'L4_E_to_L5_SST': {'amplitude': P0_PRESET['connection_strengths']['L4_E_to_L5_SST'], 'sigma': 2.5},
+    'L4_E_to_L5_PV': {'amplitude': P0_PRESET['connection_strengths']['L4_E_to_L5_PV'], 'sigma': 2.5},
+    'L4_SST_to_L5_E': {'amplitude': P0_PRESET['connection_strengths']['L4_SST_to_L5_E'], 'sigma': 3.0},
+    'L4_SST_to_L5_PV': {'amplitude': P0_PRESET['connection_strengths']['L4_SST_to_L5_PV'], 'sigma': 3.0},
+    'L4_PV_to_L5_E': {'amplitude': P0_PRESET['connection_strengths']['L4_PV_to_L5_E'], 'sigma': 1.5},
+    'L4_PV_to_L5_SST': {'amplitude': P0_PRESET['connection_strengths']['L4_PV_to_L5_SST'], 'sigma': 1.5},
+    'L4_PV_to_L5_PV': {'amplitude': P0_PRESET['connection_strengths']['L4_PV_to_L5_PV'], 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L5 -> L2/3 connections
     # -----------------------------------------------------
-    'L5_E_to_L23_E': {'amplitude': P4_PRESET['connection_strengths']['L5_E_to_L23_E'], 'sigma': 3.0},
-    'L5_E_to_L23_SST': {'amplitude': P4_PRESET['connection_strengths']['L5_E_to_L23_SST'], 'sigma': 3.0},
-    'L5_E_to_L23_PV': {'amplitude': P4_PRESET['connection_strengths']['L5_E_to_L23_PV'], 'sigma': 3.0},
-    'L5_SST_to_L23_E': {'amplitude': P4_PRESET['connection_strengths']['L5_SST_to_L23_E'], 'sigma': 3.0},
-    'L5_SST_to_L23_PV': {'amplitude': P4_PRESET['connection_strengths']['L5_SST_to_L23_PV'], 'sigma': 3.0},
-    'L5_PV_to_L23_E': {'amplitude': P4_PRESET['connection_strengths']['L5_PV_to_L23_E'], 'sigma': 1.5},
-    'L5_PV_to_L23_SST': {'amplitude': P4_PRESET['connection_strengths']['L5_PV_to_L23_SST'], 'sigma': 1.5},
-    'L5_PV_to_L23_PV': {'amplitude': P4_PRESET['connection_strengths']['L5_PV_to_L23_PV'], 'sigma': 1.5},
+    'L5_E_to_L23_E': {'amplitude': P0_PRESET['connection_strengths']['L5_E_to_L23_E'], 'sigma': 3.0},
+    'L5_E_to_L23_SST': {'amplitude': P0_PRESET['connection_strengths']['L5_E_to_L23_SST'], 'sigma': 3.0},
+    'L5_E_to_L23_PV': {'amplitude': P0_PRESET['connection_strengths']['L5_E_to_L23_PV'], 'sigma': 3.0},
+    'L5_SST_to_L23_E': {'amplitude': P0_PRESET['connection_strengths']['L5_SST_to_L23_E'], 'sigma': 3.0},
+    'L5_SST_to_L23_PV': {'amplitude': P0_PRESET['connection_strengths']['L5_SST_to_L23_PV'], 'sigma': 3.0},
+    'L5_PV_to_L23_E': {'amplitude': P0_PRESET['connection_strengths']['L5_PV_to_L23_E'], 'sigma': 1.5},
+    'L5_PV_to_L23_SST': {'amplitude': P0_PRESET['connection_strengths']['L5_PV_to_L23_SST'], 'sigma': 1.5},
+    'L5_PV_to_L23_PV': {'amplitude': P0_PRESET['connection_strengths']['L5_PV_to_L23_PV'], 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L5 -> L4 connections
     # -----------------------------------------------------
-    'L5_E_to_L4_E': {'amplitude': P4_PRESET['connection_strengths']['L5_E_to_L4_E'], 'sigma': 3.0},
-    'L5_E_to_L4_SST': {'amplitude': P4_PRESET['connection_strengths']['L5_E_to_L4_SST'], 'sigma': 3.0},
-    'L5_E_to_L4_PV': {'amplitude': P4_PRESET['connection_strengths']['L5_E_to_L4_PV'], 'sigma': 3.0},
-    'L5_SST_to_L4_E': {'amplitude': P4_PRESET['connection_strengths']['L5_SST_to_L4_E'], 'sigma': 3.0},
-    'L5_SST_to_L4_PV': {'amplitude': P4_PRESET['connection_strengths']['L5_SST_to_L4_PV'], 'sigma': 3.0},
-    'L5_PV_to_L4_E': {'amplitude': P4_PRESET['connection_strengths']['L5_PV_to_L4_E'], 'sigma': 1.5},
-    'L5_PV_to_L4_SST': {'amplitude': P4_PRESET['connection_strengths']['L5_PV_to_L4_SST'], 'sigma': 1.5},
-    'L5_PV_to_L4_PV': {'amplitude': P4_PRESET['connection_strengths']['L5_PV_to_L4_PV'], 'sigma': 1.5},
+    'L5_E_to_L4_E': {'amplitude': P0_PRESET['connection_strengths']['L5_E_to_L4_E'], 'sigma': 3.0},
+    'L5_E_to_L4_SST': {'amplitude': P0_PRESET['connection_strengths']['L5_E_to_L4_SST'], 'sigma': 3.0},
+    'L5_E_to_L4_PV': {'amplitude': P0_PRESET['connection_strengths']['L5_E_to_L4_PV'], 'sigma': 3.0},
+    'L5_SST_to_L4_E': {'amplitude': P0_PRESET['connection_strengths']['L5_SST_to_L4_E'], 'sigma': 3.0},
+    'L5_SST_to_L4_PV': {'amplitude': P0_PRESET['connection_strengths']['L5_SST_to_L4_PV'], 'sigma': 3.0},
+    'L5_PV_to_L4_E': {'amplitude': P0_PRESET['connection_strengths']['L5_PV_to_L4_E'], 'sigma': 1.5},
+    'L5_PV_to_L4_SST': {'amplitude': P0_PRESET['connection_strengths']['L5_PV_to_L4_SST'], 'sigma': 1.5},
+    'L5_PV_to_L4_PV': {'amplitude': P0_PRESET['connection_strengths']['L5_PV_to_L4_PV'], 'sigma': 1.5},
     
     # -----------------------------------------------------
     # L5 -> L5 connections
     # -----------------------------------------------------
-    'L5_E_to_L5_E': {'amplitude': P4_PRESET['connection_strengths']['L5_E_to_L5_E'], 'sigma': 2.0},
-    'L5_E_to_L5_SST': {'amplitude': P4_PRESET['connection_strengths']['L5_E_to_L5_SST'], 'sigma': 2.0},
-    'L5_E_to_L5_PV': {'amplitude': P4_PRESET['connection_strengths']['L5_E_to_L5_PV'], 'sigma': 2.0},
-    'L5_SST_to_L5_E': {'amplitude': P4_PRESET['connection_strengths']['L5_SST_to_L5_E'], 'sigma': 3.0},
-    'L5_SST_to_L5_PV': {'amplitude': P4_PRESET['connection_strengths']['L5_SST_to_L5_PV'], 'sigma': 3.0},
-    'L5_PV_to_L5_E': {'amplitude': P4_PRESET['connection_strengths']['L5_PV_to_L5_E'], 'sigma': 1.5},
-    'L5_PV_to_L5_SST': {'amplitude': P4_PRESET['connection_strengths']['L5_PV_to_L5_SST'], 'sigma': 1.5},
-    'L5_PV_to_L5_PV': {'amplitude': P4_PRESET['connection_strengths']['L5_PV_to_L5_PV'], 'sigma': 1.5},
+    'L5_E_to_L5_E': {'amplitude': P0_PRESET['connection_strengths']['L5_E_to_L5_E'], 'sigma': 2.0},
+    'L5_E_to_L5_SST': {'amplitude': P0_PRESET['connection_strengths']['L5_E_to_L5_SST'], 'sigma': 2.0},
+    'L5_E_to_L5_PV': {'amplitude': P0_PRESET['connection_strengths']['L5_E_to_L5_PV'], 'sigma': 2.0},
+    'L5_SST_to_L5_E': {'amplitude': P0_PRESET['connection_strengths']['L5_SST_to_L5_E'], 'sigma': 3.0},
+    'L5_SST_to_L5_PV': {'amplitude': P0_PRESET['connection_strengths']['L5_SST_to_L5_PV'], 'sigma': 3.0},
+    'L5_PV_to_L5_E': {'amplitude': P0_PRESET['connection_strengths']['L5_PV_to_L5_E'], 'sigma': 1.5},
+    'L5_PV_to_L5_SST': {'amplitude': P0_PRESET['connection_strengths']['L5_PV_to_L5_SST'], 'sigma': 1.5},
+    'L5_PV_to_L5_PV': {'amplitude': P0_PRESET['connection_strengths']['L5_PV_to_L5_PV'], 'sigma': 1.5},
     
     # -----------------------------------------------------
     # Thalamic connections to all layers
     # -----------------------------------------------------
-    'thalamus_to_L23_E': {'amplitude': P4_PRESET['connection_strengths']['thalamus_to_L23_E'], 'sigma': 2.0},
-    'thalamus_to_L23_SST': {'amplitude': P4_PRESET['connection_strengths']['thalamus_to_L23_SST'], 'sigma': 2.0},
-    'thalamus_to_L23_PV': {'amplitude': P4_PRESET['connection_strengths']['thalamus_to_L23_PV'], 'sigma': 2.0},
+    'thalamus_to_L23_E': {'amplitude': P0_PRESET['connection_strengths']['thalamus_to_L23_E'], 'sigma': 2.0},
+    'thalamus_to_L23_SST': {'amplitude': P0_PRESET['connection_strengths']['thalamus_to_L23_SST'], 'sigma': 2.0},
+    'thalamus_to_L23_PV': {'amplitude': P0_PRESET['connection_strengths']['thalamus_to_L23_PV'], 'sigma': 2.0},
     
-    'thalamus_to_L4_E': {'amplitude': P4_PRESET['connection_strengths']['thalamus_to_L4_E'], 'sigma': 2.0},
-    'thalamus_to_L4_SST': {'amplitude': P4_PRESET['connection_strengths']['thalamus_to_L4_SST'], 'sigma': 2.0},
-    'thalamus_to_L4_PV': {'amplitude': P4_PRESET['connection_strengths']['thalamus_to_L4_PV'], 'sigma': 2.0},
+    'thalamus_to_L4_E': {'amplitude': P0_PRESET['connection_strengths']['thalamus_to_L4_E'], 'sigma': 2.0},
+    'thalamus_to_L4_SST': {'amplitude': P0_PRESET['connection_strengths']['thalamus_to_L4_SST'], 'sigma': 2.0},
+    'thalamus_to_L4_PV': {'amplitude': P0_PRESET['connection_strengths']['thalamus_to_L4_PV'], 'sigma': 2.0},
     
-    'thalamus_to_L5_E': {'amplitude': P4_PRESET['connection_strengths']['thalamus_to_L5_E'], 'sigma': 2.0},
-    'thalamus_to_L5_SST': {'amplitude': P4_PRESET['connection_strengths']['thalamus_to_L5_SST'], 'sigma': 2.0},
-    'thalamus_to_L5_PV': {'amplitude': P4_PRESET['connection_strengths']['thalamus_to_L5_PV'], 'sigma': 2.0}
+    'thalamus_to_L5_E': {'amplitude': P0_PRESET['connection_strengths']['thalamus_to_L5_E'], 'sigma': 2.0},
+    'thalamus_to_L5_SST': {'amplitude': P0_PRESET['connection_strengths']['thalamus_to_L5_SST'], 'sigma': 2.0},
+    'thalamus_to_L5_PV': {'amplitude': P0_PRESET['connection_strengths']['thalamus_to_L5_PV'], 'sigma': 2.0}
 }
 
 #------------------------------------------------------------------------------

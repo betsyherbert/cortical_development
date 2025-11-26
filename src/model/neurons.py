@@ -207,9 +207,6 @@ class CorticalCircuit:
         
         # Initialize thalamic input (will be set from outside)
         self.thalamus = np.zeros((grid_size, grid_size))
-        
-        # Initialize constant background drives
-        self.constant_drives = {'E': 0.0, 'SST': 0.0, 'PV': 0.0}
     
     def get_layer_activities(self) -> Dict[str, Dict[str, np.ndarray]]:
         """
@@ -248,8 +245,8 @@ class CorticalCircuit:
         for _ in range(n_steps):
             # Process each layer
             for target_layer in LAYERS:
-                # Initialize inputs for this layer with constant drives
-                layer_inputs = {cell_type: np.full(grid_shape, self.constant_drives[cell_type]) 
+                # Initialize inputs for this layer
+                layer_inputs = {cell_type: np.zeros(grid_shape) 
                                 for cell_type in CELL_TYPES}
                 
                 # Add thalamic inputs - using weight matrices to properly apply strength scaling
@@ -358,24 +355,3 @@ class CorticalCircuit:
             Dictionary mapping cell types to their background input values
         """
         return self.layers['L4'].background_input.copy()
-    
-    def set_constant_drive(self, cell_type: str, value: float) -> None:
-        """Set constant background drive for a specific cell type.
-        
-        Args:
-            cell_type: The cell type to update ('E', 'SST', or 'PV')
-            value: Constant background drive value
-        """
-        if cell_type in CELL_TYPES:
-            self.constant_drives[cell_type] = value
-        
-    def get_constant_drive(self, cell_type: str) -> float:
-        """Get current constant background drive for a specific cell type.
-        
-        Args:
-            cell_type: The cell type to query ('E', 'SST', or 'PV')
-            
-        Returns:
-            Current constant background drive value
-        """
-        return self.constant_drives.get(cell_type, 0.0)

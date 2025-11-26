@@ -39,7 +39,7 @@ class BifurcationAnalysis:
             Default configuration dictionary
         """
         return {
-            'stages': ['P4', 'P8', 'P12', 'P16'],
+            'stages': ['P0', 'P5', 'P10', 'P15'],
             'mode': 'fixed_absolute',
             'n_processes': None,  # Will use cpu_count - 1
             'stability_pairs': DEFAULT_STABILITY_PAIRS,
@@ -187,7 +187,7 @@ Examples:
   python -m src.analysis.bifurcation --mode fixed_ratio
   
   # Run for specific stages
-  python -m src.analysis.bifurcation --stages P4 P8
+  python -m src.analysis.bifurcation --stages P0 P5
   
   # Specify number of parallel processes
   python -m src.analysis.bifurcation --n-processes 4
@@ -204,8 +204,8 @@ Examples:
     parser.add_argument(
         '--stages',
         nargs='+',
-        choices=['P4', 'P8', 'P12', 'P16'],
-        default=['P4', 'P8', 'P12', 'P16'],
+        choices=['P0', 'P5', 'P10', 'P15'],
+        default=['P0', 'P5', 'P10', 'P15'],
         help='Developmental stages to analyze (default: all)'
     )
     

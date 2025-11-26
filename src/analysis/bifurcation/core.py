@@ -77,7 +77,7 @@ class NetworkModel:
         """Initialize network from preset.
         
         Args:
-            preset: Developmental preset dictionary (e.g., P4_PRESET)
+            preset: Developmental preset dictionary (e.g., P0_PRESET)
             layers: List of layers to analyze (e.g., ['L4'] or ['L23', 'L4', 'L5'])
                    Defaults to ['L4'] for backward compatibility
         """

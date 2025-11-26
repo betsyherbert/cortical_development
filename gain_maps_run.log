@@ -16,7 +16,7 @@
 
 
 ======================================================================
-  Stage: P4
+  Stage: P0
 ======================================================================
 
 Stage parameters: τ_E = 15.0 ms, σ_E = 6.0
@@ -25,7 +25,7 @@ Stage parameters: τ_E = 15.0 ms, σ_E = 6.0
     σ_ratio: [0.017, 1.083]
 
 ============================================================
-Computing gain maps for P4
+Computing gain maps for P0
 ============================================================
 
 Computing gain at exact preset parameters...
@@ -46,7 +46,7 @@ Scanning PV parameter space (20×20 = 400 points)...
   Completed PV scan!
 
 ======================================================================
-  Stage: P8
+  Stage: P5
 ======================================================================
 
 Stage parameters: τ_E = 14.0 ms, σ_E = 2.5
@@ -55,7 +55,7 @@ Stage parameters: τ_E = 14.0 ms, σ_E = 2.5
     σ_ratio: [0.040, 2.600]
 
 ============================================================
-Computing gain maps for P8
+Computing gain maps for P5
 ============================================================
 
 Computing gain at exact preset parameters...
@@ -76,7 +76,7 @@ Scanning PV parameter space (20×20 = 400 points)...
   Completed PV scan!
 
 ======================================================================
-  Stage: P12
+  Stage: P10
 ======================================================================
 
 Stage parameters: τ_E = 7.0 ms, σ_E = 2.8
@@ -85,7 +85,7 @@ Stage parameters: τ_E = 7.0 ms, σ_E = 2.8
     σ_ratio: [0.036, 2.321]
 
 ============================================================
-Computing gain maps for P12
+Computing gain maps for P10
 ============================================================
 
 Computing gain at exact preset parameters...
@@ -106,7 +106,7 @@ Scanning PV parameter space (20×20 = 400 points)...
   Completed PV scan!
 
 ======================================================================
-  Stage: P16
+  Stage: P15
 ======================================================================
 
 Stage parameters: τ_E = 9.0 ms, σ_E = 0.8
@@ -115,7 +115,7 @@ Stage parameters: τ_E = 9.0 ms, σ_E = 0.8
     σ_ratio: [0.125, 8.125]
 
 ============================================================
-Computing gain maps for P16
+Computing gain maps for P15
 ============================================================
 
 Computing gain at exact preset parameters...
