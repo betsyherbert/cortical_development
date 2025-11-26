@@ -1,4 +1,8 @@
-"""Developmental parameter presets for the cortical circuit simulation, updated."""
+"""Developmental parameter presets for the cortical circuit simulation, updated.
+
+Note: All spatial parameters (thalamic_widths, outgoing_widths) are in μm.
+Default anatomical grid size is 1000 μm × 1000 μm.
+"""
 
 # ----------------- P0 PRESET (Early 1st Week) -----------------
 P0_PRESET = {
@@ -8,13 +12,6 @@ P0_PRESET = {
         'SST': 25.0,  # SST cells already somewhat active, but still slower
         'PV': 25.0    # prospective PV cells, minimal functional synapses
     },
-
-    # Gains: relative excitability within [0,1]. 
-    'gains': {
-        'E': 1.0,
-        'SST': 1.0,
-        'PV': 1.0
-    },
     
     # Constant background input for each cell type.
     'background_input': {
@@ -23,18 +20,18 @@ P0_PRESET = {
         'PV': 0.0
     },
 
-    # Thalamic input widths: how broadly thalamic input is spatially spread. 
+    # Thalamic input widths: how broadly thalamic input is spatially spread (μm). 
     'thalamic_widths': {
-        'E': 2.0,
-        'SST': 1.5,
-        'PV': 2.0
+        'E': 100.0,
+        'SST': 75.0,
+        'PV': 100.0
     },
 
-    # Outgoing widths: how far each cell type's lateral connections spread.
+    # Outgoing widths: how far each cell type's lateral connections spread (μm).
     'outgoing_widths': {
-        'E': 6.0,
-        'SST': 6.0,
-        'PV': 6.0
+        'E': 300.0,
+        'SST': 300.0,
+        'PV': 300.0
     },
     
     # Strength scaling factors: overall scaling of connection strengths.
@@ -160,11 +157,6 @@ P5_PRESET = {
         'SST': 20.0,
         'PV': 20.0
     },
-    'gains': {
-        'E': 1.0,
-        'SST': 1.0,
-        'PV': 1.0
-    },
     
     'background_input': {
         'E': 0.0,
@@ -172,16 +164,18 @@ P5_PRESET = {
         'PV': 0.0
     },
 
+    # Thalamic input widths (μm)
     'thalamic_widths': {
-        'E': 1.1,
-        'SST': 1.5,
-        'PV': 2.0
+        'E': 55.0,
+        'SST': 75.0,
+        'PV': 100.0
     },
 
+    # Outgoing widths (μm)
     'outgoing_widths': {
-        'E': 2.5,
-        'SST': 6.0,
-        'PV': 6.0
+        'E': 125.0,
+        'SST': 300.0,
+        'PV': 300.0
     },
 
     'strength_scaling': {
@@ -301,27 +295,23 @@ P5_PRESET = {
 # ----------------- P10 PRESET (Mid 2nd Week) -----------------
 P10_PRESET = {
     'time_constants': {
-        'E': 7.0,  
+        'E': 9.0,  
         'SST': 20.0,
         'PV': 20.0
     },
 
-    'gains': {
-        'E': 1.0,    
-        'SST': 1.0,  
-        'PV': 1.0    
-    },
-
+    # Thalamic input widths (μm)
     'thalamic_widths': {
-        'E': 1.0,
-        'SST': 1.8,
-        'PV': 1.5
+        'E': 50.0,
+        'SST': 90.0,
+        'PV': 75.0
     },
 
+    # Outgoing widths (μm)
     'outgoing_widths': {
-        'E': 2.8,   
-        'SST': 1.5,
-        'PV': 2.0
+        'E': 140.0,   
+        'SST': 75.0,
+        'PV': 100.0
     },
     
     'strength_scaling': {
@@ -448,27 +438,23 @@ P10_PRESET = {
 # ----------------- P15 PRESET (Late 2nd Week) -----------------
 P15_PRESET = {
     'time_constants': {
-        'E': 9.0,  
+        'E': 7.0,  
         'SST': 10.0,
         'PV': 5.0
     },
 
-    'gains': {
-        'E': 1.0,   
-        'SST': 1.0,
-        'PV': 1.0   
-    },
-
+    # Thalamic input widths (μm)
     'thalamic_widths': {
-        'E': 1.0,
-        'SST': 1.2,
-        'PV': 1.2
+        'E': 50.0,
+        'SST': 60.0,
+        'PV': 60.0
     },
 
+    # Outgoing widths (μm)
     'outgoing_widths': {
-        'E': 0.8,
-        'SST': 1.0,  
-        'PV': 1.2, 
+        'E': 40.0,
+        'SST': 50.0,  
+        'PV': 60.0, 
     },
     
     'strength_scaling': {

@@ -43,7 +43,7 @@ class DescriptiveAnalysis:
         """Apply developmental stage preset to simulation."""
         self._update_connection_strengths(preset)
         self._update_scaling(preset)
-        self._update_time_constants_and_gains(preset)
+        self._update_time_constants(preset)
         self._update_background_input(preset)
         self._update_thalamic_widths(preset)
         self._update_outgoing_widths(preset)
@@ -65,15 +65,11 @@ class DescriptiveAnalysis:
             for cell_type, scaling in preset['strength_scaling'].items():
                 self.simulation.set_strength_scaling(cell_type, scaling)
 
-    def _update_time_constants_and_gains(self, preset: Dict[str, Any]) -> None:
-        """Update time constants and gains from preset."""
+    def _update_time_constants(self, preset: Dict[str, Any]) -> None:
+        """Update time constants from preset."""
         if 'time_constants' in preset:
             for cell_type, tau in preset['time_constants'].items():
                 self.simulation.set_time_constant(cell_type, tau)
-        
-        if 'gains' in preset:
-            for cell_type, gain in preset['gains'].items():
-                self.simulation.set_gain(cell_type, gain)
 
     def _update_background_input(self, preset: Dict[str, Any]) -> None:
         """Update background input from preset."""

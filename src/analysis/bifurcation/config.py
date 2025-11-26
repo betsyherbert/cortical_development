@@ -1,14 +1,19 @@
-"""Configuration parameters for bifurcation analysis."""
+"""Configuration parameters for bifurcation analysis.
+
+Note: All spatial parameters (sigma, wavelength) are in μm (anatomical units).
+Wavenumber k is in cycles/μm.
+"""
 
 from typing import Tuple, List, Optional
-from src.model.config import RANDOM_SEED
+from src.model.config import RANDOM_SEED, ANATOMICAL_GRID_SIZE
 
 # Analysis parameters
 ANALYSIS_PARAMS = {
     'n_modes': 10,                  # Number of Fourier modes to scan in each direction
     'tolerance': 1e-6,              # Convergence tolerance for steady state finder
-    'max_iters': 2000,              # Maximum iterations for steady state finder
-    'grid_size': 20,                # Standard grid size for spatial scaling and Fourier normalization
+    'max_iters': 1000,              # Maximum iterations for steady state finder
+    'grid_size': 20,                # Standard grid size (number of grid points) for Fourier normalization
+    'anatomical_grid_size': ANATOMICAL_GRID_SIZE,  # Anatomical size in μm (default: 1000 μm)
 }
 
 # Output - standardized relative path from project root
@@ -77,6 +82,7 @@ class ParameterSpec:
 
 
 # Define all scannable parameters
+# Note: All spatial parameters (sigma) are in μm
 SCANNABLE_PARAMETERS = {
     # Time constants
     'tau_E': ParameterSpec(
@@ -103,52 +109,52 @@ SCANNABLE_PARAMETERS = {
         default_range=(1.0, 28.0)
     ),
     
-    # Spatial widths (outgoing connections)
+    # Spatial widths (outgoing connections) - in μm
     'sigma_E': ParameterSpec(
         path=['outgoing_widths', 'E'],
         display_name='σ_E',
-        units='grid units',
+        units='μm',
         use_ratio=False,
-        default_range=(0.1, 6.5)
+        default_range=(5.0, 325.0)
     ),
     'sigma_SST': ParameterSpec(
         path=['outgoing_widths', 'SST'],
         display_name='σ_SST',
-        units='grid units',
+        units='μm',
         use_ratio=True,
         reference_param='sigma_E',
-        default_range=(0.1, 6.5)
+        default_range=(5.0, 325.0)
     ),
     'sigma_PV': ParameterSpec(
         path=['outgoing_widths', 'PV'],
         display_name='σ_PV',
-        units='grid units',
+        units='μm',
         use_ratio=True,
         reference_param='sigma_E',
-        default_range=(0.1, 6.5)
+        default_range=(5.0, 325.0)
     ),
     
-    # Thalamic widths (for spectrum analysis)
+    # Thalamic widths (for spectrum analysis) - in μm
     'thalamic_width_E': ParameterSpec(
         path=['thalamic_widths', 'E'],
         display_name='σ_thal→E',
-        units='grid units',
+        units='μm',
         use_ratio=False,
-        default_range=(0.5, 10.0)
+        default_range=(25.0, 500.0)
     ),
     'thalamic_width_SST': ParameterSpec(
         path=['thalamic_widths', 'SST'],
         display_name='σ_thal→SST',
-        units='grid units',
+        units='μm',
         use_ratio=False,
-        default_range=(0.5, 10.0)
+        default_range=(25.0, 500.0)
     ),
     'thalamic_width_PV': ParameterSpec(
         path=['thalamic_widths', 'PV'],
         display_name='σ_thal→PV',
-        units='grid units',
+        units='μm',
         use_ratio=False,
-        default_range=(0.5, 10.0)
+        default_range=(25.0, 500.0)
     ),
 }
 
@@ -175,10 +181,10 @@ DEFAULT_SPECTRUM_SWEEPS = [
 # ============================================================================
 
 # Parameter space scan ranges (matching dashboard limits)
-TAU_MIN = 1.0    # Minimum time constant (ms) on dashboard
-TAU_MAX = 28.0   # Maximum time constant (ms) on dashboard
-SIGMA_MIN = 0.1  # Minimum spatial width on dashboard
-SIGMA_MAX = 6.5  # Maximum spatial width on dashboard (must be >= max preset σ value)
+TAU_MIN = 1.0      # Minimum time constant (ms) on dashboard
+TAU_MAX = 28.0     # Maximum time constant (ms) on dashboard
+SIGMA_MIN = 5.0    # Minimum spatial width (μm) on dashboard
+SIGMA_MAX = 325.0  # Maximum spatial width (μm) on dashboard (must be >= max preset σ value)
 
 # Fixed ratio mode specific limits (applied to τ_inh/τ_E and σ_inh/σ_E ratios)
 FIXED_RATIO_TAU_MIN = 0.1    # Minimum tau ratio to scan
@@ -190,7 +196,7 @@ FIXED_RATIO_SIGMA_MAX = 4.0  # Maximum sigma ratio to scan
 #   - fixed_absolute mode: computed dynamically per stage from TAU_MIN/MAX and SIGMA_MIN/MAX
 #     tau_ratio ∈ [TAU_MIN/τ_E, TAU_MAX/τ_E], sigma_ratio ∈ [SIGMA_MIN/σ_E, SIGMA_MAX/σ_E]
 #   - fixed_ratio mode: uses FIXED_RATIO_* constants directly
-GRID_RESOLUTION = 50             # Number of points per axis
+GRID_RESOLUTION = 20             # Number of points per axis
 MEAN_STATE_SEED = RANDOM_SEED    # Random seed for SteadyStateFinder reproducibility
 
 # Visualization parameters

@@ -3,12 +3,14 @@
 This module generates realistic thalamic activity patterns that combine:
 1. Intrinsic bursts - ongoing random burst activity with wave-like properties
 2. Sensory inputs - localized stimulus-driven responses
+
+Note: All spatial parameters (sigma) are in μm (anatomical units).
 """
 
 import numpy as np
 from typing import Tuple, List, Dict
 from .config import (
-    GRID_SIZE, DT, 
+    GRID_SIZE, DT, ANATOMICAL_GRID_SIZE,
     THALAMIC_INTRINSIC_SIGMA, THALAMIC_INTRINSIC_DURATION,
     THALAMIC_INTRINSIC_INTERVAL, THALAMIC_INTRINSIC_AMP,
     THALAMIC_SENSORY_SIGMA, THALAMIC_SENSORY_DURATION,
@@ -18,13 +20,26 @@ from .config import (
 
 
 class ThalamicInput:
-    """Generates thalamic activity patterns combining intrinsic and sensory components."""
+    """Generates thalamic activity patterns combining intrinsic and sensory components.
     
-    def __init__(self, grid_size: int = GRID_SIZE, dt: float = DT):
-        """Initialize the thalamic input generator."""
+    Note: All sigma (spatial width) parameters are in μm (anatomical units) and are
+    converted internally to grid units for computation.
+    """
+    
+    def __init__(self, grid_size: int = GRID_SIZE, dt: float = DT,
+                 anatomical_grid_size: float = ANATOMICAL_GRID_SIZE):
+        """Initialize the thalamic input generator.
+        
+        Args:
+            grid_size: Number of grid points in each dimension
+            dt: Time step in milliseconds
+            anatomical_grid_size: Anatomical size of the grid in μm
+        """
         self.grid_size = grid_size
         self.dt = dt
         self.t = 0.0
+        self.anatomical_grid_size = anatomical_grid_size
+        self.grid_scale = anatomical_grid_size / grid_size  # μm per grid unit
         
         # Set up spatial coordinate grid
         y, x = np.meshgrid(np.arange(grid_size), np.arange(grid_size))
@@ -47,14 +62,26 @@ class ThalamicInput:
         self.x_coords, self.y_coords = self.coords
         self.grid_center = (self.grid_size // 2, self.grid_size // 2)
     
-    def gaussian_spatial(self, center: Tuple[int, int], sigma: float) -> np.ndarray:
-        """Generate a 2D Gaussian spatial profile with caching."""
-        cache_key = (center, sigma)
+    def gaussian_spatial(self, center: Tuple[int, int], sigma_um: float) -> np.ndarray:
+        """Generate a 2D Gaussian spatial profile with caching.
+        
+        Args:
+            center: Center coordinates in grid units (x, y)
+            sigma_um: Width of the Gaussian in μm (anatomical units)
+            
+        Returns:
+            2D array containing the Gaussian profile
+        """
+        # Convert sigma from μm to grid units
+        sigma_grid = sigma_um / self.grid_scale
+        
+        # Use μm value for cache key (for consistency)
+        cache_key = (center, sigma_um)
         if cache_key in self._spatial_cache:
             return self._spatial_cache[cache_key]
             
         d_squared = (self.x_coords - center[0])**2 + (self.y_coords - center[1])**2
-        profile = np.exp(-0.5 * d_squared / sigma**2)
+        profile = np.exp(-0.5 * d_squared / sigma_grid**2)
         
         self._spatial_cache[cache_key] = profile
         return profile
@@ -135,12 +162,23 @@ class ThalamicInput:
         activity, self.sensory_bursts = self._generate_burst_activity(self.sensory_bursts, is_intrinsic=False)
         return activity
     
-    def _create_burst(self, center: Tuple[int, int], sigma: float, duration: float, 
+    def _create_burst(self, center: Tuple[int, int], sigma_um: float, duration: float, 
                      amplitude: float, is_intrinsic: bool = False) -> Dict:
-        """Create a new burst with appropriate parameters."""
+        """Create a new burst with appropriate parameters.
+        
+        Args:
+            center: Center coordinates in grid units (x, y)
+            sigma_um: Base spatial width in μm (will be randomized)
+            duration: Base duration in ms (will be randomized)
+            amplitude: Base amplitude (will be randomized)
+            is_intrinsic: Whether this is an intrinsic burst
+            
+        Returns:
+            Dictionary with burst parameters
+        """
         burst = {
             'center': center,
-            'sigma': sigma * np.random.uniform(0.3, 1.7),
+            'sigma': sigma_um * np.random.uniform(0.3, 1.7),  # sigma in μm
             'duration': duration * np.random.uniform(0.5, 1.5),
             'amplitude': amplitude * np.random.uniform(0.5, 1.5),
             'start_time': self.t

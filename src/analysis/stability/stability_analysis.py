@@ -107,8 +107,6 @@ class StabilityAnalysis:
         for cell_type in CELL_TYPES:
             if cell_type in preset['time_constants']:
                 self.simulation.set_time_constant(cell_type, preset['time_constants'][cell_type])
-            if cell_type in preset['gains']:
-                self.simulation.set_gain(cell_type, preset['gains'][cell_type])
     
     def _capture_current_state(self, frame_idx: int, thalamic_sum: float, thalamic_input: np.ndarray) -> Dict:
         """Capture current network state for analysis."""

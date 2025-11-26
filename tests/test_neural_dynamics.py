@@ -2,54 +2,8 @@
 
 import numpy as np
 import pytest
-from src.model.neurons import NoiseGenerator, NeuralLayer, CorticalCircuit
-from src.model.config import CELL_TYPES, LAYERS, DT, NOISE_TAU, GRID_SIZE
-
-
-def test_noise_generator_initialization(grid_size):
-    """Test NoiseGenerator initializes correctly."""
-    noise_gen = NoiseGenerator(grid_size, dt=DT, tau=NOISE_TAU)
-    
-    assert noise_gen.grid_size == grid_size
-    assert noise_gen.dt == DT
-    assert noise_gen.tau == NOISE_TAU
-    
-    # Check all cell types have noise states
-    for cell_type in CELL_TYPES:
-        assert cell_type in noise_gen.private_noise
-        assert noise_gen.private_noise[cell_type].shape == (grid_size, grid_size)
-
-
-def test_noise_generator_update(grid_size):
-    """Test NoiseGenerator produces noise on update."""
-    noise_gen = NoiseGenerator(grid_size, dt=DT, tau=NOISE_TAU)
-    
-    # Reset to zero
-    noise_gen.reset()
-    
-    # Update and check noise is generated
-    noise = noise_gen.update()
-    
-    assert isinstance(noise, dict)
-    for cell_type in CELL_TYPES:
-        assert cell_type in noise
-        assert noise[cell_type].shape == (grid_size, grid_size)
-        # After reset and one update, noise should be non-zero (stochastic)
-        # (very unlikely all values remain exactly zero)
-
-
-def test_noise_generator_parameters(grid_size):
-    """Test NoiseGenerator parameter getter/setter."""
-    noise_gen = NoiseGenerator(grid_size, dt=DT, tau=NOISE_TAU)
-    
-    # Test setting parameters
-    noise_gen.set_parameters('E', mean=0.1, std=0.2, correlation=0.5)
-    
-    # Test getting parameters
-    mean, std, corr = noise_gen.get_parameters('E')
-    assert mean == 0.1
-    assert std == 0.2
-    assert corr == 0.5
+from src.model.neurons import NeuralLayer, CorticalCircuit
+from src.model.config import CELL_TYPES, LAYERS, DT, GRID_SIZE
 
 
 def test_neural_layer_initialization(grid_size):
@@ -114,23 +68,6 @@ def test_cortical_circuit_update(grid_size, random_seed):
         for cell_type in CELL_TYPES:
             assert cell_type in activities[layer_name]
             assert activities[layer_name][cell_type].shape == (grid_size, grid_size)
-
-
-def test_random_seed_reproducibility(grid_size):
-    """Test that random seed produces reproducible results."""
-    # First run
-    np.random.seed(42)
-    noise_gen1 = NoiseGenerator(grid_size, dt=DT, tau=NOISE_TAU)
-    noise1 = noise_gen1.update()
-    
-    # Second run with same seed
-    np.random.seed(42)
-    noise_gen2 = NoiseGenerator(grid_size, dt=DT, tau=NOISE_TAU)
-    noise2 = noise_gen2.update()
-    
-    # Results should be identical
-    for cell_type in CELL_TYPES:
-        assert np.allclose(noise1[cell_type], noise2[cell_type])
 
 
 def test_neural_layer_time_constant_setter(grid_size):

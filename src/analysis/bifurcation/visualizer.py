@@ -95,21 +95,30 @@ class BifurcationVisualizer:
                      left=self.left_margin, right=0.88,
                      top=0.80, bottom=0.08)
         
-        # Determine global k range for consistent colormap across all rows
-        all_k_values = []
+        # Determine global wavelength range for consistent colormap across all rows
+        # Convert k (cycles/μm) to wavelength λ (μm): λ = 1/k
+        all_wavelength_values = []
         for param_pair in param_pairs:
             if param_pair in results:
                 for stage in stages:
                     if stage in results[param_pair]:
-                        all_k_values.append(results[param_pair][stage]['k_matrix'])
+                        k_matrix = results[param_pair][stage]['k_matrix']
+                        # Convert k to wavelength, avoiding division by zero
+                        wavelength_matrix = np.where(k_matrix > 0, 1.0 / k_matrix, np.inf)
+                        all_wavelength_values.append(wavelength_matrix)
         
-        if all_k_values:
-            k_min = 0
-            k_max = min(np.max([np.max(k) for k in all_k_values]), 5.0)
+        if all_wavelength_values:
+            # Use finite values only
+            finite_wavelengths = [w[np.isfinite(w)] for w in all_wavelength_values]
+            if any(len(w) > 0 for w in finite_wavelengths):
+                wavelength_min = max(np.min([np.min(w) for w in finite_wavelengths if len(w) > 0]), 50.0)
+                wavelength_max = min(np.max([np.max(w) for w in finite_wavelengths if len(w) > 0]), 2000.0)
+            else:
+                wavelength_min, wavelength_max = 50.0, 2000.0
         else:
-            k_min, k_max = 0, 5.0
+            wavelength_min, wavelength_max = 50.0, 2000.0
         
-        norm = colors.Normalize(vmin=k_min, vmax=k_max)
+        norm = colors.Normalize(vmin=wavelength_min, vmax=wavelength_max)
         cmap = plt.colormaps[BIFURCATION_COLORMAP]
         
         # Plot each row (parameter pair) and column (stage)
@@ -164,6 +173,9 @@ class BifurcationVisualizer:
                 stability_matrix_T = stability_matrix.T
                 flatness_matrix_T = flatness_matrix.T if flatness_matrix is not None else None
                 
+                # Convert k to wavelength: λ = 1/k (μm)
+                wavelength_matrix_T = np.where(k_matrix_T > 0, 1.0 / k_matrix_T, np.inf)
+                
                 # Compute alpha values based on stability
                 alpha_matrix = np.zeros_like(stability_matrix_T)
                 alpha_matrix[stability_matrix_T < STABILITY_THRESHOLD] = OPACITY_STABLE_FAR
@@ -171,14 +183,14 @@ class BifurcationVisualizer:
                 alpha_matrix[stability_matrix_T >= 0] = OPACITY_UNSTABLE
                 
                 # Create RGBA image (grey for flat spectra, colormap otherwise)
-                rgba_image = np.zeros((*k_matrix_T.shape, 4))
+                rgba_image = np.zeros((*wavelength_matrix_T.shape, 4))
                 grey_color = (0.5, 0.5, 0.5)
-                for i in range(k_matrix_T.shape[0]):
-                    for j in range(k_matrix_T.shape[1]):
+                for i in range(wavelength_matrix_T.shape[0]):
+                    for j in range(wavelength_matrix_T.shape[1]):
                         if flatness_matrix_T is not None and flatness_matrix_T[i, j]:
                             color_rgb = grey_color
                         else:
-                            color_rgb = cmap(norm(k_matrix_T[i, j]))[:3]
+                            color_rgb = cmap(norm(wavelength_matrix_T[i, j]))[:3]
                         rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
                 
                 # Display image
@@ -296,9 +308,9 @@ class BifurcationVisualizer:
         
         # Fill each row with colors from the full colormap (varying by row)
         # Each column has the same color but different opacity
-        k_values_for_legend = np.linspace(k_min, k_max, n_ticks)
-        for i, k_val in enumerate(k_values_for_legend):
-            color_rgb = cmap(norm(k_val))[:3]
+        wavelength_values_for_legend = np.linspace(wavelength_min, wavelength_max, n_ticks)
+        for i, wavelength_val in enumerate(wavelength_values_for_legend):
+            color_rgb = cmap(norm(wavelength_val))[:3]
             # Left column: stable far (0.3), middle: stable near (0.6), right: unstable (1.0)
             opacity_legend[i, 0, :3] = color_rgb
             opacity_legend[i, 0, 3] = OPACITY_STABLE_FAR
@@ -325,13 +337,13 @@ class BifurcationVisualizer:
         cbar_ax.xaxis.tick_top()
         cbar_ax.tick_params(axis='x', bottom=False, top=True, labelsize=self.secondary_tick_fontsize)
         
-        # Y-axis: show k values (spatial frequency) with ticks and label on RIGHT
-        k_tick_positions = np.linspace(0, n_ticks - 1, 6)  # 6 ticks
-        k_tick_values = np.linspace(k_min, k_max, 6)
-        cbar_ax.set_yticks(k_tick_positions)
-        cbar_ax.set_yticklabels([f'{k:.0f}' for k in k_tick_values], 
+        # Y-axis: show wavelength values (μm) with ticks and label on RIGHT
+        wavelength_tick_positions = np.linspace(0, n_ticks - 1, 6)  # 6 ticks
+        wavelength_tick_values = np.linspace(wavelength_min, wavelength_max, 6)
+        cbar_ax.set_yticks(wavelength_tick_positions)
+        cbar_ax.set_yticklabels([f'{w:.0f}' for w in wavelength_tick_values], 
                                fontsize=self.tick_fontsize)
-        cbar_ax.set_ylabel('Spatial freq. w/ max Re($\\lambda$)', 
+        cbar_ax.set_ylabel('Wavelength w/ max Re($\\lambda$) (μm)', 
                           fontsize=self.label_fontsize, labelpad=18)
         cbar_ax.yaxis.set_label_position('right')
         cbar_ax.yaxis.tick_right()
@@ -399,21 +411,30 @@ class BifurcationVisualizer:
                      left=self.left_margin, right=0.88,
                      top=0.80, bottom=0.08)
         
-        # Determine global k range across all rows
-        all_k_values = []
+        # Determine global wavelength range across all rows
+        # Convert k (cycles/μm) to wavelength λ (μm): λ = 1/k
+        all_wavelength_values = []
         for param_pair in param_pairs:
             if param_pair in results:
                 for stage in stages:
                     if stage in results[param_pair]:
-                        all_k_values.append(results[param_pair][stage]['k_matrix'])
+                        k_matrix = results[param_pair][stage]['k_matrix']
+                        # Convert k to wavelength, avoiding division by zero
+                        wavelength_matrix = np.where(k_matrix > 0, 1.0 / k_matrix, np.inf)
+                        all_wavelength_values.append(wavelength_matrix)
         
-        if all_k_values:
-            k_min = 0
-            k_max = min(np.max([np.max(k) for k in all_k_values]), 5.0)
+        if all_wavelength_values:
+            # Use finite values only
+            finite_wavelengths = [w[np.isfinite(w)] for w in all_wavelength_values]
+            if any(len(w) > 0 for w in finite_wavelengths):
+                wavelength_min = max(np.min([np.min(w) for w in finite_wavelengths if len(w) > 0]), 50.0)
+                wavelength_max = min(np.max([np.max(w) for w in finite_wavelengths if len(w) > 0]), 2000.0)
+            else:
+                wavelength_min, wavelength_max = 50.0, 2000.0
         else:
-            k_min, k_max = 0, 5.0
+            wavelength_min, wavelength_max = 50.0, 2000.0
         
-        norm = colors.Normalize(vmin=k_min, vmax=k_max)
+        norm = colors.Normalize(vmin=wavelength_min, vmax=wavelength_max)
         cmap = plt.colormaps[GAIN_COLORMAP]
         
         # Plot each row (parameter pair) and column (stage)
@@ -468,6 +489,9 @@ class BifurcationVisualizer:
                 gain_matrix_T = gain_matrix.T
                 flatness_matrix_T = flatness_matrix.T if flatness_matrix is not None else None
                 
+                # Convert k to wavelength: λ = 1/k (μm)
+                wavelength_matrix_T = np.where(k_matrix_T > 0, 1.0 / k_matrix_T, np.inf)
+                
                 # Compute alpha values based on gain (log-scale)
                 gain_valid = np.where(np.isnan(gain_matrix_T), 1.0, gain_matrix_T)
                 gain_clipped = np.clip(gain_valid, 1.0, GAIN_CLIP_MAX)
@@ -482,14 +506,14 @@ class BifurcationVisualizer:
                 alpha_matrix = np.where(np.isnan(gain_matrix_T), 0.1, alpha_matrix)
                 
                 # Create RGBA image
-                rgba_image = np.zeros((*k_matrix_T.shape, 4))
+                rgba_image = np.zeros((*wavelength_matrix_T.shape, 4))
                 grey_color = (0.5, 0.5, 0.5)
-                for i in range(k_matrix_T.shape[0]):
-                    for j in range(k_matrix_T.shape[1]):
+                for i in range(wavelength_matrix_T.shape[0]):
+                    for j in range(wavelength_matrix_T.shape[1]):
                         if flatness_matrix_T is not None and flatness_matrix_T[i, j]:
                             color_rgb = grey_color
                         else:
-                            color_rgb = cmap(norm(k_matrix_T[i, j]))[:3]
+                            color_rgb = cmap(norm(wavelength_matrix_T[i, j]))[:3]
                         rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
                 
                 # Display image
@@ -592,7 +616,7 @@ class BifurcationVisualizer:
         cbar_height = cbar_top - cbar_bottom
         cbar_ax = fig.add_axes([0.92, cbar_bottom, 0.015, cbar_height])
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='vertical')
-        cbar.set_label('Spatial freq. w/ max gain',
+        cbar.set_label('Wavelength w/ max gain (μm)',
                       fontsize=self.label_fontsize, labelpad=18)
         cbar.ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.6)
         
@@ -682,19 +706,25 @@ class BifurcationVisualizer:
             
             param_results = results[param_key]
             
-            # Determine consistent k-axis limits across all stages in this row
-            all_k_values = []
+            # Determine consistent wavelength-axis limits across all stages in this row
+            # Convert k (cycles/μm) to wavelength λ (μm): λ = 1/k
+            all_wavelength_values = []
             for stage in stages:
                 if stage in param_results:
-                    all_k_values.extend([
-                        param_results[stage]['k_values'][0],
-                        param_results[stage]['k_values'][-1]
-                    ])
+                    k_values = param_results[stage]['k_values']
+                    # Convert k to wavelength (excluding k=0)
+                    wavelength_values = np.where(k_values > 0, 1.0 / k_values, np.inf)
+                    finite_wavelengths = wavelength_values[np.isfinite(wavelength_values)]
+                    if len(finite_wavelengths) > 0:
+                        all_wavelength_values.extend([
+                            np.min(finite_wavelengths),
+                            np.max(finite_wavelengths)
+                        ])
             
-            if all_k_values:
-                k_lim = (min(all_k_values), max(all_k_values))
+            if all_wavelength_values:
+                wavelength_lim = (min(all_wavelength_values), max(all_wavelength_values))
             else:
-                k_lim = (0, 10)
+                wavelength_lim = (50, 2000)
             
             for stage_idx, stage_name in enumerate(stages):
                 if stage_name not in param_results:
@@ -708,6 +738,16 @@ class BifurcationVisualizer:
                 
                 ax = fig.add_subplot(gs[row_idx, stage_idx])
                 
+                # Convert k to wavelength: λ = 1/k (μm)
+                wavelength_values = np.where(k_values > 0, 1.0 / k_values, np.inf)
+                # Filter out infinite values for extent
+                finite_mask = np.isfinite(wavelength_values)
+                if np.sum(finite_mask) > 0:
+                    wavelength_extent = [np.min(wavelength_values[finite_mask]), 
+                                        np.max(wavelength_values[finite_mask])]
+                else:
+                    wavelength_extent = [50, 2000]
+                
                 # Apply log scale if enabled
                 if SPECTRUM_LOG_SCALE:
                     plot_data = np.log10(gain_matrix, where=(gain_matrix > 0))
@@ -715,14 +755,16 @@ class BifurcationVisualizer:
                 else:
                     plot_data = gain_matrix
                 
-                # Create heatmap
-                extent = [k_values[0], k_values[-1], param_values[0], param_values[-1]]
-                im = ax.imshow(plot_data, origin='lower', extent=extent,
+                # Create heatmap (flip data left-right since wavelength is inverse of k)
+                # Larger wavelength (smaller k) should be on the left
+                plot_data_flipped = np.fliplr(plot_data)
+                extent = [wavelength_extent[0], wavelength_extent[1], param_values[0], param_values[-1]]
+                im = ax.imshow(plot_data_flipped, origin='lower', extent=extent,
                               aspect='auto', cmap=cmap, norm=norm,
                               interpolation='nearest')
                 
-                # Apply axis limits: k-axis consistent across row, y-axis adaptive per stage
-                ax.set_xlim(k_lim)
+                # Apply axis limits: wavelength-axis consistent across row, y-axis adaptive per stage
+                ax.set_xlim(wavelength_lim)
                 
                 # Set y-axis limits based on preset value with fixed margin
                 param_lim_min = preset_value * SPECTRUM_Y_MARGIN[0]
@@ -736,7 +778,7 @@ class BifurcationVisualizer:
                 # Labels
                 # Only show x-labels on bottom row
                 if row_idx == n_rows - 1:
-                    ax.set_xlabel('Spatial Frequency (1/grid unit)',
+                    ax.set_xlabel('Wavelength (μm)',
                                  fontsize=self.secondary_label_fontsize)
                 else:
                     ax.set_xlabel('')

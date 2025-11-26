@@ -9,9 +9,9 @@ from typing import Dict
 import numpy as np
 from .connectivity import LayerConnectivity
 from .config import (
-    GRID_SIZE, DT,
+    GRID_SIZE, DT, ANATOMICAL_GRID_SIZE,
     INTEGRATION_STEPS, CELL_TYPES, LAYERS,
-    INITIAL_BACKGROUND_INPUT
+    INITIAL_BACKGROUND_INPUT, INITIAL_TIME_CONSTANTS
 )
 
 
@@ -31,27 +31,27 @@ class NeuralLayer:
     - Constant background input
     """
     
-    def __init__(self, grid_size: int = GRID_SIZE, dt: float = DT, gain: float = 1.0):
+    def __init__(self, grid_size: int = GRID_SIZE, dt: float = DT, 
+                 time_constants: Dict[str, float] = None):
         """
-        Initialize a neural layer with specified grid size and time constant.
+        Initialize a neural layer with specified grid size and time constants.
         
         Args:
             grid_size: Size of the square grid
             dt: Time step in milliseconds
-            gain: Gain parameter (default value, can be overridden per cell type)
+            time_constants: Dict mapping cell types to time constants (ms).
+                           If None, uses INITIAL_TIME_CONSTANTS from config.
         """
         self.grid_size = grid_size
-        # Initialize separate time constants for each cell type
-        self.tau = {
-            'E': 80.0,    # Default time constant for E cells
-            'SST': 60.0,  # Default time constant for SST cells
-            'PV': 40.0    # Default time constant for PV cells
-        }
-        # Initialize separate gains for each cell type
+        # Initialize time constants from preset (no hardcoded defaults)
+        if time_constants is None:
+            time_constants = INITIAL_TIME_CONSTANTS
+        self.tau = time_constants.copy()
+        # Initialize gains (always 1.0 for all cell types)
         self.gain = {
-            'E': gain,
-            'SST': gain,
-            'PV': gain
+            'E': 1.0,
+            'SST': 1.0,
+            'PV': 1.0
         }
         # Initialize background input for each cell type
         self.background_input = {
@@ -186,14 +186,18 @@ class CorticalCircuit:
     circuit dynamics, including inputs from thalamus.
     """
     
-    def __init__(self, grid_size: int = GRID_SIZE):
+    def __init__(self, grid_size: int = GRID_SIZE, 
+                 anatomical_grid_size: float = ANATOMICAL_GRID_SIZE):
         """
         Initialize the full cortical circuit with all layers.
         
         Args:
-            grid_size: Size of the square grid
+            grid_size: Number of grid points in each dimension
+            anatomical_grid_size: Anatomical size of the grid in μm
         """
         self.grid_size = grid_size
+        self.anatomical_grid_size = anatomical_grid_size
+        self.grid_scale = anatomical_grid_size / grid_size  # μm per grid unit
         
         # Initialize cortical layers
         self.layers = {
@@ -202,8 +206,8 @@ class CorticalCircuit:
             'L5': NeuralLayer(grid_size)
         }
         
-        # Initialize connectivity
-        self.connectivity = LayerConnectivity(grid_size)
+        # Initialize connectivity (pass anatomical_grid_size for spatial scale conversion)
+        self.connectivity = LayerConnectivity(grid_size, anatomical_grid_size)
         
         # Initialize thalamic input (will be set from outside)
         self.thalamus = np.zeros((grid_size, grid_size))

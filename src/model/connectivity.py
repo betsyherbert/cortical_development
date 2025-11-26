@@ -1,10 +1,14 @@
-"""Connectivity module for the cortical circuit simulation."""
+"""Connectivity module for the cortical circuit simulation.
+
+Note: All sigma (spatial width) parameters are in μm (anatomical units).
+The conversion to grid units happens internally during Gaussian computation.
+"""
 
 from typing import Dict, Optional, Tuple
 import numpy as np
 
 from .config import (
-    GRID_SIZE, LAYER_CONNECTIVITY_PARAMS,
+    GRID_SIZE, ANATOMICAL_GRID_SIZE, LAYER_CONNECTIVITY_PARAMS,
     INITIAL_STRENGTH_SCALING
 )
 
@@ -15,16 +19,24 @@ class ConnectivityProfile:
     This class efficiently computes and caches 2D Gaussian profiles and weight matrices
     for neural connectivity. It uses pre-computed coordinate grids and distance matrices
     to optimize repeated calculations.
+    
+    Note: All sigma parameters are expected in μm (anatomical units) and are
+    converted internally to grid units for computation.
     """
     
-    def __init__(self, grid_size: int = GRID_SIZE):
+    def __init__(self, grid_size: int = GRID_SIZE, 
+                 anatomical_grid_size: float = ANATOMICAL_GRID_SIZE):
         """
         Initialize connectivity profiles with optimized caching.
         
         Args:
-            grid_size: Size of the square grid
+            grid_size: Number of grid points in each dimension
+            anatomical_grid_size: Anatomical size of the grid in μm
         """
         self.grid_size = grid_size
+        self.anatomical_grid_size = anatomical_grid_size
+        self.grid_scale = anatomical_grid_size / grid_size  # μm per grid unit
+        
         self._profile_cache = {}  # Cache for Gaussian profiles
         self._matrix_cache = {}  # Cache for weight matrices
         
@@ -39,33 +51,36 @@ class ConnectivityProfile:
         # Pre-compute common grid sizes for weight matrices
         self.common_size = (grid_size * grid_size, grid_size * grid_size)
     
-    def _compute_gaussian(self, d_squared: np.ndarray, sigma: float) -> np.ndarray:
+    def _compute_gaussian(self, d_squared: np.ndarray, sigma_grid: float) -> np.ndarray:
         """
         Compute Gaussian profile from squared distances.
         
         Args:
-            d_squared: Array of squared distances
-            sigma: Width of the Gaussian
+            d_squared: Array of squared distances (in grid units squared)
+            sigma_grid: Width of the Gaussian in grid units
             
         Returns:
             Normalized Gaussian profile
         """
-        profile = np.exp(-0.5 * d_squared / sigma**2)
+        profile = np.exp(-0.5 * d_squared / sigma_grid**2)
         return profile / profile.sum()
     
-    def gaussian_profile(self, sigma: float, center: Optional[Tuple[int, int]] = None) -> np.ndarray:
+    def gaussian_profile(self, sigma_um: float, center: Optional[Tuple[int, int]] = None) -> np.ndarray:
         """
         Get a cached 2D Gaussian profile or compute if not available.
         
         Args:
-            sigma: Width of the Gaussian
-            center: Optional center coordinates (x, y). If None, uses grid center.
+            sigma_um: Width of the Gaussian in μm (anatomical units)
+            center: Optional center coordinates (x, y) in grid units. If None, uses grid center.
             
         Returns:
             2D array containing the normalized Gaussian profile
         """
-        # Use cached profile if available
-        cache_key = (sigma, center if center else 'center')
+        # Convert sigma from μm to grid units
+        sigma_grid = sigma_um / self.grid_scale
+        
+        # Use cached profile if available (cache key uses μm for consistency)
+        cache_key = (sigma_um, center if center else 'center')
         if cache_key in self._profile_cache:
             return self._profile_cache[cache_key]
         
@@ -78,11 +93,11 @@ class ConnectivityProfile:
             d_squared = (x - center[0])**2 + (y - center[1])**2
         
         # Compute and cache Gaussian profile
-        profile = self._compute_gaussian(d_squared, sigma)
+        profile = self._compute_gaussian(d_squared, sigma_grid)
         self._profile_cache[cache_key] = profile
         return profile
 
-    def compute_weight_matrix(self, amplitude: float, sigma: float,
+    def compute_weight_matrix(self, amplitude: float, sigma_um: float,
                             source_size: Tuple[int, int],
                             target_size: Tuple[int, int]) -> np.ndarray:
         """
@@ -90,20 +105,20 @@ class ConnectivityProfile:
         
         Args:
             amplitude: Connection strength
-            sigma: Width of the Gaussian profile
-            source_size: Size of source population grid
-            target_size: Size of target population grid
+            sigma_um: Width of the Gaussian profile in μm (anatomical units)
+            source_size: Size of source population grid (in grid points)
+            target_size: Size of target population grid (in grid points)
             
         Returns:
             2D connection weight matrix (target_neurons x source_neurons)
         """
         # Cache key for this specific weight matrix
-        cache_key = (amplitude, sigma, source_size, target_size)
+        cache_key = (amplitude, sigma_um, source_size, target_size)
         if cache_key in self._matrix_cache:
             return self._matrix_cache[cache_key]
             
-        # Get Gaussian profile
-        profile = self.gaussian_profile(sigma)
+        # Get Gaussian profile (sigma conversion happens inside gaussian_profile)
+        profile = self.gaussian_profile(sigma_um)
         
         # Optimize for the common case of same-size grids
         if source_size == target_size == (self.grid_size, self.grid_size):
@@ -165,19 +180,25 @@ class LayerConnectivity:
     
     This class handles the creation and updating of weight matrices for connections
     between different neural populations.
+    
+    Note: All sigma (spatial width) parameters are in μm (anatomical units).
     """
     
-    def __init__(self, grid_size: int = GRID_SIZE):
+    def __init__(self, grid_size: int = GRID_SIZE, 
+                 anatomical_grid_size: float = ANATOMICAL_GRID_SIZE):
         """
         Initialize connectivity matrices for all layer connections.
         
         Args:
-            grid_size: Size of the square grid
+            grid_size: Number of grid points in each dimension
+            anatomical_grid_size: Anatomical size of the grid in μm
         """
         self.grid_size = grid_size
-        self.profile = ConnectivityProfile(grid_size)
+        self.anatomical_grid_size = anatomical_grid_size
+        self.grid_scale = anatomical_grid_size / grid_size  # μm per grid unit
+        self.profile = ConnectivityProfile(grid_size, anatomical_grid_size)
         
-        # Initialize with layer parameters
+        # Initialize with layer parameters (sigma values are in μm)
         self.layer_params = LAYER_CONNECTIVITY_PARAMS.copy()
         
         # Weight matrices dictionary
@@ -427,15 +448,15 @@ class LayerConnectivity:
         
         # Create connection parameter entry if it doesn't exist
         if conn_key not in self.layer_params:
-            # Determine appropriate sigma based on cell type patterns
+            # Determine appropriate sigma (in μm) based on cell type patterns
             if source_cell == 'E' or source_layer == 'thalamus':
-                sigma = 2.0  # Default for excitatory connections
+                sigma = 100.0  # Default for excitatory connections (μm)
             elif source_cell == 'SST':
-                sigma = 3.0  # Default for SST connections (wider)
+                sigma = 150.0  # Default for SST connections (wider, μm)
             elif source_cell == 'PV':
-                sigma = 1.5  # Default for PV connections (narrower)
+                sigma = 75.0  # Default for PV connections (narrower, μm)
             else:
-                sigma = 2.0  # Default fallback
+                sigma = 100.0  # Default fallback (μm)
                 
             # Add the new connection parameters
             self.layer_params[conn_key] = {'amplitude': 0.0, 'sigma': sigma}
@@ -472,7 +493,7 @@ class LayerConnectivity:
             target_cell: Target cell type ('E', 'SST', 'PV')
             
         Returns:
-            Connection sigma or default value if connection doesn't exist
+            Connection sigma in μm, or default value if connection doesn't exist
         """
         # Generate the connection key
         if source_layer == 'thalamus':
@@ -484,19 +505,19 @@ class LayerConnectivity:
         if conn_key in self.layer_params:
             return self.layer_params[conn_key]['sigma']
         
-        # Determine default sigma based on cell type patterns if connection doesn't exist
+        # Determine default sigma (in μm) based on cell type patterns if connection doesn't exist
         if source_cell == 'E' or source_layer == 'thalamus':
-            return 2.0  # Default for excitatory connections
+            return 100.0  # Default for excitatory connections (μm)
         elif source_cell == 'SST':
-            return 3.0  # Default for SST connections (wider)
+            return 150.0  # Default for SST connections (wider, μm)
         elif source_cell == 'PV':
-            return 1.5  # Default for PV connections (narrower)
+            return 75.0  # Default for PV connections (narrower, μm)
         
-        return 2.0  # Default fallback
+        return 100.0  # Default fallback (μm)
 
     def set_connection_sigma(self, source_layer: str, source_cell: str, 
                            target_layer: str, target_cell: str, 
-                           sigma: float) -> None:
+                           sigma_um: float) -> None:
         """
         Set the connection width (sigma) between two populations.
         
@@ -505,7 +526,7 @@ class LayerConnectivity:
             source_cell: Source cell type ('E', 'SST', 'PV', or None for thalamus)
             target_layer: Target layer ('L23', 'L4', 'L5')
             target_cell: Target cell type ('E', 'SST', 'PV')
-            sigma: Connection width (Gaussian sigma)
+            sigma_um: Connection width (Gaussian sigma) in μm
         """
         # Generate the connection key
         if source_layer == 'thalamus':
@@ -526,10 +547,10 @@ class LayerConnectivity:
                 amplitude = 0.0  # Default fallback
                 
             # Add the new connection parameters
-            self.layer_params[conn_key] = {'amplitude': amplitude, 'sigma': sigma}
+            self.layer_params[conn_key] = {'amplitude': amplitude, 'sigma': sigma_um}
         else:
             # Update the parameter
-            self.layer_params[conn_key]['sigma'] = sigma
+            self.layer_params[conn_key]['sigma'] = sigma_um
             
         # Get current raw amplitude
         amplitude = self.layer_params[conn_key]['amplitude']
@@ -540,9 +561,9 @@ class LayerConnectivity:
         # Create the connection tuple key
         tuple_key = (source_layer, source_cell, target_layer, target_cell)
         
-        # Create the weight matrix with scaled amplitude
+        # Create the weight matrix with scaled amplitude (sigma is in μm)
         weight_matrix = self.profile.compute_weight_matrix(
-            scaled_amplitude, sigma, (self.grid_size, self.grid_size), (self.grid_size, self.grid_size)
+            scaled_amplitude, sigma_um, (self.grid_size, self.grid_size), (self.grid_size, self.grid_size)
         )
         
         # Store weight matrix

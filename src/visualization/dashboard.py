@@ -15,7 +15,8 @@ from src.model.config import (
     INITIAL_THALAMIC_WIDTHS, INITIAL_OUTGOING_WIDTHS, 
     INITIAL_TIME_CONSTANTS, CELL_ACTIVITY_COLORS,
     INITIAL_STRENGTH_SCALING, INITIAL_BACKGROUND_INPUT,
-    CELL_COLORS, LAYER_COLORS as MODEL_LAYER_COLORS
+    CELL_COLORS, LAYER_COLORS as MODEL_LAYER_COLORS,
+    ANATOMICAL_GRID_SIZE, GRID_SIZE
 )
 from src.model.presets import P0_PRESET, P5_PRESET, P10_PRESET, P15_PRESET
 from src.analysis.bifurcation import (
@@ -216,11 +217,12 @@ class DashboardApp:
         "marks": {0.4: "0.4", 0.6: "0.6", 0.8: "0.8", 1.0: "1"}
     }
     
+    # Spatial width parameters in μm (anatomical units)
     WIDTH_PARAMS = {
-        "min_val": 0.1,
-        "max_val": 8.0,
-        "step": 0.1,
-        "marks": {i: f"{i}" for i in range(0, 9, 2)}
+        "min_val": 5.0,
+        "max_val": 400.0,
+        "step": 5.0,
+        "marks": {i: f"{i}" for i in range(0, 401, 100)}
     }
     
     STRENGTH_SCALING_PARAMS = {
@@ -681,8 +683,8 @@ class DashboardApp:
             from src.analysis.bifurcation.config import ANALYSIS_PARAMS
             n_modes = ANALYSIS_PARAMS['n_modes']
             grid_size = ANALYSIS_PARAMS['grid_size']
-            domain_length = ANALYSIS_PARAMS.get('domain_length', grid_size)
-            n_modes_effective = min(n_modes, int(0.6 * domain_length))
+            anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']  # μm
+            n_modes_effective = min(n_modes, int(0.6 * grid_size))
             
             total_pops = len(network.tau)
             
@@ -694,12 +696,13 @@ class DashboardApp:
                     k_squared_set.add(n1**2 + n2**2)
             
             # Build cache: exp_cache[k²][i,j] = exp(-2π²k²σ²_ij)
+            # sigma values are in μm, normalize by anatomical_grid_size (also in μm)
             exp_cache = {}
             for k_squared in k_squared_set:
                 exp_cache[k_squared] = np.zeros((total_pops, total_pops))
                 for i in range(total_pops):
                     for j in range(total_pops):
-                        sigma_ij = network.sigma[i, j] / domain_length
+                        sigma_ij = network.sigma[i, j] / anatomical_grid_size
                         exp_cache[k_squared][i, j] = np.exp(
                             -2 * np.pi**2 * k_squared * sigma_ij**2
                         )
@@ -772,14 +775,14 @@ class DashboardApp:
             print(f"Error computing stability spectrum: {e}")
             return np.array([]), np.array([]), np.array([]), 0.0
     
-    def compute_B_fourier(self, network: 'NetworkModel', k_squared: float, domain_length: float) -> np.ndarray:
+    def compute_B_fourier(self, network: 'NetworkModel', k_squared: float, anatomical_grid_size: float) -> np.ndarray:
         """
         Compute thalamic input B(k) in Fourier space with Gaussian spatial filtering.
         
         Args:
             network: NetworkModel instance containing thalamic parameters
-            k_squared: Square of the wavenumber k
-            domain_length: Domain length for normalization
+            k_squared: Square of the wavenumber k (mode number)
+            anatomical_grid_size: Anatomical grid size in μm
             
         Returns:
             B(k): Thalamic input vector in Fourier space (length = number of populations)
@@ -788,8 +791,9 @@ class DashboardApp:
         B_k = np.zeros(total_pops)
         
         for i in range(total_pops):
-            # Normalize thalamic width by domain length
-            sigma_thal_i = network.thalamic_widths[i] / domain_length
+            # Normalize thalamic width by anatomical grid size
+            # thalamic_widths are in μm, anatomical_grid_size is in μm, so ratio is dimensionless
+            sigma_thal_i = network.thalamic_widths[i] / anatomical_grid_size
             # Apply Gaussian spatial filtering: B[i] = strength * exp(-2π²k²σ²)
             B_k[i] = network.thalamic_strengths[i] * np.exp(-2 * np.pi**2 * k_squared * sigma_thal_i**2)
         
@@ -822,8 +826,8 @@ class DashboardApp:
             from src.analysis.bifurcation.config import ANALYSIS_PARAMS
             n_modes = ANALYSIS_PARAMS['n_modes']
             grid_size = ANALYSIS_PARAMS['grid_size']
-            domain_length = ANALYSIS_PARAMS.get('domain_length', grid_size)
-            n_modes_effective = min(n_modes, int(0.6 * domain_length))
+            anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']  # μm
+            n_modes_effective = min(n_modes, int(0.6 * grid_size))
             total_pops = len(network.tau)
             
             # Cache exponentials for cortical connections (reuse from stability spectrum)
@@ -833,12 +837,13 @@ class DashboardApp:
                     k_squared_set.add(n1**2 + n2**2)
             
             # Cache for cortical connection exponentials
+            # sigma values are in μm, normalize by anatomical_grid_size (also in μm)
             exp_cache = {}
             for k_squared in k_squared_set:
                 exp_cache[k_squared] = np.zeros((total_pops, total_pops))
                 for i in range(total_pops):
                     for j in range(total_pops):
-                        sigma_ij = network.sigma[i, j] / domain_length
+                        sigma_ij = network.sigma[i, j] / anatomical_grid_size
                         exp_cache[k_squared][i, j] = np.exp(
                             -2 * np.pi**2 * k_squared * sigma_ij**2
                         )
@@ -867,7 +872,7 @@ class DashboardApp:
                                 J[i, j] = (analyzer.g_eff[i] * w_tilde) / network.tau[i]
                     
                     # Compute B(k) with thalamic spatial filtering
-                    B_k = self.compute_B_fourier(network, k_squared, domain_length)
+                    B_k = self.compute_B_fourier(network, k_squared, anatomical_grid_size)
                     
                     # Extract subset if selected_pops is provided
                     if selected_pops is not None and len(selected_pops) > 0:
@@ -942,14 +947,15 @@ class DashboardApp:
             from src.analysis.bifurcation.config import ANALYSIS_PARAMS
             n_modes = ANALYSIS_PARAMS['n_modes']
             grid_size = ANALYSIS_PARAMS['grid_size']
-            domain_length = ANALYSIS_PARAMS.get('domain_length', grid_size)
-            n_modes_effective = min(n_modes, int(0.6 * domain_length))
+            anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']  # μm
+            n_modes_effective = min(n_modes, int(0.6 * grid_size))
             total_pops = len(network.tau)
             
             # Define temporal frequency range (0-1 Hz)
             omega_values = np.linspace(0, 1, 21)  # 21 samples for smooth heatmap up to 1 Hz
             
             # Cache exponentials for cortical connections
+            # sigma values are in μm, normalize by anatomical_grid_size (also in μm)
             k_squared_set = set()
             for n1 in range(0, n_modes_effective + 1):
                 for n2 in range(0, n_modes_effective + 1):
@@ -960,7 +966,7 @@ class DashboardApp:
                 exp_cache[k_squared] = np.zeros((total_pops, total_pops))
                 for i in range(total_pops):
                     for j in range(total_pops):
-                        sigma_ij = network.sigma[i, j] / domain_length
+                        sigma_ij = network.sigma[i, j] / anatomical_grid_size
                         exp_cache[k_squared][i, j] = np.exp(
                             -2 * np.pi**2 * k_squared * sigma_ij**2
                         )
@@ -999,7 +1005,7 @@ class DashboardApp:
                             J[i, j] = (analyzer.g_eff[i] * w_tilde) / network.tau[i]
                 
                 # Compute B(k) with thalamic spatial filtering
-                B_k = self.compute_B_fourier(network, k_squared, domain_length)
+                B_k = self.compute_B_fourier(network, k_squared, anatomical_grid_size)
                 
                 # Extract subset if selected_pops is provided
                 if selected_pops is not None and len(selected_pops) > 0:
@@ -1046,10 +1052,10 @@ class DashboardApp:
     
     def create_stability_spectrum_figure(self, k_values: np.ndarray, max_real_values: np.ndarray) -> go.Figure:
         """
-        Create Plotly figure for stability spectrum (max Re(λ) vs k).
+        Create Plotly figure for stability spectrum (max Re(λ) vs wavelength).
         
         Args:
-            k_values: Array of k values (wave numbers)
+            k_values: Array of k values (mode numbers, dimensionless)
             max_real_values: Array of max real eigenvalues for each k
             selected_pops: Optional list of selected population IDs for title
             
@@ -1062,44 +1068,78 @@ class DashboardApp:
 
         # Check if we have data
         if len(k_values) > 0 and len(max_real_values) > 0:
-            # Add main spectrum line
-            fig.add_trace(go.Scatter(
-                x=k_values,
-                y=max_real_values,
-                mode='lines',
-                name='max Re(λ)',
-                line=dict(color='#2c3e50', width=2),
-                hovertemplate='k=%{x:.2f}<br>max Re(λ)=%{y:.3f}<extra></extra>',
-                showlegend=False
-            ))
+            # Convert k (mode number) to wavelength: λ = anatomical_grid_size / k (μm)
+            from src.analysis.bifurcation.config import ANALYSIS_PARAMS
+            anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']
             
-            # Add horizontal line at y=0 (stability boundary)
-            fig.add_trace(go.Scatter(
-                x=[k_values.min(), k_values.max()],
-                y=[0, 0],
-                mode='lines',
-                name='Stability boundary',
-                line=dict(color='gray', width=2, dash='dash'),
-                showlegend=False,
-                hoverinfo='skip'
-            ))
+            # Filter out k=0 first to avoid division by zero
+            nonzero_mask = k_values > 0
+            k_values_nonzero = k_values[nonzero_mask]
+            max_real_values_nonzero = max_real_values[nonzero_mask]
             
-            # Determine y-axis range
-            y_min = min(max_real_values.min(), -0.5)
-            y_max = max(max_real_values.max(), 0.5)
-            y_range = y_max - y_min
-            y_padding = y_range * 0.1
+            if len(k_values_nonzero) > 0:
+                # Now safe to divide
+                wavelength_values_finite = anatomical_grid_size / k_values_nonzero
+                max_real_values_finite = max_real_values_nonzero
+                k_values_finite = k_values_nonzero
+                
+                # Add main spectrum line
+                fig.add_trace(go.Scatter(
+                    x=wavelength_values_finite,
+                    y=max_real_values_finite,
+                    mode='lines',
+                    name='max Re(λ)',
+                    line=dict(color='#2c3e50', width=2),
+                    hovertemplate='L=%{x:.0f} μm<br>max Re(λ)=%{y:.3f}<extra></extra>',
+                    showlegend=False
+                ))
+                
+                # Add horizontal line at y=0 (stability boundary)
+                fig.add_trace(go.Scatter(
+                    x=[wavelength_values_finite.min(), wavelength_values_finite.max()],
+                    y=[0, 0],
+                    mode='lines',
+                    name='Stability boundary',
+                    line=dict(color='gray', width=2, dash='dash'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+                
+                # Determine y-axis range
+                y_min = min(max_real_values_finite.min(), -0.5)
+                y_max = max(max_real_values_finite.max(), 0.5)
+                y_range = y_max - y_min
+                y_padding = y_range * 0.1
 
-            # Determine dominant mode (strict maximum)
-            max_idx = int(np.argmax(max_real_values))
-            max_value = max_real_values[max_idx]
-            if np.sum(np.isclose(max_real_values, max_value)) == 1:
-                highlight_k = k_values[max_idx]
-                highlight_color = '#e74c3c' if max_value > 0 else '#7f8c8d'
-                highlight_data = (highlight_k, max_value, highlight_color)
+                # Determine dominant mode (strict maximum)
+                max_idx = int(np.argmax(max_real_values_finite))
+                max_value = max_real_values_finite[max_idx]
+                if np.sum(np.isclose(max_real_values_finite, max_value)) == 1:
+                    highlight_wavelength = wavelength_values_finite[max_idx]
+                    highlight_color = '#e74c3c' if max_value > 0 else '#7f8c8d'
+                    highlight_data = (highlight_wavelength, max_value, highlight_color)
+                
+                # Determine wavelength range dynamically from data
+                wavelength_min = wavelength_values_finite.min() * 0.9  # Add 10% padding
+                wavelength_max = wavelength_values_finite.max() * 1.1
+            else:
+                y_min, y_max, y_padding = -0.5, 0.5, 0
+                n_modes = ANALYSIS_PARAMS['n_modes']
+                wavelength_min, wavelength_max = anatomical_grid_size / n_modes, anatomical_grid_size
+                fig.add_annotation(
+                    text="Network not yet active (run simulation to see spectrum)",
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5,
+                    showarrow=False,
+                    font=dict(size=SUBTITLE_FONT_SIZE, color='gray')
+                )
         else:
             # No data - show empty plot with message
+            from src.analysis.bifurcation.config import ANALYSIS_PARAMS
+            anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']
+            n_modes = ANALYSIS_PARAMS['n_modes']
             y_min, y_max, y_padding = -0.5, 0.5, 0
+            wavelength_min, wavelength_max = anatomical_grid_size / n_modes, anatomical_grid_size
             fig.add_annotation(
                 text="Network not yet active (run simulation to see spectrum)",
                 xref="paper", yref="paper",
@@ -1110,33 +1150,29 @@ class DashboardApp:
         
         # Add highlight marker if applicable
         if highlight_data is not None:
-            highlight_k, highlight_val, highlight_color = highlight_data
+            highlight_wavelength, highlight_val, highlight_color = highlight_data
             fig.add_trace(go.Scatter(
-                x=[highlight_k],
+                x=[highlight_wavelength],
                 y=[highlight_val],
                 mode='markers',
                 marker=dict(size=11, color=highlight_color, symbol='star', line=dict(color='#ffffff', width=1)),
-                hovertemplate='Dominant k=%{x:.2f}<br>max Re(λ)=%{y:.3f}<extra></extra>',
+                hovertemplate='Dominant L=%{x:.0f} μm<br>max Re(λ)=%{y:.3f}<extra></extra>',
                 showlegend=False,
                 cliponaxis=False
             ))
 
-        # Configure layout with dashboard styling
-        from src.analysis.bifurcation.config import ANALYSIS_PARAMS
-        n_modes = ANALYSIS_PARAMS['n_modes']
-        
         # Generate title
         title_text = "Stability Spectrum"
         
         fig.update_layout(
             title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=SUBTITLE_FONT_SIZE)),
             xaxis=dict(
-                title=dict(text='Spatial frequency k', font=dict(size=AXIS_FONT_SIZE)),
+                title=dict(text='Wavelength (μm)', font=dict(size=AXIS_FONT_SIZE)),
                 tickfont=dict(size=AXIS_FONT_SIZE),
                 showgrid=True,
                 gridcolor='#e0e0e0',
                 zeroline=False,
-                range=[0, n_modes] if len(k_values) > 0 else [0, 10]
+                range=[wavelength_min, wavelength_max]
             ),
             yaxis=dict(
                 title=dict(text='max Re(λ)', font=dict(size=AXIS_FONT_SIZE)),
@@ -1164,7 +1200,7 @@ class DashboardApp:
         
         Args:
             eigenvalues: Complex array of eigenvalues to plot
-            k_max: The k value at which these eigenvalues were computed
+            k_max: The k value (mode number, dimensionless) at which these eigenvalues were computed
             selected_pops: Optional list of selected population IDs for title
             
         Returns:
@@ -1218,9 +1254,18 @@ class DashboardApp:
                 font=dict(size=SUBTITLE_FONT_SIZE, color='gray')
             )
         
-        # Add k value annotation in top right corner (always show)
+        # Convert k (mode number) to wavelength and add annotation in top right corner (always show)
+        from src.analysis.bifurcation.config import ANALYSIS_PARAMS
+        anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']
+        
+        wavelength_max = (anatomical_grid_size / k_max) if k_max > 0 else np.inf
+        if np.isfinite(wavelength_max):
+            wavelength_text = f"L = {wavelength_max:.0f} μm"
+        else:
+            wavelength_text = "L = ∞"
+        
         fig.add_annotation(
-            text=f"k = {k_max:.2f}",
+            text=wavelength_text,
             xref="paper", yref="paper",
             x=0.999, y=0.999,
             xanchor='right', yanchor='top',
@@ -1271,10 +1316,10 @@ class DashboardApp:
     
     def create_static_gain_figure(self, k_values: np.ndarray, gain_values: np.ndarray) -> go.Figure:
         """
-        Create Plotly figure for static spatial gain G(k).
+        Create Plotly figure for static spatial gain G(λ).
         
         Args:
-            k_values: Array of k values (wave numbers)
+            k_values: Array of k values (mode numbers, dimensionless)
             gain_values: Array of gain values for each k
             selected_pops: Optional list of selected population IDs for title
             
@@ -1287,29 +1332,62 @@ class DashboardApp:
 
         # Check if we have data
         if len(k_values) > 0 and len(gain_values) > 0:
-            # Add main gain curve
-            fig.add_trace(go.Scatter(
-                x=k_values,
-                y=gain_values,
-                mode='lines',
-                name='G(k)',
-                line=dict(color='#2c3e50', width=2),
-                hovertemplate='k=%{x:.2f}<br>Gain=%{y:.2f}<extra></extra>',
-                showlegend=False
-            ))
+            # Convert k (mode number) to wavelength: λ = anatomical_grid_size / k (μm)
+            from src.analysis.bifurcation.config import ANALYSIS_PARAMS
+            anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']
             
-            # Determine y-axis range
-            y_min = 0
-            y_max = max(gain_values.max() * 1.1, 1.0)
+            # Filter out k=0 first to avoid division by zero
+            nonzero_mask = k_values > 0
+            k_values_nonzero = k_values[nonzero_mask]
+            gain_values_nonzero = gain_values[nonzero_mask]
+            
+            if len(k_values_nonzero) > 0:
+                # Now safe to divide
+                wavelength_values_finite = anatomical_grid_size / k_values_nonzero
+                gain_values_finite = gain_values_nonzero
+                
+                # Add main gain curve
+                fig.add_trace(go.Scatter(
+                    x=wavelength_values_finite,
+                    y=gain_values_finite,
+                    mode='lines',
+                    name='G(L)',
+                    line=dict(color='#2c3e50', width=2),
+                    hovertemplate='L=%{x:.0f} μm<br>Gain=%{y:.2f}<extra></extra>',
+                    showlegend=False
+                ))
+                
+                # Determine y-axis range
+                y_min = 0
+                y_max = max(gain_values_finite.max() * 1.1, 1.0)
 
-            # Determine dominant gain mode (unique maximum)
-            max_idx = int(np.argmax(gain_values))
-            max_value = gain_values[max_idx]
-            if np.sum(np.isclose(gain_values, max_value)) == 1:
-                highlight_data = (k_values[max_idx], max_value)
+                # Determine dominant gain mode (unique maximum)
+                max_idx = int(np.argmax(gain_values_finite))
+                max_value = gain_values_finite[max_idx]
+                if np.sum(np.isclose(gain_values_finite, max_value)) == 1:
+                    highlight_data = (wavelength_values_finite[max_idx], max_value)
+                
+                # Determine wavelength range dynamically from data
+                wavelength_min = wavelength_values_finite.min() * 0.9  # Add 10% padding
+                wavelength_max = wavelength_values_finite.max() * 1.1
+            else:
+                y_min, y_max = 0, 10
+                n_modes = ANALYSIS_PARAMS['n_modes']
+                wavelength_min, wavelength_max = anatomical_grid_size / n_modes, anatomical_grid_size
+                fig.add_annotation(
+                    text="Network not yet active (run simulation to see gain)",
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5,
+                    showarrow=False,
+                    font=dict(size=SUBTITLE_FONT_SIZE, color='gray')
+                )
         else:
             # No data - show empty plot with message
+            from src.analysis.bifurcation.config import ANALYSIS_PARAMS
+            anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']
+            n_modes = ANALYSIS_PARAMS['n_modes']
             y_min, y_max = 0, 10
+            wavelength_min, wavelength_max = anatomical_grid_size / n_modes, anatomical_grid_size
             fig.add_annotation(
                 text="Network not yet active (run simulation to see gain)",
                 xref="paper", yref="paper",
@@ -1320,20 +1398,16 @@ class DashboardApp:
 
         # Add highlight marker if applicable
         if highlight_data is not None:
-            highlight_k, highlight_val = highlight_data
+            highlight_wavelength, highlight_val = highlight_data
             fig.add_trace(go.Scatter(
-                x=[highlight_k],
+                x=[highlight_wavelength],
                 y=[highlight_val],
                 mode='markers',
                 marker=dict(size=11, color='#7f8c8d', symbol='star', line=dict(color='#ffffff', width=1)),
-                hovertemplate='Dominant k=%{x:.2f}<br>Gain=%{y:.2f}<extra></extra>',
+                hovertemplate='Dominant L=%{x:.0f} μm<br>Gain=%{y:.2f}<extra></extra>',
                 showlegend=False,
                 cliponaxis=False
             ))
-        
-        # Configure layout
-        from src.analysis.bifurcation.config import ANALYSIS_PARAMS
-        n_modes = ANALYSIS_PARAMS['n_modes']
         
         # Generate title
         title_text = "Static Gain"
@@ -1341,15 +1415,15 @@ class DashboardApp:
         fig.update_layout(
             title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=SUBTITLE_FONT_SIZE)),
             xaxis=dict(
-                title=dict(text='Spatial frequency k', font=dict(size=AXIS_FONT_SIZE)),
+                title=dict(text='Wavelength (μm)', font=dict(size=AXIS_FONT_SIZE)),
                 tickfont=dict(size=AXIS_FONT_SIZE),
                 showgrid=True,
                 gridcolor='#e0e0e0',
                 zeroline=False,
-                range=[0, n_modes] if len(k_values) > 0 else [0, 10]
+                range=[wavelength_min, wavelength_max]
             ),
             yaxis=dict(
-                title=dict(text='Gain G(k)', font=dict(size=AXIS_FONT_SIZE)),
+                title=dict(text='Gain G(L)', font=dict(size=AXIS_FONT_SIZE)),
                 tickfont=dict(size=AXIS_FONT_SIZE),
                 showgrid=True,
                 gridcolor='#e0e0e0',
@@ -1369,10 +1443,10 @@ class DashboardApp:
     def create_spatiotemporal_gain_figure(self, k_values: np.ndarray, omega_values: np.ndarray, 
                                          gain_matrix: np.ndarray) -> go.Figure:
         """
-        Create Plotly figure for spatiotemporal amplification map A(k,ω).
+        Create Plotly figure for spatiotemporal amplification map A(λ,ω).
         
         Args:
-            k_values: Array of spatial frequencies k
+            k_values: Array of spatial frequencies k (mode numbers, dimensionless)
             omega_values: Array of temporal frequencies ω (Hz)
             gain_matrix: 2D array of gain values [k_idx, omega_idx]
             selected_pops: Optional list of selected population IDs for title
@@ -1384,26 +1458,63 @@ class DashboardApp:
         
         # Check if we have data
         if len(k_values) > 0 and len(omega_values) > 0 and gain_matrix.size > 0:
-            # Create heatmap
-            fig.add_trace(go.Heatmap(
-                x=k_values,
-                y=omega_values,
-                z=gain_matrix.T,  # Transpose so k is on x-axis
-                colorscale='Hot',
-                colorbar=dict(
-                    title=dict(
-                        text='Amplification',
-                        side='right',
-                        font=dict(size=AXIS_FONT_SIZE)
+            # Convert k (mode number) to wavelength: λ = anatomical_grid_size / k (μm)
+            from src.analysis.bifurcation.config import ANALYSIS_PARAMS
+            anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']
+            
+            # Filter out k=0 first to avoid division by zero
+            nonzero_mask = k_values > 0
+            k_values_nonzero = k_values[nonzero_mask]
+            gain_matrix_nonzero = gain_matrix[nonzero_mask, :]
+            
+            if len(k_values_nonzero) > 0:
+                # Now safe to divide
+                wavelength_values_finite = anatomical_grid_size / k_values_nonzero
+                gain_matrix_finite = gain_matrix_nonzero
+                # Flip gain matrix left-right since wavelength is inverse of k
+                gain_matrix_flipped = np.flipud(gain_matrix_finite)
+                wavelength_min = wavelength_values_finite.min()
+                wavelength_max = wavelength_values_finite.max()
+                
+                # Create heatmap
+                fig.add_trace(go.Heatmap(
+                    x=wavelength_values_finite[::-1],  # Reverse so larger wavelengths are on left
+                    y=omega_values,
+                    z=gain_matrix_flipped.T,  # Transpose so wavelength is on x-axis
+                    colorscale='Hot',
+                    colorbar=dict(
+                        title=dict(
+                            text='Amplification',
+                            side='right',
+                            font=dict(size=AXIS_FONT_SIZE)
+                        ),
+                        tickfont=dict(size=AXIS_FONT_SIZE),
+                        len=1.0,
+                        thickness=12
                     ),
-                    tickfont=dict(size=AXIS_FONT_SIZE),
-                    len=1.0,
-                    thickness=12
-                ),
-                hovertemplate='k=%{x:.2f}<br>ω=%{y:.2f} Hz<br>Gain=%{z:.2f}<extra></extra>'
-            ))
+                    hovertemplate='L=%{x:.0f} μm<br>ω=%{y:.2f} Hz<br>Gain=%{z:.2f}<extra></extra>'
+                ))
+                
+                # Determine wavelength range dynamically from data
+                wavelength_range = [wavelength_min * 0.9, wavelength_max * 1.1]
+            else:
+                from src.analysis.bifurcation.config import ANALYSIS_PARAMS
+                anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']
+                n_modes = ANALYSIS_PARAMS['n_modes']
+                wavelength_range = [anatomical_grid_size / n_modes, anatomical_grid_size]
+                fig.add_annotation(
+                    text="Network not yet active (run simulation to see amplification)",
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5,
+                    showarrow=False,
+                    font=dict(size=SUBTITLE_FONT_SIZE, color='gray')
+                )
         else:
             # No data - show empty plot with message
+            from src.analysis.bifurcation.config import ANALYSIS_PARAMS
+            anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']
+            n_modes = ANALYSIS_PARAMS['n_modes']
+            wavelength_range = [anatomical_grid_size / n_modes, anatomical_grid_size]
             fig.add_annotation(
                 text="Network not yet active (run simulation to see amplification)",
                 xref="paper", yref="paper",
@@ -1412,20 +1523,16 @@ class DashboardApp:
                 font=dict(size=SUBTITLE_FONT_SIZE, color='gray')
             )
         
-        # Configure layout
-        from src.analysis.bifurcation.config import ANALYSIS_PARAMS
-        n_modes = ANALYSIS_PARAMS['n_modes']
-        
         # Generate title
         title_text = "Spatiotemporal Gain"
         
         fig.update_layout(
             title=dict(text=title_text, x=0.5, xanchor='center', font=dict(size=SUBTITLE_FONT_SIZE)),
             xaxis=dict(
-                title=dict(text='Spatial freq k', font=dict(size=AXIS_FONT_SIZE)),
+                title=dict(text='Wavelength (μm)', font=dict(size=AXIS_FONT_SIZE)),
                 tickfont=dict(size=AXIS_FONT_SIZE),
                 showgrid=False,
-                range=[0, n_modes] if len(k_values) > 0 else [0, 10]
+                range=wavelength_range
             ),
             yaxis=dict(
                 title=dict(text='Temporal freq ω (Hz)', font=dict(size=AXIS_FONT_SIZE)),
@@ -1985,11 +2092,6 @@ class DashboardApp:
         if 'strength_scaling' in preset:
             for cell_type, scaling in preset['strength_scaling'].items():
                 self.simulation.set_strength_scaling(cell_type, scaling)
-        
-        # Update gains if present in the preset
-        if 'gains' in preset:
-            for cell_type, gain in preset['gains'].items():
-                self.simulation.set_gain(cell_type, gain)
         
         # Update background input if present in the preset
         if 'background_input' in preset:

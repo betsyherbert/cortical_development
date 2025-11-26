@@ -2,6 +2,9 @@
 
 This module implements stability map computations, scanning parameter spaces to
 find critical spatial modes and bifurcation boundaries through eigenvalue analysis.
+
+Note: All spatial parameters (sigma, wavelength) are in μm (anatomical units).
+Wavenumber k is in cycles/μm.
 """
 
 import numpy as np
@@ -69,6 +72,7 @@ def compute_stability_for_point(preset: Dict, verbose: bool = False) -> Tuple[fl
     # Get analysis parameters
     n_modes = ANALYSIS_PARAMS['n_modes']
     grid_size = ANALYSIS_PARAMS['grid_size']
+    anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']
     n_modes_effective = min(n_modes, int(0.6 * grid_size))
     
     total_pops = len(network.tau)
@@ -80,12 +84,13 @@ def compute_stability_for_point(preset: Dict, verbose: bool = False) -> Tuple[fl
             k_squared_set.add(n1**2 + n2**2)
     
     # Cache exponential factors for spatial filtering
+    # sigma values are in μm, normalize by anatomical_grid_size (also in μm)
     exp_cache = {}
     for k_squared in k_squared_set:
         exp_cache[k_squared] = np.zeros((total_pops, total_pops))
         for i in range(total_pops):
             for j in range(total_pops):
-                sigma_ij = network.sigma[i, j] / grid_size
+                sigma_ij = network.sigma[i, j] / anatomical_grid_size
                 exp_cache[k_squared][i, j] = np.exp(
                     -2 * np.pi**2 * k_squared * sigma_ij**2
                 )
@@ -97,9 +102,9 @@ def compute_stability_for_point(preset: Dict, verbose: bool = False) -> Tuple[fl
     for n1 in range(0, n_modes_effective + 1):
         for n2 in range(0, n_modes_effective + 1):
             k_squared = n1**2 + n2**2
-            k = np.sqrt(k_squared)
+            k_mode = np.sqrt(k_squared)  # Mode number (dimensionless)
             
-            if k > n_modes:
+            if k_mode > n_modes:
                 continue
             
             # Build Jacobian using cached exponentials
@@ -119,9 +124,9 @@ def compute_stability_for_point(preset: Dict, verbose: bool = False) -> Tuple[fl
             eigenvalues = np.linalg.eigvals(J)
             max_real = np.max(eigenvalues.real)
             
-            # Store or update max real eigenvalue for this k
+            # Store or update max real eigenvalue for this k (k_mode is mode number)
             if k_squared not in results_by_k2:
-                results_by_k2[k_squared] = {'k': k, 'max_real': max_real}
+                results_by_k2[k_squared] = {'k_mode': k_mode, 'max_real': max_real}
             else:
                 if max_real > results_by_k2[k_squared]['max_real']:
                     results_by_k2[k_squared]['max_real'] = max_real
@@ -131,7 +136,8 @@ def compute_stability_for_point(preset: Dict, verbose: bool = False) -> Tuple[fl
         max_entry = max(results_by_k2.values(), key=lambda x: x['max_real'])
         min_entry = min(results_by_k2.values(), key=lambda x: x['max_real'])
         
-        k_critical = max_entry['k']
+        # Convert k from mode number to cycles/μm
+        k_critical = max_entry['k_mode'] / anatomical_grid_size  # cycles/μm
         max_real_eigenvalue = max_entry['max_real']
         
         spectrum_range = max_entry['max_real'] - min_entry['max_real']

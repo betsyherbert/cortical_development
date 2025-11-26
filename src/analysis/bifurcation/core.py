@@ -3,6 +3,9 @@
 This module provides the fundamental classes and utilities for network stability
 and gain analysis, including network parameter extraction, steady state finding,
 and stability computation through eigenvalue analysis.
+
+Note: All spatial parameters (sigma, wavelength) are in μm (anatomical units).
+Wavenumber k is in cycles/μm.
 """
 
 import numpy as np
@@ -43,13 +46,13 @@ def get_nested_value(d: Dict, path: List[str]) -> float:
     return d
 
 
-def compute_B_fourier(network: 'NetworkModel', k_squared: float, grid_size: float) -> np.ndarray:
+def compute_B_fourier(network: 'NetworkModel', k_squared: float, anatomical_grid_size: float) -> np.ndarray:
     """Compute thalamic input B(k) in Fourier space with Gaussian spatial filtering.
     
     Args:
         network: NetworkModel instance containing thalamic parameters
-        k_squared: Square of the wavenumber k
-        grid_size: Grid size for normalization
+        k_squared: Square of the wavenumber k (in mode number units)
+        anatomical_grid_size: Anatomical size of the grid in μm
         
     Returns:
         B(k): Thalamic input vector in Fourier space (length = number of populations)
@@ -58,8 +61,9 @@ def compute_B_fourier(network: 'NetworkModel', k_squared: float, grid_size: floa
     B_k = np.zeros(total_pops)
     
     for i in range(total_pops):
-        # Normalize thalamic width by grid size
-        sigma_thal_i = network.thalamic_widths[i] / grid_size
+        # Normalize thalamic width by anatomical grid size
+        # thalamic_widths are in μm, anatomical_grid_size is in μm, so ratio is dimensionless
+        sigma_thal_i = network.thalamic_widths[i] / anatomical_grid_size
         # Apply Gaussian spatial filtering: B[i] = strength * exp(-2π²k²σ²)
         B_k[i] = network.thalamic_strengths[i] * np.exp(-2 * np.pi**2 * k_squared * sigma_thal_i**2)
     
@@ -114,11 +118,11 @@ class NetworkModel:
         self.tau = np.tile(tau_per_layer, len(self.layers))
     
     def _extract_gains(self):
-        """Extract gains for each population, repeated for each layer."""
-        g_e = self.preset['gains']['E']
-        g_sst = self.preset['gains']['SST']
-        g_pv = self.preset['gains']['PV']
-        gain_per_layer = np.array([g_e, g_sst, g_pv])
+        """Extract gains for each population, repeated for each layer.
+        
+        Gains are always 1.0 for all cell types.
+        """
+        gain_per_layer = np.array([1.0, 1.0, 1.0])  # E, SST, PV
         
         # Repeat for each layer
         self.gain = np.tile(gain_per_layer, len(self.layers))
@@ -405,7 +409,7 @@ class StabilityAnalyzer:
             n×n Jacobian matrix (n = total populations across all layers)
         """
         k_squared = n1**2 + n2**2
-        grid_size = ANALYSIS_PARAMS['grid_size']
+        anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']
         
         # Total number of populations (all layers)
         n = len(self.network.tau)
@@ -414,10 +418,10 @@ class StabilityAnalyzer:
         for i in range(n):  # target
             for j in range(n):  # source
                 # Get spatial scale for this connection (source population's width)
-                # σ values in presets are in grid cells (e.g., 2-3 cells on a 20×20 grid)
-                # Normalize by grid_size to convert to physical units: σ_phys = σ_cells / grid_size
-                # For Fourier transform: exp(-2π²k²σ_phys²) with k = sqrt(n1²+n2²)
-                sigma_ij = self.network.sigma[i, j] / grid_size
+                # σ values in presets are in μm (anatomical units)
+                # Normalize by anatomical_grid_size to get dimensionless ratio: σ_norm = σ_μm / L_μm
+                # For Fourier transform: exp(-2π²k²σ_norm²) with k = sqrt(n1²+n2²)
+                sigma_ij = self.network.sigma[i, j] / anatomical_grid_size
                 
                 # Fourier transform of Gaussian connectivity
                 # For domain [0,L]², wave number k corresponds to exp(2πi k·x / L)
@@ -442,10 +446,12 @@ class StabilityAnalyzer:
         
         Returns:
             (distance_to_instability, critical_mode, critical_k, wavelength) tuple
-            wavelength = grid_size / critical_k (or inf if k=0)
+            - critical_k: Critical wavenumber in cycles/μm
+            - wavelength: Critical wavelength in μm (= anatomical_grid_size / k_mode, or inf if k=0)
         """
         # Clamp mode scan range based on grid_size (Nyquist limit)
         grid_size = ANALYSIS_PARAMS['grid_size']
+        anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']
         n_modes_effective = min(self.n_modes, int(0.6 * grid_size))
         
         if verbose:
@@ -456,7 +462,7 @@ class StabilityAnalyzer:
         
         max_real_eigenvalue = -np.inf
         critical_mode = (0, 0)
-        critical_k = 0.0
+        critical_k_mode = 0.0  # Mode number (dimensionless)
         
         # Scan Fourier modes (clamped range)
         for n1 in range(-n_modes_effective, n_modes_effective + 1):
@@ -468,16 +474,19 @@ class StabilityAnalyzer:
                 if max_real > max_real_eigenvalue:
                     max_real_eigenvalue = max_real
                     critical_mode = (n1, n2)
-                    critical_k = np.sqrt(n1**2 + n2**2)
+                    critical_k_mode = np.sqrt(n1**2 + n2**2)
         
         # Distance to instability: negative of max eigenvalue
         distance_to_instability = -max_real_eigenvalue
         
-        # Compute wavelength: λ* = L / k
-        wavelength = grid_size / critical_k if critical_k > 0 else np.inf
+        # Convert k from mode number to cycles/μm
+        critical_k = critical_k_mode / anatomical_grid_size  # cycles/μm
+        
+        # Compute wavelength in μm: λ* = L / k_mode = 1 / k_physical
+        wavelength = anatomical_grid_size / critical_k_mode if critical_k_mode > 0 else np.inf
         
         if verbose:
-            print(f"  [Stability] Critical mode: {critical_mode}, k={critical_k:.4f}, λ*={wavelength:.4f}")
+            print(f"  [Stability] Critical mode: {critical_mode}, k={critical_k:.6f} cycles/μm, λ*={wavelength:.1f} μm")
             print(f"  [Stability] Max Re(λ): {max_real_eigenvalue:.6f}")
             print(f"  [Stability] Distance to instability: {distance_to_instability:.6f}")
         

@@ -2,6 +2,9 @@
 
 This module implements gain map and spectrum computations, showing how circuits
 amplify thalamic input at different spatial frequencies across parameter spaces.
+
+Note: All spatial parameters (sigma, wavelength) are in μm (anatomical units).
+Wavenumber k is in cycles/μm.
 """
 
 import numpy as np
@@ -82,6 +85,7 @@ def compute_gain_for_point(preset: Dict, verbose: bool = False) -> Tuple[float, 
     # Get analysis parameters
     n_modes = ANALYSIS_PARAMS['n_modes']
     grid_size = ANALYSIS_PARAMS['grid_size']
+    anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']
     n_modes_effective = min(n_modes, int(0.6 * grid_size))
     
     total_pops = len(network.tau)
@@ -93,12 +97,13 @@ def compute_gain_for_point(preset: Dict, verbose: bool = False) -> Tuple[float, 
             k_squared_set.add(n1**2 + n2**2)
     
     # Cache exponential factors for spatial filtering
+    # sigma values are in μm, normalize by anatomical_grid_size (also in μm)
     exp_cache = {}
     for k_squared in k_squared_set:
         exp_cache[k_squared] = np.zeros((total_pops, total_pops))
         for i in range(total_pops):
             for j in range(total_pops):
-                sigma_ij = network.sigma[i, j] / grid_size
+                sigma_ij = network.sigma[i, j] / anatomical_grid_size
                 exp_cache[k_squared][i, j] = np.exp(
                     -2 * np.pi**2 * k_squared * sigma_ij**2
                 )
@@ -129,7 +134,7 @@ def compute_gain_for_point(preset: Dict, verbose: bool = False) -> Tuple[float, 
                         J[i, j] = (analyzer.g_eff[i] * w_tilde) / network.tau[i]
             
             # Compute B(k) with thalamic spatial filtering
-            B_k = compute_B_fourier(network, k_squared, grid_size)
+            B_k = compute_B_fourier(network, k_squared, anatomical_grid_size)
             
             # Check if B(k) is non-zero
             if np.linalg.norm(B_k) < 1e-10:
@@ -141,9 +146,9 @@ def compute_gain_for_point(preset: Dict, verbose: bool = False) -> Tuple[float, 
                 response = np.linalg.solve(-J, B_k)
                 gain = np.linalg.norm(response)
                 
-                # Store or update max gain for this k
+                # Store or update max gain for this k (k is mode number here)
                 if k_squared not in results_by_k2:
-                    results_by_k2[k_squared] = {'k': k, 'gain': gain}
+                    results_by_k2[k_squared] = {'k_mode': k, 'gain': gain}
                 else:
                     if gain > results_by_k2[k_squared]['gain']:
                         results_by_k2[k_squared]['gain'] = gain
@@ -156,7 +161,8 @@ def compute_gain_for_point(preset: Dict, verbose: bool = False) -> Tuple[float, 
         max_entry = max(results_by_k2.values(), key=lambda x: x['gain'])
         min_entry = min(results_by_k2.values(), key=lambda x: x['gain'])
         
-        k_critical = max_entry['k']
+        # Convert k from mode number to cycles/μm
+        k_critical = max_entry['k_mode'] / anatomical_grid_size  # cycles/μm
         max_gain = max_entry['gain']
         
         # Check for flat spectrum (less than 20% variation)
@@ -435,17 +441,19 @@ def compute_gain_spectrum(preset: Dict, k_values: np.ndarray, verbose: bool = Fa
     analyzer = StabilityAnalyzer(network, r_star)
     
     # Get analysis parameters
-    grid_size = ANALYSIS_PARAMS['grid_size']
+    anatomical_grid_size = ANALYSIS_PARAMS['anatomical_grid_size']
     total_pops = len(network.tau)
     
     # Pre-compute exponential cache for all k values
+    # Note: k_values here are mode numbers (dimensionless)
     k_squared_values = k_values ** 2
     exp_cache = {}
     for k_squared in k_squared_values:
         exp_cache[k_squared] = np.zeros((total_pops, total_pops))
         for i in range(total_pops):
             for j in range(total_pops):
-                sigma_ij = network.sigma[i, j] / grid_size
+                # sigma values are in μm, normalize by anatomical_grid_size (also in μm)
+                sigma_ij = network.sigma[i, j] / anatomical_grid_size
                 exp_cache[k_squared][i, j] = np.exp(
                     -2 * np.pi**2 * k_squared * sigma_ij**2
                 )
@@ -470,7 +478,7 @@ def compute_gain_spectrum(preset: Dict, k_values: np.ndarray, verbose: bool = Fa
                     J[i, j] = (analyzer.g_eff[i] * w_tilde) / network.tau[i]
         
         # Compute B(k) with thalamic spatial filtering
-        B_k = compute_B_fourier(network, k_squared, grid_size)
+        B_k = compute_B_fourier(network, k_squared, anatomical_grid_size)
         
         # Check if B(k) is non-zero
         if np.linalg.norm(B_k) < 1e-10:

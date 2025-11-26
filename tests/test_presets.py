@@ -1,8 +1,11 @@
-"""Tests for developmental presets."""
+"""Tests for developmental presets.
+
+Note: All spatial parameters (thalamic_widths, outgoing_widths) are in μm.
+"""
 
 import pytest
 from src.model.presets import P0_PRESET, P5_PRESET, P10_PRESET, P15_PRESET
-from src.model.config import CELL_TYPES, LAYERS
+from src.model.config import CELL_TYPES, LAYERS, ANATOMICAL_GRID_SIZE
 
 
 def test_all_presets_exist():
@@ -26,10 +29,10 @@ def test_preset_structure(preset_name='P0'):
     
     # Required top-level keys
     required_keys = [
-        'time_constants', 'gains', 'noise_params',
+        'time_constants',
         'thalamic_widths', 'outgoing_widths',
         'strength_scaling', 'thalamic_alpha',
-        'connection_strengths'
+        'connection_strengths', 'background_input'
     ]
     
     for key in required_keys:
@@ -47,40 +50,6 @@ def test_preset_time_constants():
         tau = preset['time_constants'][cell_type]
         assert isinstance(tau, (int, float))
         assert tau > 0  # Time constants should be positive
-
-
-def test_preset_gains():
-    """Test preset gains are valid."""
-    preset = P0_PRESET
-    
-    assert 'gains' in preset
-    
-    for cell_type in CELL_TYPES:
-        assert cell_type in preset['gains']
-        gain = preset['gains'][cell_type]
-        assert isinstance(gain, (int, float))
-        assert gain >= 0  # Gains should be non-negative
-
-
-def test_preset_noise_params():
-    """Test preset noise parameters are valid."""
-    preset = P0_PRESET
-    
-    assert 'noise_params' in preset
-    
-    for cell_type in CELL_TYPES:
-        assert cell_type in preset['noise_params']
-        noise_params = preset['noise_params'][cell_type]
-        
-        assert 'mean' in noise_params
-        assert 'std' in noise_params
-        assert 'c' in noise_params
-        
-        # Check std is non-negative
-        assert noise_params['std'] >= 0
-        
-        # Check correlation is in valid range
-        assert 0 <= noise_params['c'] <= 1
 
 
 def test_preset_connection_strengths():
@@ -136,7 +105,43 @@ def test_preset_valid_structure(preset_name):
     
     # Verify required structure exists
     assert 'time_constants' in preset
-    assert 'gains' in preset
-    assert 'noise_params' in preset
     assert 'thalamic_alpha' in preset
+    assert 'connection_strengths' in preset
+    assert 'strength_scaling' in preset
+
+
+@pytest.mark.parametrize("preset_name", ['P0', 'P5', 'P10', 'P15'])
+def test_preset_spatial_parameters_in_um(preset_name):
+    """Test that all spatial parameters are in μm (anatomical units)."""
+    presets = {
+        'P0': P0_PRESET,
+        'P5': P5_PRESET,
+        'P10': P10_PRESET,
+        'P15': P15_PRESET
+    }
+    
+    preset = presets[preset_name]
+    
+    # Check thalamic_widths are in reasonable μm range (10-500 μm)
+    for cell_type in CELL_TYPES:
+        width = preset['thalamic_widths'][cell_type]
+        assert 10.0 <= width <= 500.0, f"thalamic_width {cell_type} = {width} should be in μm range [10, 500]"
+    
+    # Check outgoing_widths are in reasonable μm range (10-500 μm)
+    for cell_type in CELL_TYPES:
+        width = preset['outgoing_widths'][cell_type]
+        assert 10.0 <= width <= 500.0, f"outgoing_width {cell_type} = {width} should be in μm range [10, 500]"
+
+
+def test_spatial_parameters_scale_correctly():
+    """Test that spatial parameters scale correctly with anatomical grid size."""
+    # P0 preset should have:
+    # - thalamic_widths['E'] = 100.0 μm (was 2.0 grid units × 50 μm/grid)
+    # - outgoing_widths['E'] = 300.0 μm (was 6.0 grid units × 50 μm/grid)
+    
+    assert P0_PRESET['thalamic_widths']['E'] == 100.0  # μm
+    assert P0_PRESET['outgoing_widths']['E'] == 300.0  # μm
+    
+    # With default 1000 μm grid and 20 grid points, 1 grid unit = 50 μm
+    # So 100 μm = 2 grid units, 300 μm = 6 grid units (original values)
 

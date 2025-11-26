@@ -57,25 +57,6 @@ Where:
 - `G_σsc(dx,dy) = exp(-0.5 * (dx² + dy²) / σ_sc²) / (2π * σ_sc²)` is the normalized Gaussian profile
 - `σ_sc` is the spatial spread of connections
 
-### Noise Model
-
-The model implements spatially and temporally correlated noise using an Ornstein-Uhlenbeck process:
-
-```
-dη_c(x,y,t) = -(η_c(x,y,t) - μ_c) * dt/τ_noise + σ_c * √(2*dt/τ_noise) * dW_c(x,y,t)
-```
-
-With both private and shared noise components:
-```
-η_c(x,y,t) = μ_c + σ_c * [√(1-c_c) * η_private_c(x,y,t) + √(c_c) * η_shared(x,y,t)]
-```
-
-Where:
-- `μ_c` is the mean noise level
-- `σ_c` is the noise standard deviation
-- `c_c` is the correlation coefficient controlling shared vs. private noise
-- `τ_noise = 20ms` is the noise correlation time constant
-
 ## Thalamic Input Model
 
 The thalamic input combines two components representing different activity patterns during early development:
