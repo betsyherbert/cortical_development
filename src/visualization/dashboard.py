@@ -1648,6 +1648,47 @@ class DashboardApp:
         # Create event figures
         self._initialize_event_figures()
     
+    def _create_grid_info_boxes(self):
+        """Create info boxes showing grid parameters."""
+        return html.Div([
+            dbc.Row([
+                # Empty column to match heatmap label width
+                dbc.Col(width=2),
+                # Info boxes container
+                dbc.Col([
+                    html.Div([
+                        # Anatomical grid size box
+                        html.Div([
+                            html.Div("Anatomical Grid Size", 
+                                   style={"fontSize": "11px", "fontWeight": "600", "color": "#34495e"}),
+                            html.Div(f"{ANATOMICAL_GRID_SIZE:.0f} × {ANATOMICAL_GRID_SIZE:.0f} μm", 
+                                   style={"fontSize": "13px", "fontWeight": "bold", "color": "#2c3e50"})
+                        ], style={
+                            "display": "inline-block",
+                            "padding": "8px 16px",
+                            "backgroundColor": "#ecf0f1",
+                            "borderRadius": "4px",
+                            "marginRight": "15px",
+                            "textAlign": "center"
+                        }),
+                        # Neurons per grid box
+                        html.Div([
+                            html.Div("Neurons Per Grid", 
+                                   style={"fontSize": "11px", "fontWeight": "600", "color": "#34495e"}),
+                            html.Div(f"{GRID_SIZE} × {GRID_SIZE} = {GRID_SIZE*GRID_SIZE}", 
+                                   style={"fontSize": "13px", "fontWeight": "bold", "color": "#2c3e50"})
+                        ], style={
+                            "display": "inline-block",
+                            "padding": "8px 16px",
+                            "backgroundColor": "#ecf0f1",
+                            "borderRadius": "4px",
+                            "textAlign": "center"
+                        })
+                    ], style={"display": "flex", "justifyContent": "flex-start", "marginLeft": "20px"})
+                ], width=10)
+            ])
+        ], className="mb-3")
+    
     def _create_preset_buttons(self):
         """Create the preset buttons row."""
         return html.Div([
@@ -1717,6 +1758,9 @@ class DashboardApp:
         return dbc.Col([
             # Add more top padding to shift visualization down
             html.Div(style={"height": "10px"}),
+            
+            # Grid info boxes
+            self._create_grid_info_boxes(),
             
             # Preset Buttons
             self._create_preset_buttons(),
@@ -3254,7 +3298,7 @@ class DashboardApp:
             # Headers row
             dbc.Row([
                 dbc.Col("", width=1),
-                dbc.Col(html.Div("Time Constant", className="text-center"), width=5),
+                dbc.Col(html.Div("Time Constant (ms)", className="text-center"), width=5),
                 dbc.Col(html.Div("Background Input", className="text-center"), width=5),
             ], className="mb-1"),
             
@@ -3289,8 +3333,8 @@ class DashboardApp:
             # Headers row
             dbc.Row([
                 dbc.Col("", width=1),
-                dbc.Col(html.Div("Thalamic", className="text-center"), width=5),
-                dbc.Col(html.Div("Outgoing", className="text-center"), width=5),
+                dbc.Col(html.Div("Thalamic (μm)", className="text-center"), width=5),
+                dbc.Col(html.Div("Outgoing (μm)", className="text-center"), width=5),
             ], className="mb-1"),
             
             # Connectivity rows

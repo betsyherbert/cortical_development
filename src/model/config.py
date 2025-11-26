@@ -15,10 +15,10 @@ from .presets import P0_PRESET
 #------------------------------------------------------------------------------
 GRID_SIZE = 20  # Number of grid points in each dimension (N x N neurons per layer)
 ANATOMICAL_GRID_SIZE = 1000.0  # Anatomical size of the grid in μm (default: 1000 μm × 1000 μm)
-DT = 1.5  # Time step in milliseconds - INCREASE to speed up simulation
-INTEGRATION_STEPS = 3  # Number of steps per update cycle - INCREASE for faster visual changes
+DT = 3  # Time step in milliseconds - INCREASE to speed up simulation
+INTEGRATION_STEPS = 6  # Number of steps per update cycle - INCREASE for faster visual changes
 VISUALIZATION_STEPS = 5  # Number of simulation steps per visualization update - DECREASE for more frequent visual updates
-UPDATE_INTERVAL = 60  # Wall clock time between dashboard UI refresh (ms) - DECREASE for more frequent visual updates
+UPDATE_INTERVAL = 50  # Wall clock time between dashboard UI refresh (ms) - DECREASE for more frequent visual updates
 RANDOM_SEED = 9  # Global random seed for reproducible simulations
 
 

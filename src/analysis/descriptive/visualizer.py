@@ -214,7 +214,7 @@ class ActivityVisualizer:
     def _format_time_axis(self, ax: plt.Axes, time: np.ndarray, row: int, num_rows: int) -> None:
         """Format x-axis for time-based plots."""
         if row == num_rows - 1:  # Bottom row
-            ax.set_xlabel('Time (min)')
+            ax.set_xlabel('Time (s)')
             tick_values, tick_labels = self._format_minimal_ticks(time, is_time=True)
             ax.set_xticks(tick_values)
             ax.set_xticklabels(tick_labels)
@@ -249,7 +249,7 @@ class ActivityVisualizer:
                 
                 # X-axis formatting for heatmaps
                 if row == len(POSTER_CELL_TYPES) - 1:
-                    ax.set_xlabel('Time (min)')
+                    ax.set_xlabel('Time (s)')
                     n_timepoints = heatmap_data.shape[1]
                     max_time = ANALYSIS_PARAMS['simulation_duration']
                     ax.set_xticks([0, n_timepoints-1])
