@@ -72,17 +72,14 @@ class ParameterSpec:
             if self.units:
                 return f'{self.display_name} ({self.units})'
             return self.display_name
-        else:
-            # Ratio mode
-            if self.reference_param:
-                ref_spec = SCANNABLE_PARAMETERS.get(self.reference_param)
-                if ref_spec:
-                    return f'{self.display_name} / {ref_spec.display_name}'
-            return f'{self.display_name} (ratio)'
+        
+        if self.reference_param:
+            ref_spec = SCANNABLE_PARAMETERS.get(self.reference_param)
+            if ref_spec:
+                return f'{self.display_name} / {ref_spec.display_name}'
+        return f'{self.display_name} (ratio)'
 
 
-# Define all scannable parameters
-# Note: All spatial parameters (sigma) are in μm
 SCANNABLE_PARAMETERS = {
     # Time constants
     'tau_E': ParameterSpec(
@@ -181,42 +178,42 @@ DEFAULT_SPECTRUM_SWEEPS = [
 # ============================================================================
 
 # Parameter space scan ranges (matching dashboard limits)
-TAU_MIN = 1.0      # Minimum time constant (ms) on dashboard
-TAU_MAX = 28.0     # Maximum time constant (ms) on dashboard
-SIGMA_MIN = 5.0    # Minimum spatial width (μm) on dashboard
-SIGMA_MAX = 325.0  # Maximum spatial width (μm) on dashboard (must be >= max preset σ value)
+TAU_MIN = 1.0      # Minimum time constant (ms)
+TAU_MAX = 28.0     # Maximum time constant (ms)
+SIGMA_MIN = 5.0    # Minimum spatial width (μm)
+SIGMA_MAX = 325.0  # Maximum spatial width (μm), must be >= max preset σ value
 
-# Fixed ratio mode specific limits (applied to τ_inh/τ_E and σ_inh/σ_E ratios)
-FIXED_RATIO_TAU_MIN = 0.1    # Minimum tau ratio to scan
-FIXED_RATIO_TAU_MAX = 2.0    # Maximum tau ratio to scan
-FIXED_RATIO_SIGMA_MIN = 0.1  # Minimum sigma ratio to scan
-FIXED_RATIO_SIGMA_MAX = 4.0  # Maximum sigma ratio to scan
+# Fixed ratio mode limits (applied to τ_inh/τ_E and σ_inh/σ_E ratios)
+FIXED_RATIO_TAU_MIN = 0.1    # Minimum tau ratio
+FIXED_RATIO_TAU_MAX = 2.0    # Maximum tau ratio
+FIXED_RATIO_SIGMA_MIN = 0.1  # Minimum sigma ratio
+FIXED_RATIO_SIGMA_MAX = 4.0  # Maximum sigma ratio
 
 # Ratio ranges for bifurcation diagrams:
 #   - fixed_absolute mode: computed dynamically per stage from TAU_MIN/MAX and SIGMA_MIN/MAX
 #     tau_ratio ∈ [TAU_MIN/τ_E, TAU_MAX/τ_E], sigma_ratio ∈ [SIGMA_MIN/σ_E, SIGMA_MAX/σ_E]
 #   - fixed_ratio mode: uses FIXED_RATIO_* constants directly
-GRID_RESOLUTION = 20             # Number of points per axis
-MEAN_STATE_SEED = RANDOM_SEED    # Random seed for SteadyStateFinder reproducibility
+GRID_RESOLUTION = 20          # Number of points per axis
+MEAN_STATE_SEED = RANDOM_SEED  # Random seed for SteadyStateFinder reproducibility
 
 # Visualization parameters
 BIFURCATION_COLORMAP = 'viridis'  # Colormap for wavenumber
 
 # Opacity levels for stability visualization
-OPACITY_STABLE_FAR = 0.3     # Alpha for max_real < -0.05 (stable, far from boundary)
-OPACITY_STABLE_NEAR = 0.6    # Alpha for -0.05 ≤ max_real < 0 (stable, near boundary)
-OPACITY_UNSTABLE = 1.0       # Alpha for max_real ≥ 0 (unstable)
-STABILITY_THRESHOLD = -0.05  # Threshold for "near boundary" vs "far from boundary"
+OPACITY_STABLE_FAR = 0.3      # Alpha for max_real < -0.05 (stable, far from boundary)
+OPACITY_STABLE_NEAR = 0.6     # Alpha for -0.05 ≤ max_real < 0 (stable, near boundary)
+OPACITY_UNSTABLE = 1.0        # Alpha for max_real ≥ 0 (unstable)
+STABILITY_THRESHOLD = -0.05   # Threshold for "near boundary" vs "far from boundary"
 
 # ============================================================================
 # Developmental Gain Maps Configuration
 # ============================================================================
 
 # Gain map visualization parameters
-GAIN_COLORMAP = 'viridis'  # Colormap for k values
-GAIN_CLIP_MAX = 50.0     # Maximum gain for opacity calculation (clipping only affects display, not argmax)
-GAIN_OPACITY_MIN = 0.3     # Minimum opacity (low gain)
-GAIN_OPACITY_MAX = 1.0     # Maximum opacity (high gain)
+GAIN_COLORMAP = 'viridis'      # Colormap for k values
+GAIN_CLIP_MAX = 50.0           # Maximum gain for opacity (clipping only affects display, not argmax)
+GAIN_OPACITY_MIN = 0.3         # Minimum opacity (low gain)
+GAIN_OPACITY_MAX = 1.0         # Maximum opacity (high gain)
 
 # ============================================================================
 # Gain Spectrum Analysis Configuration
@@ -224,10 +221,10 @@ GAIN_OPACITY_MAX = 1.0     # Maximum opacity (high gain)
 
 # Parameter sweep configuration
 SPECTRUM_PARAM_SWEEP_RANGE = (0.2, 3.0)  # Relative to preset value (0.2x to 3x)
-SPECTRUM_PARAM_RESOLUTION = 20           # Number of parameter values
-SPECTRUM_K_MAX = 10.0                    # Maximum k value for spectrum
-SPECTRUM_COLORMAP = 'inferno'            # Colormap for gain values
-SPECTRUM_LOG_SCALE = True                # Use log10(gain) for colormap
+SPECTRUM_PARAM_RESOLUTION = 20            # Number of parameter values
+SPECTRUM_K_MAX = 10.0                     # Maximum k value for spectrum
+SPECTRUM_COLORMAP = 'inferno'             # Colormap for gain values
+SPECTRUM_LOG_SCALE = True                 # Use log10(gain) for colormap
 
 # Visualization parameters
-SPECTRUM_Y_MARGIN = (0.5, 2.0)           # Y-axis range per stage (relative to preset: 0.5x to 2x)
+SPECTRUM_Y_MARGIN = (0.5, 2.0)  # Y-axis range per stage (relative to preset: 0.5x to 2x)

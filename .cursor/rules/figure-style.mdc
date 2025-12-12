@@ -1,0 +1,24 @@
+---
+description: Figure creation
+alwaysApply: false
+---
+All figures must follow publication-quality styling.
+
+Defaults:
+- consistent font family and sizes
+- minimal, readable ticks (≤5 per axis)
+- no excessive decimals
+- uncluttered layout with adequate spacing
+
+Prefer:
+- vector output (SVG/PDF)
+- clear axis labels with units
+- restrained, colorblind-safe palettes
+
+Avoid:
+- crowded subplots
+- default matplotlib styling
+- unnecessary gridlines or spines
+
+If a figure looks busy, simplify before adding detail.
+Consistency across figures is more important than local optimization.

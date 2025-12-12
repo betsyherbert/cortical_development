@@ -1,0 +1,11 @@
+---
+alwaysApply: true
+---
+Configuration rules:
+
+- global constants live in config.py
+- config values are imported, never mutated
+- experimental parameters are passed explicitly
+- avoid class inheritance for model variants
+- prefer shared utility functions over shared base classes
+

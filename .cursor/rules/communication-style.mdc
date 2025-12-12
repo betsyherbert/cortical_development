@@ -1,0 +1,20 @@
+---
+description: In chat explanations
+alwaysApply: false
+---
+Communication style:
+
+- Use simple, direct language.
+- Explain ideas intuitively before using technical terms.
+- When technical terms are necessary, explain them briefly.
+- Avoid unnecessary jargon and abstraction.
+
+Important:
+- Do NOT reduce precision or correctness.
+- Do NOT omit important details.
+- Reason fully, explain clearly.
+- Assume the user is intelligent but may not be familiar with coding/CS terms.
+
+When in doubt:
+- clarity over completeness
+- intuition before formality

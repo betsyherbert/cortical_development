@@ -116,12 +116,13 @@ HEATMAP_ZMAX = 1.0  # Maximum activity value (allows for some headroom)
 # Correlation plot constants
 CORRELATION_WINDOW_MS = 10000  # Rolling window: 10 seconds
 CORRELATION_DISPLAY_SECONDS = 10  # Display window: 10 seconds
-CORRELATION_UPDATE_INTERVAL = 5  # Update every 5 frames (~300ms) to reduce computational load
+CORRELATION_UPDATE_INTERVAL = 20  # Update every 20 frames (~1s) to reduce computational load
+CORRELATION_CELL_SAMPLE_RATE = 4  # Sample every 4th cell to reduce matrix size
 CORRELATION_HISTORY_LENGTH = int(CORRELATION_WINDOW_MS / UPDATE_INTERVAL)
 
 # Synchronous event tracking constants (reuse correlation timing)
-SYNCHRONOUS_EVENT_THRESHOLD = 0.2      # From descriptive analysis
-ACTIVITY_THRESHOLD = 0.3                # From descriptive analysis
+SYNCHRONOUS_EVENT_THRESHOLD = 0.1       # From descriptive analysis
+ACTIVITY_THRESHOLD = 0.1                # From descriptive analysis
 
 # Font size constants for consistent aesthetics
 TITLE_FONT_SIZE = 17  # Main section titles (H5 elements)
@@ -569,40 +570,59 @@ class DashboardApp:
         if len(self.correlation_activity_buffer) < CORRELATION_HISTORY_LENGTH:
             return None
         
-        # Collect cell timeseries
-        all_cells, layer_labels, celltype_labels = [], [], []
+        # Collect cell data from buffer - organize by group for efficient computation
+        # Sample cells to reduce computational load
+        layer_data = {layer: [] for layer in LAYERS}
+        celltype_data = {cell_type: [] for cell_type in CELL_TYPES}
+        
         for snapshot in self.correlation_activity_buffer[-CORRELATION_HISTORY_LENGTH:]:
+            # Collect by layer (all cell types in each layer)
             for layer in LAYERS:
+                cells_at_t = []
                 for cell_type in CELL_TYPES:
-                    all_cells.append(snapshot[layer][cell_type].flatten())
-                    layer_labels.append(layer)
-                    celltype_labels.append(cell_type)
+                    cells = snapshot[layer][cell_type].flatten()
+                    # Sample every Nth cell to reduce matrix size
+                    cells_at_t.extend(cells[::CORRELATION_CELL_SAMPLE_RATE])
+                layer_data[layer].append(cells_at_t)
+            
+            # Collect by celltype (all layers for each cell type)
+            for cell_type in CELL_TYPES:
+                cells_at_t = []
+                for layer in LAYERS:
+                    cells = snapshot[layer][cell_type].flatten()
+                    # Sample every Nth cell to reduce matrix size
+                    cells_at_t.extend(cells[::CORRELATION_CELL_SAMPLE_RATE])
+                celltype_data[cell_type].append(cells_at_t)
         
-        all_cells = np.array(all_cells)
+        # Compute correlations within each group (much more efficient than all cells at once)
+        def compute_group_corr(data_list):
+            """Compute average pairwise correlation for a group."""
+            if not data_list or len(data_list) < 2:
+                return 0.0
+            data_array = np.array(data_list)  # Shape: (num_timepoints, num_cells_in_group)
+            # Return zeros if group inactive
+            if np.max(data_array) < 1e-6:
+                return 0.0
+            # Skip if too few cells (can't compute meaningful correlation)
+            if data_array.shape[1] < 2:
+                return 0.0
+            # Compute correlation matrix: (num_cells, num_timepoints)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                corr_matrix = np.corrcoef(data_array.T)
+            corr_matrix = np.nan_to_num(corr_matrix, nan=0.0, posinf=0.0, neginf=0.0)
+            # Extract upper triangle (excluding diagonal) and compute mean
+            if corr_matrix.shape[0] <= 1:
+                return 0.0
+            mask = np.triu(np.ones_like(corr_matrix, dtype=bool), k=1)
+            mean_corr = np.mean(corr_matrix[mask])
+            return 0.0 if not np.isfinite(mean_corr) else float(mean_corr)
         
-        # Return zeros if network inactive
-        if np.max(all_cells) < 1e-6:
-            return {
-                'by_layer': {layer: 0.0 for layer in LAYERS},
-                'by_celltype': {cell_type: 0.0 for cell_type in CELL_TYPES}
-            }
-        
-        # Compute correlation matrix with error suppression
-        with np.errstate(divide='ignore', invalid='ignore'):
-            corr_matrix = np.corrcoef(all_cells)
-        corr_matrix = np.nan_to_num(corr_matrix, nan=0.0, posinf=0.0, neginf=0.0)
-        
-        # Calculate grouped correlations
         return {
             'by_layer': {
-                layer: self._compute_group_correlation(
-                    corr_matrix, [i for i, l in enumerate(layer_labels) if l == layer]
-                ) for layer in LAYERS
+                layer: compute_group_corr(layer_data[layer]) for layer in LAYERS
             },
             'by_celltype': {
-                cell_type: self._compute_group_correlation(
-                    corr_matrix, [i for i, ct in enumerate(celltype_labels) if ct == cell_type]
-                ) for cell_type in CELL_TYPES
+                cell_type: compute_group_corr(celltype_data[cell_type]) for cell_type in CELL_TYPES
             }
         }
     
@@ -3336,8 +3356,8 @@ class DashboardApp:
             # Headers row
             dbc.Row([
                 dbc.Col("", width=1),
-                dbc.Col(html.Div("Thalamic (μm)", className="text-center"), width=5),
-                dbc.Col(html.Div("Outgoing (μm)", className="text-center"), width=5),
+                dbc.Col(html.Div("Thalamic", className="text-center"), width=5),
+                dbc.Col(html.Div("Outgoing", className="text-center"), width=5),
             ], className="mb-1"),
             
             # Connectivity rows
@@ -3437,7 +3457,7 @@ class DashboardApp:
             
             # Section: Connectivity widths
             html.Div([
-                html.H5("Connection Widths", className="text-center",
+                html.H5("Connection Widths (μm)", className="text-center",
                         style={"fontSize": f"{TITLE_FONT_SIZE}px", "fontWeight": "600"}),
                 self.create_connectivity_sliders(),
                 

@@ -8,7 +8,7 @@ from src.analysis.common import DEVELOPMENTAL_STAGES, PRESETS, ERROR_BAR_ALPHA, 
 # Analysis parameters
 ANALYSIS_PARAMS = {
     'warmup_duration': 2.0,                   # Warmup time before data collection (seconds)
-    'simulation_duration': 50.0,               # Simulation duration (seconds)
+    'simulation_duration': 10.0,               # Simulation duration (seconds)
     'activity_threshold': 0.1,                # Firing rate threshold for "active" cells
     'synchronous_event_threshold': 0.1,       # Fraction of cells for "large synchronous events"
     'correlation_activity_threshold': 0.00,    # Min network activity for correlation calculation

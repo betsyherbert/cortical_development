@@ -1,0 +1,25 @@
+---
+alwaysApply: true
+---
+This is an actively evolving computational neuroscience research codebase.
+
+Priorities:
+- clarity over cleverness
+- minimal abstractions
+- zero unnecessary redundancy
+- code readable by neuroscientists
+
+Assume the model will change.
+Optimize for ease of modification, not architectural purity.
+
+Prefer:
+- small, composable functions
+- explicit data flow
+- simple control logic
+
+Avoid:
+- premature optimization
+- heavy design patterns
+- metaprogramming
+
+Tests define the scientific contract of the model. They must never be modified implicitly or as a side effect of refactoring or cleanup commands

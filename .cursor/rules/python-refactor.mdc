@@ -1,0 +1,18 @@
+---
+alwaysApply: true
+---
+Python refactoring rules:
+
+- do not change behavior unless explicitly requested
+- keep diffs small and readable
+- prefer pure functions when possible
+- avoid global mutable state
+- avoid deep call chains
+
+If refactoring:
+- explain current structure
+- propose a plan
+- wait for confirmation before large changes
+
+If a file grows large, suggest a split with rationale.
+Do not split without approval.

@@ -136,12 +136,12 @@ def test_preset_spatial_parameters_in_um(preset_name):
 def test_spatial_parameters_scale_correctly():
     """Test that spatial parameters scale correctly with anatomical grid size."""
     # P0 preset should have:
-    # - thalamic_widths['E'] = 100.0 μm (was 2.0 grid units × 50 μm/grid)
-    # - outgoing_widths['E'] = 300.0 μm (was 6.0 grid units × 50 μm/grid)
+    # - thalamic_widths['E'] = 200.0 μm (2.0 grid units × 100 μm/grid)
+    # - outgoing_widths['E'] = 300.0 μm (3.0 grid units × 100 μm/grid)
     
-    assert P0_PRESET['thalamic_widths']['E'] == 100.0  # μm
+    assert P0_PRESET['thalamic_widths']['E'] == 200.0  # μm
     assert P0_PRESET['outgoing_widths']['E'] == 300.0  # μm
     
-    # With default 1000 μm grid and 20 grid points, 1 grid unit = 50 μm
-    # So 100 μm = 2 grid units, 300 μm = 6 grid units (original values)
+    # With default 2000 μm grid and 20 grid points, 1 grid unit = 100 μm
+    # So 200 μm = 2 grid units, 300 μm = 3 grid units
 

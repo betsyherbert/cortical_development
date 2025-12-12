@@ -119,16 +119,16 @@ def test_spatial_scale_conversion():
     """Test that spatial scale conversion works correctly."""
     from src.model.config import get_grid_scale, um_to_grid, grid_to_um
     
-    # Default values: 1000 μm / 20 grid = 50 μm/grid
+    # Default values: 2000 μm / 20 grid = 100 μm/grid
     scale = get_grid_scale()
-    assert scale == 50.0
+    assert scale == 100.0
     
     # Convert 100 μm to grid units
     grid_units = um_to_grid(100.0)
-    assert grid_units == 2.0
+    assert grid_units == 1.0
     
-    # Convert 2 grid units to μm
-    um = grid_to_um(2.0)
+    # Convert 1 grid unit to μm
+    um = grid_to_um(1.0)
     assert um == 100.0
     
     # Round-trip conversion

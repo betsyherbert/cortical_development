@@ -40,7 +40,7 @@ class BifurcationVisualizer:
         plt.rcParams.update({
             'font.family': 'sans-serif',
             'font.sans-serif': ['Latin Modern Sans', 'Arial', 'DejaVu Sans', 'Helvetica'],
-            'mathtext.fontset': 'cm',
+            'mathtext.fontset': 'stixsans',  # Sans-serif math font with all glyphs
             'axes.unicode_minus': False
         })
         
@@ -89,11 +89,22 @@ class BifurcationVisualizer:
         n_rows = len(param_pairs)
         n_stages = len(stages)
         
-        # Determine spine widths based on mode
-        emphasize_ratio = mode == 'fixed_ratio'
-        emphasize_absolute = mode == 'fixed_absolute'
-        primary_width = self.bold_spine_width if emphasize_ratio else self.default_spine_width
-        secondary_width = self.bold_spine_width if emphasize_absolute else self.default_spine_width
+        # Determine spine widths and axis semantics
+        # Note: Data is ALWAYS in absolute units (extent uses absolute values)
+        # So primary axis ALWAYS shows absolute values
+        # Secondary axis ALWAYS shows ratios (via division)
+        # Emphasis (bold spine) indicates what's "fixed" across stages
+        primary_absolute = True  # Always show absolute on primary
+        secondary_absolute = False  # Always show ratios on secondary
+        
+        if mode == 'fixed_absolute':
+            # Emphasize primary (absolute values are what's fixed)
+            primary_width = self.bold_spine_width
+            secondary_width = self.default_spine_width
+        else:  # fixed_ratio
+            # Emphasize secondary (ratios are what's fixed)
+            primary_width = self.default_spine_width
+            secondary_width = self.bold_spine_width
         
         # Create figure with n_rows×n_stages grid
         fig_height = self.fig_height_per_row * n_rows
@@ -141,8 +152,8 @@ class BifurcationVisualizer:
             pair_results = results[param_pair]
             
             # Determine consistent axis limits across all stages in this row
-            # Use INTERSECTION of ranges (max of mins, min of maxs) to avoid white space
-            # This ensures all stages have data for the entire displayed range
+            # In fixed_absolute mode: all stages have same ranges (use any stage)
+            # In fixed_ratio mode: ranges differ by stage (use intersection to avoid clipping)
             x_mins, x_maxs = [], []
             y_mins, y_maxs = [], []
             for stage in stages:
@@ -155,7 +166,8 @@ class BifurcationVisualizer:
                     y_maxs.append(y_vals[-1])
             
             if x_mins and y_mins:
-                # Intersection: range covered by ALL stages
+                # Use intersection: range covered by ALL stages (max of mins, min of maxs)
+                # This ensures all stages have data for the entire displayed range
                 x_lim = (max(x_mins), min(x_maxs))
                 y_lim = (max(y_mins), min(y_maxs))
             else:
@@ -232,23 +244,23 @@ class BifurcationVisualizer:
                 ax.spines['top'].set_visible(False)
                 ax.spines['right'].set_visible(False)
                 
-                # Axis labels
+                # Axis labels (primary axes)
                 if stage_idx == 0:
-                    ax.set_ylabel(param_y_spec.get_axis_label(absolute=False), 
+                    ax.set_ylabel(param_y_spec.get_axis_label(absolute=primary_absolute), 
                                 fontsize=self.label_fontsize, labelpad=8)
                 else:
                     ax.set_ylabel('')
                 
                 # Only show x-labels on bottom row
                 if row_idx == n_rows - 1:
-                    ax.set_xlabel(param_x_spec.get_axis_label(absolute=False),
+                    ax.set_xlabel(param_x_spec.get_axis_label(absolute=primary_absolute),
                                  fontsize=self.label_fontsize, labelpad=8)
                 else:
                     ax.set_xlabel('')
                 
                 ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.5)
                 
-                # Secondary axes (absolute values)
+                # Secondary axes - always convert absolute to ratio
                 # Get reference values for ratio conversion
                 if param_y_spec.use_ratio and param_y_spec.reference_param:
                     ref_spec_y = SCANNABLE_PARAMETERS[param_y_spec.reference_param]
@@ -256,14 +268,16 @@ class BifurcationVisualizer:
                 else:
                     ref_value_y = 1.0
                 
-                ax2 = ax.secondary_yaxis('right', functions=(
-                    lambda x, rv=ref_value_y: x * rv,
-                    lambda x, rv=ref_value_y: x / rv
-                ))
+                # Always convert: absolute (primary) → ratio (secondary)
+                # Forward: absolute → ratio (divide), Inverse: ratio → absolute (multiply)
+                conv_y_fwd = lambda x, rv=ref_value_y: x / rv if rv != 0 else x
+                conv_y_inv = lambda x, rv=ref_value_y: x * rv
+                
+                ax2 = ax.secondary_yaxis('right', functions=(conv_y_fwd, conv_y_inv))
                 # Reduce number of ticks on secondary y-axis to allow 1 d.p. formatting
                 ax2.yaxis.set_major_locator(MaxNLocator(nbins=4))
                 if stage_idx == n_stages - 1:
-                    ax2.set_ylabel(param_y_spec.get_axis_label(absolute=True),
+                    ax2.set_ylabel(param_y_spec.get_axis_label(absolute=secondary_absolute),
                                  fontsize=self.secondary_label_fontsize, labelpad=8)
                     ax2.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
                 else:
@@ -280,12 +294,13 @@ class BifurcationVisualizer:
                 else:
                     ref_value_x = 1.0
                 
-                ax3 = ax.secondary_xaxis('top', functions=(
-                    lambda x, rv=ref_value_x: x * rv,
-                    lambda x, rv=ref_value_x: x / rv
-                ))
+                # Always convert: absolute (primary) → ratio (secondary)
+                conv_x_fwd = lambda x, rv=ref_value_x: x / rv if rv != 0 else x
+                conv_x_inv = lambda x, rv=ref_value_x: x * rv
+                
+                ax3 = ax.secondary_xaxis('top', functions=(conv_x_fwd, conv_x_inv))
                 if row_idx == 0:
-                    ax3.set_xlabel(param_x_spec.get_axis_label(absolute=True),
+                    ax3.set_xlabel(param_x_spec.get_axis_label(absolute=secondary_absolute),
                                   fontsize=self.secondary_label_fontsize, labelpad=8)
                     ax3.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
                 else:
@@ -351,7 +366,7 @@ class BifurcationVisualizer:
         cbar_ax.set_yticks(wavelength_tick_positions)
         cbar_ax.set_yticklabels([f'{w:.0f}' for w in wavelength_tick_values], 
                                fontsize=self.tick_fontsize)
-        cbar_ax.set_ylabel('Wavelength w/ max Re($\\lambda$) (μm)', 
+        cbar_ax.set_ylabel(r'Wavelength w/ max Re($\lambda$) ($\mu$m)', 
                           fontsize=self.label_fontsize, labelpad=18)
         cbar_ax.yaxis.set_label_position('right')
         cbar_ax.yaxis.tick_right()
@@ -405,11 +420,22 @@ class BifurcationVisualizer:
         n_rows = len(param_pairs)
         n_stages = len(stages)
         
-        # Determine spine widths
-        emphasize_ratio = mode == 'fixed_ratio'
-        emphasize_absolute = mode == 'fixed_absolute'
-        primary_width = self.bold_spine_width if emphasize_ratio else self.default_spine_width
-        secondary_width = self.bold_spine_width if emphasize_absolute else self.default_spine_width
+        # Determine spine widths and axis semantics
+        # Note: Data is ALWAYS in absolute units (extent uses absolute values)
+        # So primary axis ALWAYS shows absolute values
+        # Secondary axis ALWAYS shows ratios (via division)
+        # Emphasis (bold spine) indicates what's "fixed" across stages
+        primary_absolute = True  # Always show absolute on primary
+        secondary_absolute = False  # Always show ratios on secondary
+        
+        if mode == 'fixed_absolute':
+            # Emphasize primary (absolute values are what's fixed)
+            primary_width = self.bold_spine_width
+            secondary_width = self.default_spine_width
+        else:  # fixed_ratio
+            # Emphasize secondary (ratios are what's fixed)
+            primary_width = self.default_spine_width
+            secondary_width = self.bold_spine_width
         
         # Create figure with n_rows×n_stages grid
         fig_height = self.fig_height_per_row * n_rows
@@ -457,8 +483,8 @@ class BifurcationVisualizer:
             pair_results = results[param_pair]
             
             # Determine consistent axis limits across all stages in this row
-            # Use INTERSECTION of ranges (max of mins, min of maxs) to avoid white space
-            # This ensures all stages have data for the entire displayed range
+            # In fixed_absolute mode: all stages have same ranges (use any stage)
+            # In fixed_ratio mode: ranges differ by stage (use intersection to avoid clipping)
             x_mins, x_maxs = [], []
             y_mins, y_maxs = [], []
             for stage in stages:
@@ -471,7 +497,8 @@ class BifurcationVisualizer:
                     y_maxs.append(y_vals[-1])
             
             if x_mins and y_mins:
-                # Intersection: range covered by ALL stages
+                # Use intersection: range covered by ALL stages (max of mins, min of maxs)
+                # This ensures all stages have data for the entire displayed range
                 x_lim = (max(x_mins), min(x_maxs))
                 y_lim = (max(y_mins), min(y_maxs))
             else:
@@ -549,35 +576,36 @@ class BifurcationVisualizer:
                 ax.spines['right'].set_visible(False)
                 
                 if stage_idx == 0:
-                    ax.set_ylabel(param_y_spec.get_axis_label(absolute=False),
+                    ax.set_ylabel(param_y_spec.get_axis_label(absolute=primary_absolute),
                                 fontsize=self.label_fontsize, labelpad=8)
                 else:
                     ax.set_ylabel('')
                 
                 # Only show x-labels on bottom row
                 if row_idx == n_rows - 1:
-                    ax.set_xlabel(param_x_spec.get_axis_label(absolute=False),
+                    ax.set_xlabel(param_x_spec.get_axis_label(absolute=primary_absolute),
                                  fontsize=self.label_fontsize, labelpad=8)
                 else:
                     ax.set_xlabel('')
                 
                 ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.5)
                 
-                # Secondary axes
+                # Secondary axes - always convert absolute to ratio
                 if param_y_spec.use_ratio and param_y_spec.reference_param:
                     ref_spec_y = SCANNABLE_PARAMETERS[param_y_spec.reference_param]
                     ref_value_y = get_nested_value(preset, ref_spec_y.path)
                 else:
                     ref_value_y = 1.0
                 
-                ax2 = ax.secondary_yaxis('right', functions=(
-                    lambda x, rv=ref_value_y: x * rv,
-                    lambda x, rv=ref_value_y: x / rv
-                ))
+                # Always convert: absolute (primary) → ratio (secondary)
+                conv_y_fwd = lambda x, rv=ref_value_y: x / rv if rv != 0 else x
+                conv_y_inv = lambda x, rv=ref_value_y: x * rv
+                
+                ax2 = ax.secondary_yaxis('right', functions=(conv_y_fwd, conv_y_inv))
                 # Reduce number of ticks on secondary y-axis to allow 1 d.p. formatting
                 ax2.yaxis.set_major_locator(MaxNLocator(nbins=4))
                 if stage_idx == n_stages - 1:
-                    ax2.set_ylabel(param_y_spec.get_axis_label(absolute=True),
+                    ax2.set_ylabel(param_y_spec.get_axis_label(absolute=secondary_absolute),
                                  fontsize=self.secondary_label_fontsize, labelpad=8)
                     ax2.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
                 else:
@@ -594,12 +622,13 @@ class BifurcationVisualizer:
                 else:
                     ref_value_x = 1.0
                 
-                ax3 = ax.secondary_xaxis('top', functions=(
-                    lambda x, rv=ref_value_x: x * rv,
-                    lambda x, rv=ref_value_x: x / rv
-                ))
+                # Always convert: absolute (primary) → ratio (secondary)
+                conv_x_fwd = lambda x, rv=ref_value_x: x / rv if rv != 0 else x
+                conv_x_inv = lambda x, rv=ref_value_x: x * rv
+                
+                ax3 = ax.secondary_xaxis('top', functions=(conv_x_fwd, conv_x_inv))
                 if row_idx == 0:
-                    ax3.set_xlabel(param_x_spec.get_axis_label(absolute=True),
+                    ax3.set_xlabel(param_x_spec.get_axis_label(absolute=secondary_absolute),
                                   fontsize=self.secondary_label_fontsize, labelpad=8)
                     ax3.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
                 else:
@@ -624,7 +653,7 @@ class BifurcationVisualizer:
         cbar_height = cbar_top - cbar_bottom
         cbar_ax = fig.add_axes([0.92, cbar_bottom, 0.015, cbar_height])
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='vertical')
-        cbar.set_label('Wavelength w/ max gain (μm)',
+        cbar.set_label(r'Wavelength w/ max gain ($\mu$m)',
                       fontsize=self.label_fontsize, labelpad=18)
         cbar.ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.6)
         
@@ -786,7 +815,7 @@ class BifurcationVisualizer:
                 # Labels
                 # Only show x-labels on bottom row
                 if row_idx == n_rows - 1:
-                    ax.set_xlabel('Wavelength (μm)',
+                    ax.set_xlabel(r'Wavelength ($\mu$m)',
                                  fontsize=self.secondary_label_fontsize)
                 else:
                     ax.set_xlabel('')

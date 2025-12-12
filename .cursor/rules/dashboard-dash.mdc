@@ -1,0 +1,13 @@
+---
+globs: src/visualization/**
+alwaysApply: false
+---
+Dash/Plotly dashboard rules:
+
+- separate layout from callbacks
+- keep callbacks short
+- do not embed simulation logic in callbacks
+- extract plotting logic into helper functions
+- avoid duplicated callback patterns
+
+Prefer clarity and debuggability over abstraction.
