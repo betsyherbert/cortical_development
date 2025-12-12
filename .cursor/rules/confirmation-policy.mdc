@@ -1,0 +1,26 @@
+---
+description: During task execution
+alwaysApply: false
+---
+Confirmation policy:
+
+Proceed without interruption for:
+- mechanical refactors
+- renaming for clarity
+- deduplication with identical behavior
+- formatting and lint fixes
+- changes whose intent is fully specified
+
+STOP and ask for confirmation before proceeding when:
+- scientific or modeling assumptions may change
+- behavior could change even subtly
+- there are multiple reasonable design choices
+- an interface or data flow decision is ambiguous
+- the change affects experiment structure, outputs, or interpretation
+- the agent is unsure which option aligns with user intent
+
+When stopping:
+- clearly state the decision point
+- present 2–3 concrete options
+- explain tradeoffs briefly
+- wait for explicit user choice

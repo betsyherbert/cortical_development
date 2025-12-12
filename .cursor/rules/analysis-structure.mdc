@@ -1,0 +1,23 @@
+---
+globs: src/analysis/**
+alwaysApply: true
+---
+Analysis module structure:
+
+Each analysis subpackage (bifurcation, stability, descriptive) should follow:
+- `config.py` — constants and parameter specs only (no logic)
+- `run_analysis.py` — orchestration (main entry point)
+- `core.py` or similar — pure computation logic
+- `visualizer.py` — plotting only (no simulation logic)
+
+Shared utilities:
+- use `src/analysis/common.py` for:
+  - `DEVELOPMENTAL_STAGES`, `PRESETS`
+  - `save_with_version()`, `load_with_version()`
+  - output directory helpers
+  - figure styling constants
+
+Avoid:
+- duplicating OUTPUT_DIR definitions (use shared helper)
+- mixing plotting code with analysis logic
+- hardcoding paths outside config

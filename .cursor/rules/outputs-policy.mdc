@@ -1,0 +1,17 @@
+---
+alwaysApply: true
+---
+Outputs policy:
+
+- `outputs/` is generated-only (untracked by git)
+- `results/` is committed (curated, publication-ready)
+- all generated artifacts go under `outputs/<analysis_name>/`
+- never commit raw analysis outputs
+
+Every saved artifact must include metadata:
+- random seed used
+- package version
+- key parameters (preset stage, grid size, etc.)
+- timestamp
+
+Use `save_with_version()` from `src/analysis/common.py` for all pickle outputs.

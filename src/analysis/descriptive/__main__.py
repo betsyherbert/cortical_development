@@ -7,4 +7,4 @@ Usage:
 from .run_analysis import run_descriptive_analysis
 
 if __name__ == "__main__":
-    run_descriptive_analysis() 
+    run_descriptive_analysis()

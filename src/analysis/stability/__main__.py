@@ -5,4 +5,4 @@ import sys
 from src.analysis.stability.run_analysis import main
 
 if __name__ == "__main__":
-    sys.exit(main()) 
+    sys.exit(main())

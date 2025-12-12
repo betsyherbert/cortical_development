@@ -1,3 +1,3 @@
 """
 Neural circuit model components.
-""" 
+"""

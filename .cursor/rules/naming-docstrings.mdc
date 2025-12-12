@@ -1,0 +1,28 @@
+---
+alwaysApply: true
+---
+Naming and documentation rules:
+
+Names:
+- use explicit, descriptive names (no single-letter variables except loop indices)
+- include units in variable names when relevant (e.g., `sigma_um`, `duration_ms`)
+- avoid abbreviations that aren't universally understood
+
+Docstrings:
+- every public function needs a docstring
+- state inputs, outputs, and units
+- mention side effects (e.g., "modifies global RNG state")
+
+Example:
+```python
+def compute_gain(tau_e_ms: float, tau_i_ms: float) -> float:
+    """Compute effective gain from time constants.
+    
+    Args:
+        tau_e_ms: Excitatory time constant in milliseconds
+        tau_i_ms: Inhibitory time constant in milliseconds
+        
+    Returns:
+        Dimensionless gain ratio
+    """
+```

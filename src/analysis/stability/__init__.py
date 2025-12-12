@@ -1,15 +1,12 @@
-"""Stability analysis module for cortical circuit dynamics."""
+"""Stability analysis module for cortical circuit dynamics.
+
+Main exports:
+- StabilityAnalysis: core analysis class
+- StabilityVisualizer: plotting class
+- run_analysis.main(): CLI entrypoint
+"""
 
 from .stability_analysis import StabilityAnalysis
-from .config import ANALYSIS_PARAMS, DEVELOPMENTAL_STAGES, CONDITIONS, REGIMES, CELL_TYPES, LAYERS, DT
+from .visualizer import StabilityVisualizer
 
-__all__ = [
-    'StabilityAnalysis',
-    'ANALYSIS_PARAMS',
-    'DEVELOPMENTAL_STAGES',
-    'CONDITIONS',
-    'REGIMES', 
-    'CELL_TYPES',
-    'LAYERS',
-    'DT'
-]
+__all__ = ["StabilityAnalysis", "StabilityVisualizer"]

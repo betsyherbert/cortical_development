@@ -8,4 +8,3 @@ This package contains tools for analyzing cortical circuit dynamics:
 """
 
 __version__ = "0.1.0"
-

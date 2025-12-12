@@ -5,25 +5,25 @@ activity across developmental stages (P0, P5, P10, P15).
 """
 
 from .activity_analysis import DescriptiveAnalysis
-from .visualizer import ActivityVisualizer
 from .config import (
-    ANALYSIS_PARAMS, 
-    DEVELOPMENTAL_STAGES, 
-    PRESETS,
-    POSTER_CELL_TYPES,
+    ANALYSIS_PARAMS,
+    DEVELOPMENTAL_STAGES,
+    FONT_SIZES,
     LAYER_COLORS,
-    FONT_SIZES
+    POSTER_CELL_TYPES,
+    PRESETS,
 )
 from .run_analysis import run_descriptive_analysis
+from .visualizer import ActivityVisualizer
 
 __all__ = [
-    'DescriptiveAnalysis',
-    'ActivityVisualizer', 
-    'run_descriptive_analysis',
-    'ANALYSIS_PARAMS',
-    'DEVELOPMENTAL_STAGES',
-    'PRESETS',
-    'POSTER_CELL_TYPES',
-    'LAYER_COLORS',
-    'FONT_SIZES'
-] 
+    "ANALYSIS_PARAMS",
+    "DEVELOPMENTAL_STAGES",
+    "FONT_SIZES",
+    "LAYER_COLORS",
+    "POSTER_CELL_TYPES",
+    "PRESETS",
+    "ActivityVisualizer",
+    "DescriptiveAnalysis",
+    "run_descriptive_analysis",
+]

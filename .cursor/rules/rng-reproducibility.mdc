@@ -1,0 +1,17 @@
+---
+alwaysApply: true
+---
+Random number generator (RNG) reproducibility rules:
+
+- use `seed_random()` from `src/model/config.py` for global seeding
+- do NOT call `np.random.seed()` directly outside `seed_random()`
+- do NOT introduce new nondeterminism (time-based seeds, unordered iteration, etc.)
+
+For new code:
+- accept an optional `rng` parameter (numpy Generator) for explicit control
+- default to global RNG behavior to preserve existing tests
+- document which functions depend on random state
+
+Existing contract:
+- `seed_random()` sets global NumPy RNG; tests rely on this
+- same seed must produce same results across runs

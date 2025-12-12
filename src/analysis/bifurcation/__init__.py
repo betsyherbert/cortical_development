@@ -14,19 +14,19 @@ Main components:
 - visualizer: Figure generation
 """
 
-from .core import NetworkModel, SteadyStateFinder, StabilityAnalyzer
-from .stability_maps import compute_stability_maps_all_stages
+from .core import NetworkModel, StabilityAnalyzer, SteadyStateFinder
 from .gain_maps import compute_gain_maps_all_stages, compute_gain_spectra_all_stages
 from .run_analysis import BifurcationAnalysis
+from .stability_maps import compute_stability_maps_all_stages
 from .visualizer import BifurcationVisualizer
 
 __all__ = [
-    'NetworkModel',
-    'SteadyStateFinder',
-    'StabilityAnalyzer',
-    'compute_stability_maps_all_stages',
-    'compute_gain_maps_all_stages',
-    'compute_gain_spectra_all_stages',
-    'BifurcationAnalysis',
-    'BifurcationVisualizer',
+    "BifurcationAnalysis",
+    "BifurcationVisualizer",
+    "NetworkModel",
+    "StabilityAnalyzer",
+    "SteadyStateFinder",
+    "compute_gain_maps_all_stages",
+    "compute_gain_spectra_all_stages",
+    "compute_stability_maps_all_stages",
 ]

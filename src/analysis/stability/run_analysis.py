@@ -1,14 +1,12 @@
 """Run complete stability analysis pipeline."""
 
-import time
 import os
-import pickle
-from pathlib import Path
+import time
 
-from src.analysis.stability.stability_analysis import StabilityAnalysis
-from src.analysis.common import save_with_version
-from src.analysis.stability.visualizer import StabilityVisualizer  
+from src.analysis.common import make_run_metadata, save_with_version
 from src.analysis.stability.config import ANALYSIS_PARAMS, DEVELOPMENTAL_STAGES, OUTPUT_DIR, REGIMES
+from src.analysis.stability.stability_analysis import StabilityAnalysis
+from src.analysis.stability.visualizer import StabilityVisualizer
 
 
 def main():
@@ -16,45 +14,55 @@ def main():
     print("=" * 60)
     print("CORTICAL CIRCUIT STABILITY ANALYSIS")
     print("=" * 60)
-    print(f"Duration: {ANALYSIS_PARAMS['duration']}s | Snapshots: {ANALYSIS_PARAMS['n_snapshots']} | "
-          f"Patches: {ANALYSIS_PARAMS['layer_patch_size']}x{ANALYSIS_PARAMS['layer_patch_size']}")
+    print(
+        f"Duration: {ANALYSIS_PARAMS['duration']}s | Snapshots: {ANALYSIS_PARAMS['n_snapshots']} | "
+        f"Patches: {ANALYSIS_PARAMS['layer_patch_size']}x{ANALYSIS_PARAMS['layer_patch_size']}"
+    )
     print(f"Stages: {', '.join(DEVELOPMENTAL_STAGES)}")
     print()
-    
+
     start_time = time.time()
-    
+
     try:
         # Initialize analysis
         print("Initializing stability analysis...")
         analyzer = StabilityAnalysis()
-        
+
         # Run analysis for all conditions
         print("Running stability analysis...")
         results = analyzer.run_analysis()
-        
+
         analysis_time = time.time() - start_time
         print(f"\nAnalysis completed in {analysis_time:.1f} seconds")
-        
+
         # Generate visualizations
         print("\nGenerating visualizations...")
         visualizer = StabilityVisualizer()
         visualizer.generate_all_figures(results)
-        
+
         total_time = time.time() - start_time
         print(f"\nTotal execution time: {total_time:.1f} seconds")
-        
+
         # Save results for later use with version metadata
         print("Saving results...")
-        results_file = os.path.join(OUTPUT_DIR, 'stability_analysis_results.pkl')
+        results_file = os.path.join(OUTPUT_DIR, "stability_analysis_results.pkl")
         os.makedirs(OUTPUT_DIR, exist_ok=True)
-        save_with_version(results, results_file)
+        metadata = make_run_metadata(
+            stages=DEVELOPMENTAL_STAGES,
+            params={
+                "duration": ANALYSIS_PARAMS["duration"],
+                "n_snapshots": ANALYSIS_PARAMS["n_snapshots"],
+                "layer_patch_size": ANALYSIS_PARAMS["layer_patch_size"],
+            },
+        )
+        save_with_version(results, results_file, metadata=metadata)
         print(f"Results saved to: {results_file}")
-        
+
         # Print summary
         print("\n" + "=" * 60)
         print("ANALYSIS SUMMARY")
         print("=" * 60)
-        
+
         total_snapshots = 0
         for stage in DEVELOPMENTAL_STAGES:
             if stage in results:
@@ -65,22 +73,24 @@ def main():
                         stage_snapshots += regime_snapshots
                         print(f"  {stage} {regime}: {regime_snapshots} snapshots")
                 total_snapshots += stage_snapshots
-        
+
         print(f"\nTotal snapshots analyzed: {total_snapshots}")
         print(f"Output directory: {OUTPUT_DIR}")
         print("\nStability analysis complete!")
-        
+
     except Exception as e:
-        print(f"\nERROR: Analysis failed with exception:")
+        print("\nERROR: Analysis failed with exception:")
         print(f"  {type(e).__name__}: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
-    
+
     return 0
 
 
 if __name__ == "__main__":
     import sys
+
     exit_code = main()
-    sys.exit(exit_code) 
+    sys.exit(exit_code)
