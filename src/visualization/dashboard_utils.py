@@ -8,6 +8,32 @@ import json
 
 import dash
 
+# =============================================================================
+# Slider Popup Style (used when showing connection strength editor)
+# =============================================================================
+
+SLIDER_POPUP_STYLE = {
+    "display": "block",
+    "backgroundColor": "rgba(255, 255, 255, 0.95)",
+    "padding": "10px",
+    "border": "1px solid #ccc",
+    "borderRadius": "5px",
+    "zIndex": "1000",
+    "width": "200px",
+    "position": "absolute",
+    "top": "0px",
+    "left": "0px",
+    "boxShadow": "0 2px 8px rgba(0,0,0,0.15)",
+    "color": "#2c3e50",
+}
+
+SLIDER_HIDDEN_STYLE = {"display": "none", "position": "absolute"}
+
+
+# =============================================================================
+# Callback Context Helpers
+# =============================================================================
+
 
 def get_triggered_id() -> str | None:
     """Get the ID of the component that triggered the callback.
@@ -112,4 +138,23 @@ def format_population_title(selected_pops: list[str] | None) -> str:
         return ": " + " + ".join(selected_pops)
     else:
         return f" {len(selected_pops)} populations"
+
+
+def format_analysis_display(selected_pops: list[str] | None) -> str:
+    """Format display text for currently selected populations.
+
+    Args:
+        selected_pops: List of population IDs or None/empty for no selection
+
+    Returns:
+        Human-readable string for the UI display
+    """
+    if not selected_pops or len(selected_pops) == 0:
+        return "Click heatmaps to select populations for analysis"
+    elif len(selected_pops) == 9:
+        return "Currently analysing: full network"
+    elif len(selected_pops) <= 4:
+        return f"Currently analysing: {' + '.join(selected_pops)}"
+    else:
+        return f"Currently analysing: {len(selected_pops)} populations"
 

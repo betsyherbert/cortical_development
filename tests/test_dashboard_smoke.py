@@ -242,3 +242,154 @@ class TestUtilityHelpers:
         assert len(result) == 3
         assert all(r == dash.no_update for r in result)
 
+
+class TestDashboardAppConstruction:
+    """Test that DashboardApp can be constructed without a server.
+
+    Uses a minimal stub simulation that provides just enough interface
+    for the dashboard to initialize figures and layout.
+    """
+
+    @pytest.fixture
+    def stub_simulation(self):
+        """Create a minimal stub simulation for dashboard construction.
+
+        This stub provides just enough interface to satisfy DashboardApp
+        during __init__ and setup_layout (no server required).
+        """
+        import numpy as np
+
+        class StubConnectivity:
+            """Stub for simulation.connectivity."""
+
+            def get_all_connection_strengths(self):
+                return {}
+
+            def get_all_strength_scaling(self):
+                return {"E": 1.0, "SST": 1.0, "PV": 1.0, "thalamus": 1.0}
+
+            def get_all_sigmas(self):
+                return {}
+
+            def get_connection_strength(self, *args):
+                return 0.0
+
+            def get_scaled_connection_strength(self, *args):
+                return 0.0
+
+            def set_connection_strength(self, *args):
+                pass
+
+        class StubCircuit:
+            """Stub for simulation.circuit."""
+
+            def get_time_constants(self):
+                return {"E": 10.0, "SST": 10.0, "PV": 10.0}
+
+            def get_gains(self):
+                return {"E": 1.0, "SST": 1.0, "PV": 1.0}
+
+            def get_all_background_inputs(self):
+                return {"E": 0.1, "SST": 0.1, "PV": 0.1}
+
+            def get_layer_activities(self):
+                """Return mock activities for all layers."""
+                grid = np.zeros((10, 10))
+                return {
+                    "L23": {"E": grid, "SST": grid, "PV": grid},
+                    "L4": {"E": grid, "SST": grid, "PV": grid},
+                    "L5": {"E": grid, "SST": grid, "PV": grid},
+                }
+
+        class StubSimulation:
+            """Minimal simulation stub for dashboard testing."""
+
+            def __init__(self):
+                self.grid_size = 10
+                self.connectivity = StubConnectivity()
+                self.circuit = StubCircuit()
+
+            def set_time_constant(self, *args):
+                pass
+
+            def set_strength_scaling(self, *args):
+                pass
+
+            def set_background_input(self, *args):
+                pass
+
+            def set_connection_sigma(self, *args):
+                pass
+
+            def update(self, **kwargs):
+                """Return mock activities."""
+                grid = np.zeros((self.grid_size, self.grid_size))
+                return {
+                    "L23": {"E": grid, "SST": grid, "PV": grid},
+                    "L4": {"E": grid, "SST": grid, "PV": grid},
+                    "L5": {"E": grid, "SST": grid, "PV": grid},
+                    "thalamus": grid,
+                }
+
+            def update_thalamic_params(self, preset):
+                pass
+
+        return StubSimulation()
+
+    def test_dashboard_app_can_be_constructed(self, stub_simulation):
+        """Test that DashboardApp can be instantiated without starting a server."""
+        from src.visualization.dashboard import DashboardApp
+
+        # This should not raise any exceptions
+        app = DashboardApp(stub_simulation)
+
+        # Basic checks
+        assert app is not None
+        assert app.simulation is stub_simulation
+        assert app.app is not None
+
+    def test_dashboard_layout_is_built(self, stub_simulation):
+        """Test that the dashboard layout is properly constructed."""
+        from src.visualization.dashboard import DashboardApp
+
+        app = DashboardApp(stub_simulation)
+
+        # The layout should be set
+        assert app.app.layout is not None
+
+    def test_dashboard_layout_contains_key_ids(self, stub_simulation):
+        """Test that the layout contains expected key component IDs."""
+        from src.visualization.dashboard import DashboardApp
+
+        app = DashboardApp(stub_simulation)
+        layout = app.app.layout
+
+        # Convert layout to string representation for ID checking
+        layout_str = str(layout)
+
+        # Check for key component IDs
+        assert "interval-component" in layout_str
+        assert "spectrum-interval" in layout_str
+        assert "pause-button" in layout_str
+        assert "selected-populations" in layout_str
+
+    def test_dashboard_figures_are_initialized(self, stub_simulation):
+        """Test that dashboard figures dict is populated."""
+        from src.visualization.dashboard import DashboardApp
+
+        app = DashboardApp(stub_simulation)
+
+        # Check that figures were created
+        assert len(app.figures) > 0
+
+        # Check for specific expected figures
+        assert "graph-thalamus" in app.figures
+        assert "correlation-by-layer" in app.figures
+        assert "events-by-layer" in app.figures
+
+        # Check layer-cell figures
+        for layer in ["L23", "L4", "L5"]:
+            for cell_type in ["E", "SST", "PV"]:
+                fig_id = f"graph-{layer}-{cell_type}"
+                assert fig_id in app.figures, f"Missing figure: {fig_id}"
+

@@ -1,6 +1,5 @@
 """Dashboard module for visualizing the cortical circuit simulation."""
 
-import json
 
 import dash
 import dash_bootstrap_components as dbc
@@ -47,7 +46,23 @@ from src.visualization.dashboard_layout import (
 from src.visualization.dashboard_plots import (
     HEATMAP_ZMAX,
     HEATMAP_ZMIN,
+    create_empty_message_figure,
     create_heatmap_figure,
+    create_initial_correlation_figure,
+    create_initial_event_figure,
+)
+
+# Import utility helpers from dedicated module
+from src.visualization.dashboard_utils import (
+    SLIDER_HIDDEN_STYLE,
+    SLIDER_POPUP_STYLE,
+    format_analysis_display,
+    get_triggered_id,
+    get_triggered_value,
+    is_valid_click,
+    no_update_tuple,
+    parse_connection_cell_id,
+    parse_pattern_match_id,
 )
 
 # Correlation plot constants
@@ -1522,95 +1537,23 @@ class DashboardApp:
 
         return fig
 
-    def _create_correlation_figure(self, items, color_map):
-        """Create a correlation line plot figure."""
-        fig = go.Figure()
-        for item in items:
-            fig.add_trace(
-                go.Scatter(
-                    x=[0], y=[0], mode="lines", name=item, line=dict(color=color_map[item], width=2)
-                )
-            )
-
-        fig.update_layout(
-            xaxis=dict(
-                title=dict(text="Time (s)", font=dict(size=AXIS_FONT_SIZE)),
-                tickfont=dict(size=AXIS_FONT_SIZE),
-                range=[0, CORRELATION_DISPLAY_SECONDS],
-                showgrid=True,
-                gridcolor="rgba(220, 220, 220, 0.5)",
-            ),
-            yaxis=dict(
-                title=dict(text="Correlation", font=dict(size=AXIS_FONT_SIZE)),
-                tickfont=dict(size=AXIS_FONT_SIZE),
-                range=[0, 1],
-                showgrid=True,
-                gridcolor="rgba(220, 220, 220, 0.5)",
-            ),
-            legend=dict(
-                x=0.98,
-                y=0.98,
-                xanchor="right",
-                yanchor="top",
-                bgcolor="rgba(255, 255, 255, 0.9)",
-                bordercolor="rgba(0, 0, 0, 0.3)",
-                borderwidth=1,
-                font=dict(size=AXIS_FONT_SIZE),
-            ),
-            margin=dict(l=60, r=15, t=15, b=40),
-            height=220,
-            plot_bgcolor="white",
-            paper_bgcolor="white",
-            showlegend=True,
-        )
-        return fig
-
     def _initialize_correlation_figures(self):
         """Initialize correlation line plot figures."""
-        self.figures["correlation-by-layer"] = self._create_correlation_figure(
-            LAYERS, MODEL_LAYER_COLORS
+        self.figures["correlation-by-layer"] = create_initial_correlation_figure(
+            LAYERS, MODEL_LAYER_COLORS, CORRELATION_DISPLAY_SECONDS
         )
-        self.figures["correlation-by-celltype"] = self._create_correlation_figure(
-            CELL_TYPES, CELL_COLORS
+        self.figures["correlation-by-celltype"] = create_initial_correlation_figure(
+            CELL_TYPES, CELL_COLORS, CORRELATION_DISPLAY_SECONDS
         )
-
-    def _create_event_figure(self, items, color_map):
-        """Create a synchronous event rate line plot figure."""
-        fig = go.Figure()
-        for item in items:
-            fig.add_trace(
-                go.Scatter(
-                    x=[0], y=[0], mode="lines", name=item, line=dict(color=color_map[item], width=2)
-                )
-            )
-
-        fig.update_layout(
-            xaxis=dict(
-                title=dict(text="Time (s)", font=dict(size=AXIS_FONT_SIZE)),
-                tickfont=dict(size=AXIS_FONT_SIZE),
-                range=[0, CORRELATION_DISPLAY_SECONDS],
-                showgrid=True,
-                gridcolor="rgba(220, 220, 220, 0.5)",
-            ),
-            yaxis=dict(
-                title=dict(text="Events/s", font=dict(size=AXIS_FONT_SIZE)),
-                tickfont=dict(size=AXIS_FONT_SIZE),
-                range=[0, 5],
-                showgrid=True,
-                gridcolor="rgba(220, 220, 220, 0.5)",
-            ),
-            margin=dict(l=60, r=15, t=15, b=40),
-            height=220,
-            plot_bgcolor="white",
-            paper_bgcolor="white",
-            showlegend=False,
-        )
-        return fig
 
     def _initialize_event_figures(self):
         """Initialize synchronous event line plot figures."""
-        self.figures["events-by-layer"] = self._create_event_figure(LAYERS, MODEL_LAYER_COLORS)
-        self.figures["events-by-celltype"] = self._create_event_figure(CELL_TYPES, CELL_COLORS)
+        self.figures["events-by-layer"] = create_initial_event_figure(
+            LAYERS, MODEL_LAYER_COLORS, CORRELATION_DISPLAY_SECONDS
+        )
+        self.figures["events-by-celltype"] = create_initial_event_figure(
+            CELL_TYPES, CELL_COLORS, CORRELATION_DISPLAY_SECONDS
+        )
 
     def _initialize_figures(self):
         """Pre-create all heatmap figures for better performance."""
@@ -2776,7 +2719,7 @@ class DashboardApp:
         )
         def initialize_slider_container(_, current_data):  # pylint: disable=unused-argument
             """Initialize the slider container as hidden when the dashboard loads."""
-            return {"display": "none", "position": "absolute"}, [], None
+            return SLIDER_HIDDEN_STYLE, [], None
 
         # Handle cell clicks to show the slider
         @self.app.callback(
@@ -2791,76 +2734,42 @@ class DashboardApp:
         )
         def handle_cell_click(clicks, current_data):  # pylint: disable=unused-argument
             """Show the connection strength slider when a matrix cell is clicked."""
-            try:
-                # Get the context that triggered the callback
-                ctx = dash.callback_context
-                if not ctx.triggered:
-                    return dash.no_update, dash.no_update, dash.no_update
+            # Early return if not a valid click
+            triggered_prop_id = get_triggered_id()
+            if not triggered_prop_id or not is_valid_click(get_triggered_value()):
+                return no_update_tuple(3)
 
-                # Get the ID of the clicked cell
-                triggered_prop_id = ctx.triggered[0]["prop_id"]
+            # Parse the pattern-match ID
+            cell_data = parse_pattern_match_id(triggered_prop_id)
+            if not cell_data or "id" not in cell_data:
+                return no_update_tuple(3)
 
-                # Check if this is actually a click (not just matrix recreation)
-                # If the value is None or the prop_id doesn't contain valid data, ignore it
-                triggered_value = ctx.triggered[0]["value"]
-                if triggered_value is None or triggered_value == 0:
-                    return dash.no_update, dash.no_update, dash.no_update
+            clicked_id = cell_data["id"]
 
-                cell_data = json.loads(triggered_prop_id.split(".")[0])
-                clicked_id = cell_data["id"]
+            # Parse connection info from the cell ID
+            parsed = parse_connection_cell_id(clicked_id)
+            if not parsed:
+                print(f"Invalid cell ID format: {clicked_id}")
+                return no_update_tuple(3)
 
-                # Extract connection info from the ID
-                parts = clicked_id.split("-")
-                if len(parts) < 4:
-                    print(f"Invalid cell ID format: {clicked_id}")
-                    return dash.no_update, dash.no_update, dash.no_update
+            source_layer, source_cell, target_layer, target_cell = parsed
 
-                source_layer = parts[0]
-                source_cell = parts[1] if parts[1] != "None" else None
-                target_layer = parts[2]
-                target_cell = parts[3]
+            # Get current connection value and create slider
+            value = self.get_connection_value(source_layer, source_cell, target_layer, target_cell)
+            slider = self.create_slider_for_cell(
+                source_layer, source_cell, target_layer, target_cell, value
+            )
 
-                # Get current connection value
-                value = self.get_connection_value(
-                    source_layer, source_cell, target_layer, target_cell
-                )
+            # Build connection state data
+            connection_data = {
+                "source_layer": source_layer,
+                "source_cell": source_cell,
+                "target_layer": target_layer,
+                "target_cell": target_cell,
+                "slider_id": clicked_id,
+            }
 
-                # Create slider component
-                slider = self.create_slider_for_cell(
-                    source_layer, source_cell, target_layer, target_cell, value
-                )
-
-                # Create connection data for state
-                connection_data = {
-                    "source_layer": source_layer,
-                    "source_cell": source_cell,
-                    "target_layer": target_layer,
-                    "target_cell": target_cell,
-                    "slider_id": clicked_id,
-                }
-
-                # Return with initial position - exact positioning will be handled by clientside JS
-                return (
-                    {
-                        "display": "block",
-                        "backgroundColor": "rgba(255, 255, 255, 0.95)",
-                        "padding": "10px",
-                        "border": "1px solid #ccc",
-                        "borderRadius": "5px",
-                        "zIndex": "1000",
-                        "width": "200px",
-                        "position": "absolute",
-                        "top": "0px",
-                        "left": "0px",
-                        "boxShadow": "0 2px 8px rgba(0,0,0,0.15)",
-                        "color": "#2c3e50",
-                    },
-                    slider,
-                    connection_data,
-                )
-            except (json.JSONDecodeError, KeyError, IndexError) as e:
-                print(f"Error handling cell click: {e!s}")
-                return dash.no_update, dash.no_update, dash.no_update
+            return SLIDER_POPUP_STYLE, slider, connection_data
 
         # Update connection strength when slider changes
         @self.app.callback(
@@ -2913,17 +2822,16 @@ class DashboardApp:
         ):  # pylint: disable=unused-argument
             """Update the matrix cell appearance and value when the slider changes."""
             if raw_value is None:
-                # No change if value is None
-                return dash.no_update, dash.no_update, dash.no_update
+                return no_update_tuple(3)
 
             try:
                 # Parse cell ID from the dictionary
-                cell_id_str = cell_id["id"]  # Extract the ID string from the dictionary
-                parts = cell_id_str.split("-")
-                source_layer = parts[0]
-                source_cell = parts[1] if parts[1] != "None" else None
-                target_layer = parts[2]
-                target_cell = parts[3]
+                cell_id_str = cell_id["id"]
+                parsed = parse_connection_cell_id(cell_id_str)
+                if not parsed:
+                    return no_update_tuple(3)
+
+                source_layer, source_cell, target_layer, target_cell = parsed
 
                 # Convert to thalamus if needed
                 source_layer_sim = "thalamus" if source_layer == "Th" else source_layer
@@ -2965,7 +2873,7 @@ class DashboardApp:
                 return f"{scaled_value:.2f}", updated_style, hover_color
             except (KeyError, ValueError) as e:
                 print(f"Error updating matrix cell: {e!s}")
-                return dash.no_update, dash.no_update, dash.no_update
+                return no_update_tuple(3)
 
         # Reset the slider when clicking the reset button
         @self.app.callback(
@@ -2979,7 +2887,7 @@ class DashboardApp:
         )
         def reset_slider_state(n_clicks):  # pylint: disable=unused-argument
             """Reset the slider state when clicking outside the slider or matrix."""
-            return {"display": "none", "position": "absolute"}, [], None
+            return SLIDER_HIDDEN_STYLE, [], None
 
         # JavaScript to position the slider near the clicked cell
         self.app.clientside_callback(
@@ -3324,31 +3232,14 @@ class DashboardApp:
             """Update the stability spectrum and eigenvalue spectrum graphs periodically."""
             # Prevent concurrent computation
             if self._computing_stability:
-                return dash.no_update, dash.no_update
+                return no_update_tuple(2)
 
             try:
                 self._computing_stability = True
 
                 # Check if any populations are selected
                 if not selected_pops or len(selected_pops) == 0:
-                    # Return empty figures with message
-                    fig = go.Figure()
-                    fig.add_annotation(
-                        text="Select populations by clicking heatmaps",
-                        xref="paper",
-                        yref="paper",
-                        x=0.5,
-                        y=0.5,
-                        showarrow=False,
-                        font=dict(size=SUBTITLE_FONT_SIZE, color="gray"),
-                    )
-                    fig.update_layout(
-                        xaxis=dict(visible=False),
-                        yaxis=dict(visible=False),
-                        height=280,
-                        margin=dict(l=50, r=25, t=35, b=40),
-                    )
-                    # Return same empty figure for both plots
+                    fig = create_empty_message_figure("Select populations by clicking heatmaps")
                     return fig, fig
 
                 # Build preset from current simulation state
@@ -3384,30 +3275,14 @@ class DashboardApp:
             """Update the forced response graphs periodically."""
             # Prevent concurrent computation
             if self._computing_forced_response:
-                return dash.no_update, dash.no_update
+                return no_update_tuple(2)
 
             try:
                 self._computing_forced_response = True
 
                 # Check if any populations are selected
                 if not selected_pops or len(selected_pops) == 0:
-                    # Return empty figures with message
-                    fig = go.Figure()
-                    fig.add_annotation(
-                        text="Select populations by clicking heatmaps",
-                        xref="paper",
-                        yref="paper",
-                        x=0.5,
-                        y=0.5,
-                        showarrow=False,
-                        font=dict(size=SUBTITLE_FONT_SIZE, color="gray"),
-                    )
-                    fig.update_layout(
-                        xaxis=dict(visible=False),
-                        yaxis=dict(visible=False),
-                        height=280,
-                        margin=dict(l=50, r=25, t=35, b=40),
-                    )
+                    fig = create_empty_message_figure("Select populations by clicking heatmaps")
                     return fig, fig
 
                 # Build preset from current simulation state
@@ -3455,23 +3330,17 @@ class DashboardApp:
             n_clicks_list, selected_pops, container_ids
         ):  # pylint: disable=unused-argument
             """Toggle population selection when clicking on heatmaps."""
-            # Find which container was clicked
-            ctx = dash.callback_context
-            if not ctx.triggered:
-                return dash.no_update, dash.no_update
+            # Parse the triggered input
+            triggered_prop_id = get_triggered_id()
+            if not triggered_prop_id or "n_clicks" not in triggered_prop_id:
+                return no_update_tuple(2)
 
-            # Parse the triggered input to find which container was clicked
-            triggered_id = ctx.triggered[0]["prop_id"]
-            if "n_clicks" not in triggered_id:
-                return dash.no_update, dash.no_update
+            # Extract the population ID from the pattern-match callback
+            triggered_dict = parse_pattern_match_id(triggered_prop_id)
+            if not triggered_dict or "id" not in triggered_dict:
+                return no_update_tuple(2)
 
-            # Extract the population ID from the triggered input
-            # Format: {"id":"L4_PV","type":"graph-container"}.n_clicks
-            try:
-                triggered_dict = json.loads(triggered_id.split(".")[0])
-                pop_id = triggered_dict["id"]
-            except (KeyError, ValueError, json.JSONDecodeError):
-                return dash.no_update, dash.no_update
+            pop_id = triggered_dict["id"]
 
             # Toggle the population in the selection
             selected_pops = list(selected_pops) if selected_pops else []
@@ -3511,14 +3380,7 @@ class DashboardApp:
         )
         def update_selected_populations_display(selected_pops):
             """Update the display showing which populations are selected for analysis."""
-            if not selected_pops or len(selected_pops) == 0:
-                return "Click heatmaps to select populations for analysis"
-            elif len(selected_pops) == 9:
-                return "Currently analysing: full network"
-            elif len(selected_pops) <= 4:
-                return f"Currently analysing: {' + '.join(selected_pops)}"
-            else:
-                return f"Currently analysing: {len(selected_pops)} populations"
+            return format_analysis_display(selected_pops)
 
     def create_control_panel(self):
         """Create the control panel with all sliders and controls."""

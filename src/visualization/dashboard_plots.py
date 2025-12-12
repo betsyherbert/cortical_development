@@ -556,6 +556,144 @@ def create_event_time_series_figure(
 
 
 # =============================================================================
+# Empty/Initial Figure Creators
+# =============================================================================
+
+
+def create_empty_message_figure(message: str, height: int = 280) -> go.Figure:
+    """Create an empty figure with a centered message.
+
+    Args:
+        message: Message to display
+        height: Figure height in pixels
+
+    Returns:
+        Plotly Figure with annotation
+    """
+    fig = go.Figure()
+    _add_no_data_annotation(fig, message)
+    fig.update_layout(
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        height=height,
+        margin=dict(l=50, r=25, t=35, b=40),
+    )
+    return fig
+
+
+def create_initial_correlation_figure(
+    items: list[str],
+    color_map: dict[str, str],
+    display_seconds: float = 10.0,
+) -> go.Figure:
+    """Create an initial correlation line plot figure with placeholder traces.
+
+    Args:
+        items: List of item names (e.g., layer names or cell types)
+        color_map: Dictionary mapping names to colors
+        display_seconds: X-axis range in seconds
+
+    Returns:
+        Plotly Figure with empty traces for each item
+    """
+    fig = go.Figure()
+    for item in items:
+        fig.add_trace(
+            go.Scatter(
+                x=[0],
+                y=[0],
+                mode="lines",
+                name=item,
+                line=dict(color=color_map.get(item, "#2c3e50"), width=2),
+            )
+        )
+
+    fig.update_layout(
+        xaxis=dict(
+            title=dict(text="Time (s)", font=dict(size=AXIS_FONT_SIZE)),
+            tickfont=dict(size=AXIS_FONT_SIZE),
+            range=[0, display_seconds],
+            showgrid=True,
+            gridcolor="rgba(220, 220, 220, 0.5)",
+        ),
+        yaxis=dict(
+            title=dict(text="Correlation", font=dict(size=AXIS_FONT_SIZE)),
+            tickfont=dict(size=AXIS_FONT_SIZE),
+            range=[0, 1],
+            showgrid=True,
+            gridcolor="rgba(220, 220, 220, 0.5)",
+        ),
+        legend=dict(
+            x=0.98,
+            y=0.98,
+            xanchor="right",
+            yanchor="top",
+            bgcolor="rgba(255, 255, 255, 0.9)",
+            bordercolor="rgba(0, 0, 0, 0.3)",
+            borderwidth=1,
+            font=dict(size=AXIS_FONT_SIZE),
+        ),
+        margin=dict(l=60, r=15, t=15, b=40),
+        height=220,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        showlegend=True,
+    )
+    return fig
+
+
+def create_initial_event_figure(
+    items: list[str],
+    color_map: dict[str, str],
+    display_seconds: float = 10.0,
+) -> go.Figure:
+    """Create an initial event rate line plot figure with placeholder traces.
+
+    Args:
+        items: List of item names (e.g., layer names or cell types)
+        color_map: Dictionary mapping names to colors
+        display_seconds: X-axis range in seconds
+
+    Returns:
+        Plotly Figure with empty traces for each item
+    """
+    fig = go.Figure()
+    for item in items:
+        fig.add_trace(
+            go.Scatter(
+                x=[0],
+                y=[0],
+                mode="lines",
+                name=item,
+                line=dict(color=color_map.get(item, "#2c3e50"), width=2),
+            )
+        )
+
+    fig.update_layout(
+        xaxis=dict(
+            title=dict(text="Time (s)", font=dict(size=AXIS_FONT_SIZE)),
+            tickfont=dict(size=AXIS_FONT_SIZE),
+            range=[0, display_seconds],
+            showgrid=True,
+            gridcolor="rgba(220, 220, 220, 0.5)",
+        ),
+        yaxis=dict(
+            title=dict(text="Events/s", font=dict(size=AXIS_FONT_SIZE)),
+            tickfont=dict(size=AXIS_FONT_SIZE),
+            range=[0, 5],
+            showgrid=True,
+            gridcolor="rgba(220, 220, 220, 0.5)",
+        ),
+        margin=dict(l=60, r=15, t=15, b=40),
+        height=220,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        showlegend=False,
+    )
+    return fig
+
+
+# =============================================================================
 # Helper Functions
 # =============================================================================
 
