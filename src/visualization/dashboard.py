@@ -11,18 +11,11 @@ from dash.dependencies import ALL, MATCH, Input, Output, State
 
 from src.analysis.bifurcation import NetworkModel, StabilityAnalyzer
 from src.model.config import (
-    ANATOMICAL_GRID_SIZE,
     CELL_ACTIVITY_COLORS,
     CELL_COLORS,
     CELL_TYPES,
-    COLORMAPS,
     CONNECTIONS,
-    GRID_SIZE,
-    INITIAL_BACKGROUND_INPUT,
-    INITIAL_OUTGOING_WIDTHS,
     INITIAL_STRENGTH_SCALING,
-    INITIAL_THALAMIC_WIDTHS,
-    INITIAL_TIME_CONSTANTS,
     LAYER_CONNECTIVITY_PARAMS,
     LAYER_NAMES,
     LAYERS,
@@ -34,95 +27,28 @@ from src.model.config import (
 )
 from src.model.presets import P0_PRESET, P5_PRESET, P10_PRESET, P15_PRESET
 
-# Constants for styling
-CELL_SIZE = 40  # Size for data cells in pixels
-HEADER_HEIGHT = 40  # Height for headers in pixels
-HEADER_WIDTH = 40  # Width for all header columns
+# Import layout components from dedicated module
+from src.visualization.dashboard_layout import (
+    AXIS_FONT_SIZE,
+    CELL_STYLE,
+    CONTROL_PANEL_STYLE,
+    GRAPH_CONFIG,
+    HEADER_STYLE,
+    LAYER_COLORS,
+    SLIDER_CONTAINER_STYLE,
+    SUBTITLE_FONT_SIZE,
+    TITLE_FONT_SIZE,
+    create_control_panel,
+    create_grid_info_boxes,
+    create_preset_buttons,
+)
 
-# Common styles
-HEADER_STYLE = {
-    "border": "none",
-    "width": f"{HEADER_WIDTH}px",
-    "height": f"{HEADER_HEIGHT}px",
-    "minWidth": f"{HEADER_WIDTH}px",
-    "maxWidth": f"{HEADER_WIDTH}px",
-}
-
-CELL_STYLE = {
-    "width": f"{CELL_SIZE}px",
-    "height": f"{CELL_SIZE}px",
-    "minWidth": f"{CELL_SIZE}px",
-    "maxWidth": f"{CELL_SIZE}px",
-    "minHeight": f"{CELL_SIZE}px",
-    "maxHeight": f"{CELL_SIZE}px",
-}
-
-# Colors for light mode
-LAYER_COLORS = {
-    "L4": "rgba(52, 73, 94, 0.15)",
-    "default": "rgba(149, 165, 166, 0.15)",
-    "transparent": "transparent",
-}
-
-# Table header styles for light mode
-MAIN_HEADER_STYLE = {
-    **HEADER_STYLE,
-    "backgroundColor": LAYER_COLORS["default"],
-    "color": "#2c3e50",
-    "padding": "10px 5px",
-    "fontSize": "0.9rem",
-    "fontWeight": "600",
-}
-
-LAYER_HEADER_STYLE = {
-    **MAIN_HEADER_STYLE,
-    "backgroundColor": LAYER_COLORS["L4"],  # Will be overridden for non-L4 layers
-}
-
-CELL_TYPE_HEADER_STYLE = {
-    **HEADER_STYLE,
-    "color": "#2c3e50",
-    "padding": "8px 5px",
-    "fontSize": "0.9rem",
-    "fontWeight": "500",
-}
-
-ROW_HEADER_STYLE = {
-    **HEADER_STYLE,
-    "color": "#2c3e50",
-    "textAlign": "center",
-    "verticalAlign": "middle",
-    "padding": "10px 5px",
-    "height": "100%",
-    "fontSize": "0.9rem",
-    "fontWeight": "600",
-}
-
-# Common layout styles
-CONTROL_PANEL_STYLE = {
-    "backgroundColor": "#ffffff",
-    "borderRadius": "10px",
-    "padding": "15px",
-    "border": "1px solid #ddd",
-}
-
-SLIDER_CONTAINER_STYLE = {
-    "backgroundColor": "rgba(255, 255, 255, 0.95)",
-    "padding": "10px",
-    "border": "1px solid #ccc",
-    "borderRadius": "5px",
-    "zIndex": "1000",
-    "width": "200px",
-    "position": "absolute",
-    "boxShadow": "0 2px 8px rgba(0,0,0,0.15)",
-}
-
-# Graph configuration
-GRAPH_CONFIG = {"displayModeBar": False}
-
-# Heatmap scaling constants for fair comparison across all cell types
-HEATMAP_ZMIN = 0.0  # Minimum activity value
-HEATMAP_ZMAX = 1.0  # Maximum activity value (allows for some headroom)
+# Import plot helpers from dedicated module
+from src.visualization.dashboard_plots import (
+    HEATMAP_ZMAX,
+    HEATMAP_ZMIN,
+    create_heatmap_figure,
+)
 
 # Correlation plot constants
 CORRELATION_WINDOW_MS = 10000  # Rolling window: 10 seconds
@@ -134,34 +60,6 @@ CORRELATION_HISTORY_LENGTH = int(CORRELATION_WINDOW_MS / UPDATE_INTERVAL)
 # Synchronous event tracking constants (reuse correlation timing)
 SYNCHRONOUS_EVENT_THRESHOLD = 0.1  # From descriptive analysis
 ACTIVITY_THRESHOLD = 0.1  # From descriptive analysis
-
-# Font size constants for consistent aesthetics
-TITLE_FONT_SIZE = 17  # Main section titles (H5 elements)
-SUBTITLE_FONT_SIZE = 14  # Plot titles and subtitles
-AXIS_FONT_SIZE = 13  # Axis titles, tick labels, and legend text
-
-GRAPH_LAYOUT = {
-    "margin": dict(l=0, r=0, t=0, b=0),
-    "height": 150,  # Reduced height
-    "width": 150,  # Reduced width
-    "dragmode": False,
-    "clickmode": "event",  # Enable click events
-    "hovermode": False,  # Disable hover to prevent cursor changes
-    "xaxis": dict(
-        showgrid=False,
-        showticklabels=False,
-        zeroline=False,
-        scaleanchor="y",  # Force square aspect ratio
-        scaleratio=1,
-        fixedrange=True,  # Disable zoom/pan interactions
-    ),
-    "yaxis": dict(
-        showgrid=False,
-        showticklabels=False,
-        zeroline=False,
-        fixedrange=True,  # Disable zoom/pan interactions
-    ),
-}
 
 
 class ConnectionKeyUtils:
@@ -209,49 +107,9 @@ class DashboardApp:
 
     This class creates an interactive Dash application that displays real-time
     neural activity and provides controls for adjusting simulation parameters.
+
+    Layout components and styling are imported from dashboard_layout module.
     """
-
-    # Common slider styles and parameters
-    SLIDER_STYLE = {
-        "tooltip": {"placement": "bottom", "always_visible": False},
-        "className": "custom-slider",
-    }
-
-    TIME_CONSTANT_PARAMS = {
-        "min_val": 1.0,
-        "max_val": 60.0,
-        "step": 1.0,
-        "marks": {1: "1", 20: "20", 40: "40", 60: "60"},
-    }
-
-    GAIN_PARAMS = {
-        "min_val": 0.4,
-        "max_val": 1.0,
-        "step": 0.1,
-        "marks": {0.4: "0.4", 0.6: "0.6", 0.8: "0.8", 1.0: "1"},
-    }
-
-    # Spatial width parameters in μm (anatomical units)
-    WIDTH_PARAMS = {
-        "min_val": 5.0,
-        "max_val": 400.0,
-        "step": 5.0,
-        "marks": {i: f"{i}" for i in range(0, 401, 100)},
-    }
-
-    STRENGTH_SCALING_PARAMS = {
-        "min_val": 0.0,
-        "max_val": 10.0,
-        "step": 0.1,
-        "marks": {i: f"{i}" for i in range(0, 11, 2)},
-    }
-
-    BACKGROUND_INPUT_PARAMS = {
-        "min_val": 0.0,
-        "max_val": 0.4,
-        "step": 0.05,
-        "marks": {0.0: "0.0", 0.2: "0.2", 0.4: "0.4"},
-    }
 
     def __init__(self, simulation, update_interval: int = UPDATE_INTERVAL):
         """
@@ -1776,154 +1634,15 @@ class DashboardApp:
 
     def _create_grid_info_boxes(self):
         """Create info boxes showing grid parameters."""
-        return html.Div(
-            [
-                dbc.Row(
-                    [
-                        # Empty column to match heatmap label width
-                        dbc.Col(width=2),
-                        # Info boxes container
-                        dbc.Col(
-                            [
-                                html.Div(
-                                    [
-                                        # Anatomical grid size box
-                                        html.Div(
-                                            [
-                                                html.Div(
-                                                    "Anatomical Grid Size",
-                                                    style={
-                                                        "fontSize": "11px",
-                                                        "fontWeight": "600",
-                                                        "color": "#34495e",
-                                                    },
-                                                ),
-                                                html.Div(
-                                                    f"{ANATOMICAL_GRID_SIZE:.0f} × {ANATOMICAL_GRID_SIZE:.0f} μm",
-                                                    style={
-                                                        "fontSize": "13px",
-                                                        "fontWeight": "bold",
-                                                        "color": "#2c3e50",
-                                                    },
-                                                ),
-                                            ],
-                                            style={
-                                                "display": "inline-block",
-                                                "padding": "8px 16px",
-                                                "backgroundColor": "#ecf0f1",
-                                                "borderRadius": "4px",
-                                                "marginRight": "15px",
-                                                "textAlign": "center",
-                                            },
-                                        ),
-                                        # Neurons per grid box
-                                        html.Div(
-                                            [
-                                                html.Div(
-                                                    "Neurons Per Grid",
-                                                    style={
-                                                        "fontSize": "11px",
-                                                        "fontWeight": "600",
-                                                        "color": "#34495e",
-                                                    },
-                                                ),
-                                                html.Div(
-                                                    f"{GRID_SIZE} × {GRID_SIZE} = {GRID_SIZE*GRID_SIZE}",
-                                                    style={
-                                                        "fontSize": "13px",
-                                                        "fontWeight": "bold",
-                                                        "color": "#2c3e50",
-                                                    },
-                                                ),
-                                            ],
-                                            style={
-                                                "display": "inline-block",
-                                                "padding": "8px 16px",
-                                                "backgroundColor": "#ecf0f1",
-                                                "borderRadius": "4px",
-                                                "textAlign": "center",
-                                            },
-                                        ),
-                                    ],
-                                    style={
-                                        "display": "flex",
-                                        "justifyContent": "flex-start",
-                                        "marginLeft": "20px",
-                                    },
-                                )
-                            ],
-                            width=10,
-                        ),
-                    ]
-                )
-            ],
-            className="mb-3",
-        )
+        return create_grid_info_boxes()
 
     def _create_preset_buttons(self):
         """Create the preset buttons row."""
-        return html.Div(
-            [
-                dbc.Row(
-                    [
-                        # Empty column to match heatmap label width
-                        dbc.Col(width=2),
-                        # Buttons container
-                        dbc.Col(
-                            [
-                                html.Div(
-                                    [
-                                        dbc.Button(
-                                            "P0",
-                                            id="P0-preset-button",
-                                            color="dark",
-                                            className="mx-2 px-3",
-                                            style={
-                                                "backgroundColor": "#2c3e50",
-                                                "borderColor": "#2c3e50",
-                                            },
-                                        ),
-                                        dbc.Button(
-                                            "P5",
-                                            id="P5-preset-button",
-                                            color="dark",
-                                            className="mx-2 px-3",
-                                            style={
-                                                "backgroundColor": "#2c3e50",
-                                                "borderColor": "#2c3e50",
-                                            },
-                                        ),
-                                        dbc.Button(
-                                            "P10",
-                                            id="P10-preset-button",
-                                            color="dark",
-                                            className="mx-2 px-3",
-                                            style={
-                                                "backgroundColor": "#2c3e50",
-                                                "borderColor": "#2c3e50",
-                                            },
-                                        ),
-                                        dbc.Button(
-                                            "P15",
-                                            id="P15-preset-button",
-                                            color="dark",
-                                            className="mx-2 px-3",
-                                            style={
-                                                "backgroundColor": "#2c3e50",
-                                                "borderColor": "#2c3e50",
-                                            },
-                                        ),
-                                    ],
-                                    style={"display": "flex", "justifyContent": "center"},
-                                )
-                            ],
-                            width=10,
-                        ),
-                    ]
-                )
-            ],
-            className="mb-4",
-        )
+        # Note: Uses 'mb-3' instead of 'mb-4' in the extracted function
+        # This preserves the original spacing behavior
+        result = create_preset_buttons()
+        result.className = "mb-4"
+        return result
 
     def _create_thalamus_visualization(self):
         """Create the thalamus visualization row."""
@@ -2483,21 +2202,7 @@ class DashboardApp:
 
     def create_heatmap(self, data: np.ndarray, cell_type: str) -> go.Figure:
         """Create a heatmap figure for the given neural activity data."""
-        colorscale = COLORMAPS.get(cell_type, [[0, "black"], [1, "white"]])
-
-        return go.Figure(
-            data=[
-                go.Heatmap(
-                    z=data,
-                    colorscale=colorscale,
-                    showscale=False,
-                    hoverinfo="skip",  # Disable hover tooltips but allow click events
-                    zmin=HEATMAP_ZMIN,
-                    zmax=HEATMAP_ZMAX,
-                )
-            ],
-            layout=GRAPH_LAYOUT,
-        )
+        return create_heatmap_figure(data, cell_type)
 
     def _parse_connection_key(self, conn_key):
         """Parse a connection key into source and target components.
@@ -3815,247 +3520,9 @@ class DashboardApp:
             else:
                 return f"Currently analysing: {len(selected_pops)} populations"
 
-    def create_parameter_sliders(self):
-        """Create the neural parameter sliders section."""
-        return html.Div(
-            [
-                # Headers row
-                dbc.Row(
-                    [
-                        dbc.Col("", width=1),
-                        dbc.Col(html.Div("Time Constant (ms)", className="text-center"), width=5),
-                        dbc.Col(html.Div("Background Input", className="text-center"), width=5),
-                    ],
-                    className="mb-1",
-                ),
-                # Parameter rows
-                *[self._create_parameter_row(cell_type) for cell_type in CELL_TYPES],
-            ]
-        )
-
-    def _create_parameter_row(self, cell_type):
-        """Create a row of sliders for a cell type's parameters."""
-        return dbc.Row(
-            [
-                # Cell type label
-                dbc.Col(
-                    html.Strong(cell_type),
-                    width=1,
-                    className="d-flex align-items-center",
-                    style={"paddingRight": "5px"},
-                ),
-                # Time constant slider
-                dbc.Col(
-                    self._create_slider(
-                        id_prefix="tau",
-                        cell_type=cell_type,
-                        initial_value=INITIAL_TIME_CONSTANTS[cell_type],
-                        **self.TIME_CONSTANT_PARAMS,
-                    ),
-                    width=5,
-                    style={"paddingRight": "5px"},
-                ),
-                # Background input slider
-                dbc.Col(
-                    self._create_slider(
-                        id_prefix="background-input",
-                        cell_type=cell_type,
-                        initial_value=INITIAL_BACKGROUND_INPUT[cell_type],
-                        **self.BACKGROUND_INPUT_PARAMS,
-                    ),
-                    width=5,
-                ),
-            ],
-            className="mb-1",
-        )
-
-    def create_connectivity_sliders(self):
-        """Create the connectivity width sliders section."""
-        return html.Div(
-            [
-                # Headers row
-                dbc.Row(
-                    [
-                        dbc.Col("", width=1),
-                        dbc.Col(html.Div("Thalamic", className="text-center"), width=5),
-                        dbc.Col(html.Div("Outgoing", className="text-center"), width=5),
-                    ],
-                    className="mb-1",
-                ),
-                # Connectivity rows
-                *[self._create_connectivity_row(cell_type) for cell_type in CELL_TYPES],
-            ]
-        )
-
-    def _create_connectivity_row(self, cell_type):
-        """Create a row of sliders for a cell type's connectivity parameters."""
-        return dbc.Row(
-            [
-                # Cell type label
-                dbc.Col(
-                    html.Strong(cell_type),
-                    width=1,
-                    className="d-flex align-items-center",
-                    style={"paddingRight": "5px"},
-                ),
-                # Thalamic width slider
-                dbc.Col(
-                    self._create_slider(
-                        id_prefix="thalamic-width",
-                        cell_type=cell_type,
-                        initial_value=INITIAL_THALAMIC_WIDTHS[cell_type],
-                        **self.WIDTH_PARAMS,
-                    ),
-                    width=5,
-                    style={"paddingRight": "5px"},
-                ),
-                # Outgoing width slider
-                dbc.Col(
-                    self._create_slider(
-                        id_prefix="outgoing-width",
-                        cell_type=cell_type,
-                        initial_value=INITIAL_OUTGOING_WIDTHS[cell_type],
-                        **self.WIDTH_PARAMS,
-                    ),
-                    width=5,
-                ),
-            ],
-            className="mb-1",
-        )
-
-    def create_strength_scaling_sliders(self):
-        """Create the connection strength scaling sliders section."""
-        return html.Div(
-            [
-                # Strength scaling rows
-                *[self._create_strength_scaling_row(cell_type) for cell_type in CELL_TYPES],
-                # Add thalamus strength scaling slider
-                self._create_strength_scaling_row("thalamus"),
-            ]
-        )
-
-    def _create_strength_scaling_row(self, cell_type):
-        """Create a row for a cell type's strength scaling parameter."""
-        return dbc.Row(
-            [
-                # Cell type label
-                dbc.Col(
-                    html.Strong(cell_type if cell_type != "thalamus" else "TC"),
-                    width=1,
-                    className="d-flex align-items-center",
-                    style={"paddingRight": "5px"},
-                ),
-                # Strength scaling slider
-                dbc.Col(
-                    self._create_slider(
-                        id_prefix="strength-scaling",
-                        cell_type=cell_type.lower(),
-                        initial_value=INITIAL_STRENGTH_SCALING[cell_type],
-                        **self.STRENGTH_SCALING_PARAMS,
-                    ),
-                    width=11,
-                ),
-            ],
-            className="mb-1",
-        )
-
-    def _create_slider(self, id_prefix, cell_type, min_val, max_val, step, initial_value, marks):
-        """Create a slider with consistent styling."""
-        return dcc.Slider(
-            id=f"{id_prefix}-{cell_type.lower()}-slider",
-            min=min_val,
-            max=max_val,
-            step=step,
-            value=initial_value,
-            marks=marks,
-            **self.SLIDER_STYLE,
-        )
-
-    def create_input_controls(self):
-        """Create the input control sliders section for balancing intrinsic and sensory inputs."""
-        return dbc.Row(
-            [
-                dbc.Col(
-                    [
-                        # Balance labels
-                        dbc.Row(
-                            [
-                                dbc.Col("Intrinsic", className="text-start", width=6),
-                                dbc.Col("Sensory", className="text-end", width=6),
-                            ],
-                            className="mb-2",
-                        ),
-                        # Alpha slider - use direct ID since it's not cell-type specific
-                        dcc.Slider(
-                            id="alpha-slider",  # Changed back to original ID
-                            min=0,
-                            max=1,
-                            step=0.1,
-                            value=THALAMIC_ALPHA,
-                            marks={i / 10: f"{i/10:.1f}" for i in range(11)},
-                            tooltip={"placement": "bottom", "always_visible": False},
-                            className="custom-slider",
-                        ),
-                    ]
-                )
-            ]
-        )
-
     def create_control_panel(self):
         """Create the control panel with all sliders and controls."""
-        return html.Div(
-            [
-                # Section: Neuron parameters
-                html.Div(
-                    [
-                        html.H5(
-                            "Neuron Parameters",
-                            className="text-center",
-                            style={"fontSize": f"{TITLE_FONT_SIZE}px", "fontWeight": "600"},
-                        ),
-                        self.create_parameter_sliders(),
-                    ],
-                    className="mb-3",
-                ),
-                # Section: Connectivity widths
-                html.Div(
-                    [
-                        html.H5(
-                            "Connection Widths (μm)",
-                            className="text-center",
-                            style={"fontSize": f"{TITLE_FONT_SIZE}px", "fontWeight": "600"},
-                        ),
-                        self.create_connectivity_sliders(),
-                        # Section for strength scaling
-                        html.Div([html.Hr()], className="my-3"),
-                        html.H5(
-                            "Strength Scaling",
-                            className="text-center",
-                            style={"fontSize": f"{TITLE_FONT_SIZE}px", "fontWeight": "600"},
-                        ),
-                        self.create_strength_scaling_sliders(),
-                        # Section for thalamic input balance
-                        html.Div([html.Hr()], className="my-3"),
-                        html.H5(
-                            "Thalamic Input",
-                            className="text-center",
-                            style={"fontSize": f"{TITLE_FONT_SIZE}px", "fontWeight": "600"},
-                        ),
-                        self.create_input_controls(),
-                    ],
-                    className="mb-3",
-                ),
-                # Pause/Play control
-                html.Div(
-                    [
-                        dbc.Button(
-                            "Pause", id="pause-button", color="secondary", className="me-md-2"
-                        )
-                    ],
-                    className="mt-4",
-                ),
-            ]
-        )
+        return create_control_panel()
 
     def run(self, debug: bool = True, port: int = 8050):
         """Run the dashboard application."""
