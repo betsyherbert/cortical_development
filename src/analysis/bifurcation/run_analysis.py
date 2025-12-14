@@ -20,8 +20,8 @@ from .gain_maps import compute_gain_maps_all_stages, compute_gain_spectra_all_st
 from .stability_maps import compute_stability_maps_all_stages
 
 
-class BifurcationAnalysis:
-    """Main orchestrator for bifurcation analysis."""
+class BifurcationPipeline:
+    """Main orchestrator for bifurcation analysis pipeline."""
 
     def __init__(self, config: dict | None = None):
         """Initialize bifurcation analysis.
@@ -255,7 +255,7 @@ Examples:
     }
 
     # Initialize analyzer
-    analyzer = BifurcationAnalysis(config)
+    analyzer = BifurcationPipeline(config)
 
     # Run requested analysis
     try:
@@ -269,7 +269,7 @@ Examples:
             # Run only 2D maps
             config_maps = config.copy()
             config_maps["spectrum_sweeps"] = []
-            BifurcationAnalysis(config_maps)
+            BifurcationPipeline(config_maps)
             print("\n" + "=" * 70)
             print("GAIN MAPS ONLY")
             print("=" * 70)

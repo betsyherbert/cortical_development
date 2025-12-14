@@ -2,6 +2,12 @@
 
 This module provides comprehensive analysis and visualization of cortical circuit
 activity across developmental stages (P0, P5, P10, P15).
+
+Main exports:
+- DescriptiveAnalysis: core analysis class
+- DescriptivePipeline: orchestration class for running analysis
+- ActivityVisualizer: plotting class
+- run_analysis.main(): CLI entrypoint
 """
 
 from .activity_analysis import DescriptiveAnalysis
@@ -13,7 +19,7 @@ from .config import (
     POSTER_CELL_TYPES,
     PRESETS,
 )
-from .run_analysis import run_descriptive_analysis
+from .run_analysis import DescriptivePipeline
 from .visualizer import ActivityVisualizer
 
 __all__ = [
@@ -25,5 +31,5 @@ __all__ = [
     "PRESETS",
     "ActivityVisualizer",
     "DescriptiveAnalysis",
-    "run_descriptive_analysis",
+    "DescriptivePipeline",
 ]

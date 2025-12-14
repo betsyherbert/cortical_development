@@ -29,16 +29,14 @@ class CorticalSimulation:
         # Initialize circuit
         self.circuit = CorticalCircuit(grid_size)
 
-        # Initialize thalamus with developmental parameters from preset
-        self.thalamus = ThalamicInput(
-            grid_size=grid_size,
-            thalamic_spatial_scales=preset.get("thalamic_spatial_scales"),
-            thalamic_temporal_scales=preset.get("thalamic_temporal_scales"),
-            thalamic_modules=preset.get("thalamic_modules"),
-        )
+        # Initialize thalamus (developmental params will be set by apply_preset)
+        self.thalamus = ThalamicInput(grid_size=grid_size)
 
         # Set the random seed for reproducibility
         seed_random()
+
+        # Apply the preset to initialize all parameters from a single source of truth
+        self.apply_preset(preset)
 
     @property
     def connectivity(self):
@@ -181,6 +179,39 @@ class CorticalSimulation:
             preset: Developmental preset dictionary with thalamic parameters
         """
         self.preset = preset
+        self.thalamus.update_developmental_params(
+            thalamic_spatial_scales=preset.get("thalamic_spatial_scales"),
+            thalamic_temporal_scales=preset.get("thalamic_temporal_scales"),
+            thalamic_modules=preset.get("thalamic_modules"),
+        )
+
+    def apply_preset(self, preset: dict) -> None:
+        """
+        Apply a developmental preset to configure all simulation parameters.
+
+        This is the single canonical way to configure simulation parameters from
+        a preset. It sets connection strengths, widths, time constants, background
+        input, strength scaling, and thalamic parameters.
+
+        Args:
+            preset: Developmental preset dictionary (e.g., P0_PRESET, P5_PRESET)
+        """
+        self.preset = preset
+
+        # Apply connectivity parameters (strengths, widths, scaling)
+        self.connectivity.apply_preset(preset)
+
+        # Apply time constants
+        if "time_constants" in preset:
+            for cell_type, tau in preset["time_constants"].items():
+                self.set_time_constant(cell_type, tau)
+
+        # Apply background input
+        if "background_input" in preset:
+            for cell_type, value in preset["background_input"].items():
+                self.set_background_input(cell_type, value)
+
+        # Apply thalamic developmental parameters
         self.thalamus.update_developmental_params(
             thalamic_spatial_scales=preset.get("thalamic_spatial_scales"),
             thalamic_temporal_scales=preset.get("thalamic_temporal_scales"),

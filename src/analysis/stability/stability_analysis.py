@@ -120,21 +120,13 @@ class StabilityAnalysis:
         return snapshots
 
     def _apply_preset(self, preset: dict):
-        """Apply developmental preset to simulation."""
-        for key, value in preset["connection_strengths"].items():
-            self.simulation.circuit.connectivity.layer_params[key] = {
-                "amplitude": value,
-                "sigma": 2.0,
-            }
+        """Apply developmental preset to simulation.
 
-        self.simulation.circuit.connectivity.update_weights()
-
-        for cell_type in CELL_TYPES:
-            if cell_type in preset["time_constants"]:
-                self.simulation.set_time_constant(cell_type, preset["time_constants"][cell_type])
-
-        # Update thalamic developmental parameters
-        self.simulation.update_thalamic_params(preset)
+        Uses the centralized apply_preset() method on CorticalSimulation which
+        sets connection strengths, widths (from outgoing_widths/thalamic_widths),
+        strength scaling, time constants, background input, and thalamic parameters.
+        """
+        self.simulation.apply_preset(preset)
 
     def _capture_current_state(
         self, frame_idx: int, thalamic_sum: float, thalamic_input: np.ndarray

@@ -16,12 +16,12 @@ Main components:
 
 from .core import NetworkModel, StabilityAnalyzer, SteadyStateFinder
 from .gain_maps import compute_gain_maps_all_stages, compute_gain_spectra_all_stages
-from .run_analysis import BifurcationAnalysis
+from .run_analysis import BifurcationPipeline
 from .stability_maps import compute_stability_maps_all_stages
 from .visualizer import BifurcationVisualizer
 
 __all__ = [
-    "BifurcationAnalysis",
+    "BifurcationPipeline",
     "BifurcationVisualizer",
     "NetworkModel",
     "StabilityAnalyzer",

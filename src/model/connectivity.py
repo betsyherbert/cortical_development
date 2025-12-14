@@ -10,7 +10,6 @@ from .config import (
     ANATOMICAL_GRID_SIZE,
     GRID_SIZE,
     INITIAL_STRENGTH_SCALING,
-    LAYER_CONNECTIVITY_PARAMS,
 )
 
 
@@ -212,20 +211,16 @@ class LayerConnectivity:
         self.grid_scale = anatomical_grid_size / grid_size  # μm per grid unit
         self.profile = ConnectivityProfile(grid_size, anatomical_grid_size)
 
-        # Initialize with layer parameters (sigma values are in μm)
-        self.layer_params = LAYER_CONNECTIVITY_PARAMS.copy()
+        # Initialize empty layer parameters (will be populated by apply_preset())
+        # Format: {conn_key: {"amplitude": float, "sigma": float}}
+        self.layer_params = {}
 
         # Weight matrices dictionary
         # Format: (source_layer, source_cell, target_layer, target_cell)
         self.W = {}
 
-        # Initialize strength scaling factors
+        # Initialize strength scaling factors (will be overwritten by apply_preset())
         self.strength_scaling = INITIAL_STRENGTH_SCALING.copy()
-
-        # Use the global random state for consistency with centralized seed management
-
-        # Initialize weight matrices
-        self.update_weights()
 
     def update_weights(self, layer_params: dict[str, dict[str, float]] | None = None) -> None:
         """

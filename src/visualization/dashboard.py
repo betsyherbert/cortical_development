@@ -14,8 +14,6 @@ from src.model.config import (
     CELL_COLORS,
     CELL_TYPES,
     CONNECTIONS,
-    INITIAL_STRENGTH_SCALING,
-    LAYER_CONNECTIVITY_PARAMS,
     LAYER_NAMES,
     LAYERS,
     THALAMIC_ALPHA,
@@ -2651,7 +2649,7 @@ class DashboardApp:
     def get_connection_value(
         self, source_layer, source_cell, target_layer, target_cell, scaled=False
     ):
-        """Get the current connection strength value.
+        """Get the current connection strength value from live simulation.
 
         Args:
             source_layer: Source layer
@@ -2663,41 +2661,17 @@ class DashboardApp:
         Returns:
             Connection strength (raw or scaled)
         """
-        try:
-            # Get connection strength
-            conn_key = self.get_connection_key(source_layer, source_cell, target_layer, target_cell)
+        # Convert 'Th' to 'thalamus' for the simulation API
+        source_layer_sim = "thalamus" if source_layer == "Th" else source_layer
 
-            # First try to get the value from the simulation connectivity
-            if hasattr(self, "simulation") and hasattr(self.simulation, "connectivity"):
-                # Convert 'Th' to 'thalamus' for the simulation API
-                source_layer_sim = "thalamus" if source_layer == "Th" else source_layer
-
-                if scaled:
-                    return self.simulation.connectivity.get_scaled_connection_strength(
-                        source_layer_sim, source_cell, target_layer, target_cell
-                    )
-                else:
-                    return self.simulation.connectivity.get_connection_strength(
-                        source_layer_sim, source_cell, target_layer, target_cell
-                    )
-
-            # Fall back to config-based lookup
-            if conn_key in LAYER_CONNECTIVITY_PARAMS:
-                raw_value = LAYER_CONNECTIVITY_PARAMS[conn_key]["amplitude"]
-                if scaled:
-                    # Apply strength scaling from config
-                    if source_layer == "Th" or source_layer == "thalamus":
-                        scaling = INITIAL_STRENGTH_SCALING.get("thalamus", 1.0)
-                    else:
-                        scaling = INITIAL_STRENGTH_SCALING.get(source_cell, 1.0)
-                    return raw_value * scaling
-                return raw_value
-
-            # Default to 0 if not found
-            return 0.0
-        except (AttributeError, KeyError) as e:
-            print(f"Error getting connection from simulation: {e!s}")
-            return 0.0
+        if scaled:
+            return self.simulation.connectivity.get_scaled_connection_strength(
+                source_layer_sim, source_cell, target_layer, target_cell
+            )
+        else:
+            return self.simulation.connectivity.get_connection_strength(
+                source_layer_sim, source_cell, target_layer, target_cell
+            )
 
     def setup_callbacks(self):
         """Set up the dashboard callbacks for interactivity."""
