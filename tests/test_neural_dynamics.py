@@ -1,9 +1,8 @@
 """Tests for neural dynamics components."""
 
 import numpy as np
-import pytest
 
-from src.model.config import CELL_TYPES, DT, GRID_SIZE, LAYERS
+from src.model.config import CELL_TYPES, DT, LAYERS, seed_random
 from src.model.neurons import CorticalCircuit, NeuralLayer
 
 
@@ -53,7 +52,7 @@ def test_cortical_circuit_initialization(grid_size):
 
 def test_cortical_circuit_update(grid_size, random_seed):
     """Test CorticalCircuit update returns expected structure."""
-    np.random.seed(random_seed)
+    seed_random(random_seed)
     circuit = CorticalCircuit(grid_size)
 
     # Set some thalamic input

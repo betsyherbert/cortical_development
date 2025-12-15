@@ -4,7 +4,7 @@ All constants for both analysis and visualization live here.
 Import from here, not from visualizer.py or other modules.
 """
 
-from src.analysis.common import DEVELOPMENTAL_STAGES, PRESETS, get_output_dir
+from src.analysis.common import get_output_dir
 from src.model.config import CELL_TYPES, DT, LAYERS
 
 # Re-export for convenience (single import point)
@@ -14,12 +14,10 @@ __all__ = [
     "COLORBAR_PARAMS",
     "COLORMAP",
     "CONDITIONS",
-    "DEVELOPMENTAL_STAGES",
     "DT",
     "FONT_CONFIG",
     "LAYERS",
     "OUTPUT_DIR",
-    "PRESETS",
     "REGIMES",
     "REGIME_COLORS",
     "REGIME_LABELS",

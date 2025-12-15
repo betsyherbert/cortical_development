@@ -2,15 +2,14 @@
 
 import numpy as np
 
-from src.main import CorticalSimulation
+from src.analysis.common import DEVELOPMENTAL_STAGES, PRESETS
+from src.simulation import CorticalSimulation
 
 from .config import (
     ANALYSIS_PARAMS,
     CELL_TYPES,
-    DEVELOPMENTAL_STAGES,
     DT,
     LAYERS,
-    PRESETS,
     REGIMES,
 )
 

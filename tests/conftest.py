@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from src.main import CorticalSimulation
+from src.simulation import CorticalSimulation
 from src.model.config import get_default_seed, seed_random
 
 

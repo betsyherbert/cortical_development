@@ -11,11 +11,12 @@ from typing import Any
 
 from tqdm import tqdm
 
+from src.analysis.common import DEVELOPMENTAL_STAGES
+
 from .config import (
     ANALYSIS_PARAMS,
     AVERAGE_FIRING_RATE_YLIM,
     CELL_COLORS,
-    DEVELOPMENTAL_STAGES,
     DPI,
     ERROR_BAR_ALPHA,
     FIGSIZE_TIMESERIES,

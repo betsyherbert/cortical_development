@@ -13,7 +13,7 @@ import os
 
 import numpy as np
 
-from src.analysis.common import PRESETS
+from src.analysis.common import DEVELOPMENTAL_STAGES, PRESETS
 
 from .config import (
     ALL_LAYERS,
@@ -359,7 +359,7 @@ def compute_stability_maps_all_stages(
         Nested dict: {param_pair: {stage: results}}
     """
     if stages is None:
-        stages = ["P0", "P5", "P10", "P15"]
+        stages = DEVELOPMENTAL_STAGES
 
     print("\n" + "=" * 70)
     print(f"  STABILITY MAPS - Computing All Stages ({mode})")

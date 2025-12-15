@@ -8,7 +8,8 @@ import argparse
 import time
 from pathlib import Path
 
-from src.analysis.common import make_run_metadata, save_with_version
+from src.analysis.common import DEVELOPMENTAL_STAGES, make_run_metadata, save_with_version
+from src.model.config import seed_random
 
 from .config import (
     DEFAULT_GAIN_PAIRS,
@@ -31,6 +32,7 @@ class BifurcationPipeline:
                    If None, uses default configuration.
         """
         self.config = config or self._default_config()
+        self._seed_used = None  # Track the actual seed used for metadata
 
     def _default_config(self) -> dict:
         """Get default configuration.
@@ -39,7 +41,7 @@ class BifurcationPipeline:
             Default configuration dictionary
         """
         return {
-            "stages": ["P0", "P5", "P10", "P15"],
+            "stages": DEVELOPMENTAL_STAGES,
             "mode": "fixed_absolute",
             "n_processes": None,  # Will use cpu_count - 1
             "stability_pairs": DEFAULT_STABILITY_PAIRS,
@@ -54,9 +56,14 @@ class BifurcationPipeline:
         Returns:
             Dictionary with stability results organized by parameter pair and stage
         """
+        # Seed RNG if not already seeded by run_all()
+        if self._seed_used is None:
+            self._seed_used = seed_random()
+
         print("\n" + "=" * 70)
         print("STABILITY ANALYSIS")
         print("=" * 70)
+        print(f"Random seed: {self._seed_used}")
 
         start_time = time.time()
 
@@ -78,6 +85,7 @@ class BifurcationPipeline:
         mode_suffix = self.config["mode"]
         results_file = output_dir / f"stability_maps_{mode_suffix}.pkl"
         metadata = make_run_metadata(
+            seed=self._seed_used,
             stages=self.config["stages"],
             params={"mode": mode_suffix, "pairs": self.config["stability_pairs"]},
         )
@@ -92,9 +100,14 @@ class BifurcationPipeline:
         Returns:
             Dictionary with 'maps' and 'spectra' keys containing respective results
         """
+        # Seed RNG if not already seeded by run_all()
+        if self._seed_used is None:
+            self._seed_used = seed_random()
+
         print("\n" + "=" * 70)
         print("GAIN ANALYSIS")
         print("=" * 70)
+        print(f"Random seed: {self._seed_used}")
 
         start_time = time.time()
 
@@ -127,6 +140,7 @@ class BifurcationPipeline:
         # Save maps
         maps_file = output_dir / f"gain_maps_{mode_suffix}.pkl"
         map_metadata = make_run_metadata(
+            seed=self._seed_used,
             stages=self.config["stages"],
             params={"mode": mode_suffix, "pairs": self.config["gain_pairs"]},
         )
@@ -136,6 +150,7 @@ class BifurcationPipeline:
         # Save spectra
         spectra_file = output_dir / "gain_spectra.pkl"
         spectra_metadata = make_run_metadata(
+            seed=self._seed_used,
             stages=self.config["stages"],
             params={"sweeps": self.config["spectrum_sweeps"]},
         )
@@ -150,9 +165,13 @@ class BifurcationPipeline:
         Returns:
             Dictionary with 'stability', 'gain_maps', and 'gain_spectra' results
         """
+        # Seed RNG once at the start of the full pipeline
+        self._seed_used = seed_random()
+
         print("\n" + "=" * 70)
         print("BIFURCATION ANALYSIS - COMPLETE PIPELINE")
         print("=" * 70)
+        print(f"Random seed: {self._seed_used}")
         print(f"Stages: {', '.join(self.config['stages'])}")
         print(f"Mode: {self.config['mode']}")
         print(f"Output: {self.config['output_dir']}")
@@ -213,8 +232,8 @@ Examples:
     parser.add_argument(
         "--stages",
         nargs="+",
-        choices=["P0", "P5", "P10", "P15"],
-        default=["P0", "P5", "P10", "P15"],
+        choices=DEVELOPMENTAL_STAGES,
+        default=list(DEVELOPMENTAL_STAGES),
         help="Developmental stages to analyze (default: all)",
     )
 
@@ -266,13 +285,12 @@ Examples:
         elif args.analysis == "gain":
             results = {"gain": analyzer.run_gain_analysis()}
         elif args.analysis == "gain_maps":
-            # Run only 2D maps
-            config_maps = config.copy()
-            config_maps["spectrum_sweeps"] = []
-            BifurcationPipeline(config_maps)
+            # Run only 2D maps (seed RNG for reproducibility)
+            seed_used = seed_random()
             print("\n" + "=" * 70)
             print("GAIN MAPS ONLY")
             print("=" * 70)
+            print(f"Random seed: {seed_used}")
             map_results = compute_gain_maps_all_stages(
                 parameter_pairs=config["gain_pairs"],
                 stages=config["stages"],
@@ -283,6 +301,7 @@ Examples:
             output_dir.mkdir(parents=True, exist_ok=True)
             maps_file = output_dir / f'gain_maps_{config["mode"]}.pkl'
             map_metadata = make_run_metadata(
+                seed=seed_used,
                 stages=config["stages"],
                 params={"mode": config["mode"], "pairs": config["gain_pairs"]},
             )
@@ -290,10 +309,12 @@ Examples:
             print(f"Gain maps saved to: {maps_file}")
             results = {"gain_maps": map_results}
         elif args.analysis == "gain_spectra":
-            # Run only 1D spectra
+            # Run only 1D spectra (seed RNG for reproducibility)
+            seed_used = seed_random()
             print("\n" + "=" * 70)
             print("GAIN SPECTRA ONLY")
             print("=" * 70)
+            print(f"Random seed: {seed_used}")
             spectrum_results = compute_gain_spectra_all_stages(
                 parameter_keys=config["spectrum_sweeps"],
                 stages=config["stages"],
@@ -303,6 +324,7 @@ Examples:
             output_dir.mkdir(parents=True, exist_ok=True)
             spectra_file = output_dir / "gain_spectra.pkl"
             spectra_metadata = make_run_metadata(
+                seed=seed_used,
                 stages=config["stages"],
                 params={"sweeps": config["spectrum_sweeps"]},
             )
@@ -339,4 +361,6 @@ Examples:
 
 
 if __name__ == "__main__":
-    exit(main())
+    import sys
+
+    sys.exit(main())

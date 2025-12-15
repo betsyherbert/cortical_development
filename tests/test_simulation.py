@@ -1,10 +1,9 @@
 """Tests for CorticalSimulation."""
 
 import numpy as np
-import pytest
 
-from src.main import CorticalSimulation
-from src.model.config import CELL_TYPES, GRID_SIZE, LAYERS, RANDOM_SEED
+from src.simulation import CorticalSimulation
+from src.model.config import CELL_TYPES, LAYERS, seed_random
 
 
 def test_simulation_initialization(grid_size):
@@ -19,11 +18,12 @@ def test_simulation_initialization(grid_size):
 
 def test_simulation_reset(grid_size, random_seed):
     """Test CorticalSimulation reset produces same initial state."""
-    np.random.seed(random_seed)
+    seed_random(random_seed)
     sim1 = CorticalSimulation(grid_size=grid_size)
     initial_state1 = sim1.update()
 
     # Reset and get initial state again
+    seed_random(random_seed)
     sim1.reset()
     initial_state2 = sim1.update()
 

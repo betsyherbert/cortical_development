@@ -1,13 +1,17 @@
-"""Configuration parameters for descriptive analysis."""
+"""Configuration parameters for descriptive analysis.
+
+Note:
+    Developmental stage selection and preset mappings are centralized in
+    `src.analysis.common` (DEVELOPMENTAL_STAGES, PRESETS). This module keeps
+    only descriptive-analysis-specific constants.
+"""
 
 from src.analysis.common import (
-    DEVELOPMENTAL_STAGES,
     DPI,
     ERROR_BAR_ALPHA,
     FIGSIZE_TRENDS,
     LINE_WIDTH,
     MARKER_SIZE,
-    PRESETS,
     SEM_FACTOR,
     get_output_dir,
 )
@@ -19,7 +23,6 @@ __all__ = [
     "AVERAGE_FIRING_RATE_YLIM",
     "CELL_COLORS",
     "CELL_TYPES",
-    "DEVELOPMENTAL_STAGES",
     "DPI",
     "ERROR_BAR_ALPHA",
     "FIGSIZE_TIMESERIES",
@@ -33,7 +36,6 @@ __all__ = [
     "MARKER_SIZE",
     "OUTPUT_DIR",
     "POSTER_CELL_TYPES",
-    "PRESETS",
     "SEM_FACTOR",
     "SUBPLOT_PADDING",
     "Y_MARGIN_FACTOR",
@@ -63,7 +65,7 @@ POSTER_CELL_TYPES = ["SST", "E", "PV"]  # Reordered for poster layout
 
 # Heatmap visualization settings
 HEATMAP_VMIN = 0
-HEATMAP_VMAX = 0.1
+HEATMAP_VMAX = 1.0
 
 # Plot layout constants
 SUBPLOT_PADDING = {

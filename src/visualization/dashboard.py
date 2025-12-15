@@ -1,19 +1,19 @@
 """Dashboard module for visualizing the cortical circuit simulation."""
 
+import logging
 
 import dash
 import dash_bootstrap_components as dbc
 import numpy as np
 import plotly.graph_objects as go
 from dash import dcc, html
-from dash.dependencies import ALL, MATCH, Input, Output, State
+from dash.dependencies import Input, Output, State
 
-from src.analysis.bifurcation import NetworkModel, StabilityAnalyzer
+from src.analysis.bifurcation.config import ANALYSIS_PARAMS
 from src.model.config import (
     CELL_ACTIVITY_COLORS,
     CELL_COLORS,
     CELL_TYPES,
-    CONNECTIONS,
     LAYER_NAMES,
     LAYERS,
     THALAMIC_ALPHA,
@@ -42,76 +42,43 @@ from src.visualization.dashboard_layout import (
 
 # Import plot helpers from dedicated module
 from src.visualization.dashboard_plots import (
-    HEATMAP_ZMAX,
-    HEATMAP_ZMIN,
-    create_empty_message_figure,
+    create_eigenvalue_spectrum_figure,
     create_heatmap_figure,
     create_initial_correlation_figure,
     create_initial_event_figure,
+    create_stability_spectrum_figure,
+    create_static_gain_figure,
+    create_spatiotemporal_gain_figure,
 )
 
 # Import utility helpers from dedicated module
 from src.visualization.dashboard_utils import (
-    SLIDER_HIDDEN_STYLE,
-    SLIDER_POPUP_STYLE,
-    format_analysis_display,
-    get_triggered_id,
-    get_triggered_value,
-    is_valid_click,
-    no_update_tuple,
-    parse_connection_cell_id,
-    parse_pattern_match_id,
+    build_connection_key,
+    parse_connection_key,
 )
 
-# Correlation plot constants
-CORRELATION_WINDOW_MS = 10000  # Rolling window: 10 seconds
-CORRELATION_DISPLAY_SECONDS = 10  # Display window: 10 seconds
-CORRELATION_UPDATE_INTERVAL = 20  # Update every 20 frames (~1s) to reduce computational load
-CORRELATION_CELL_SAMPLE_RATE = 4  # Sample every 4th cell to reduce matrix size
-CORRELATION_HISTORY_LENGTH = int(CORRELATION_WINDOW_MS / UPDATE_INTERVAL)
+# Import callback registration modules
+from src.visualization import (
+    dashboard_callbacks_analysis,
+    dashboard_callbacks_connectivity,
+    dashboard_callbacks_core,
+    dashboard_callbacks_presets,
+)
 
-# Synchronous event tracking constants (reuse correlation timing)
-SYNCHRONOUS_EVENT_THRESHOLD = 0.1  # From descriptive analysis
-ACTIVITY_THRESHOLD = 0.1  # From descriptive analysis
+# Import centralized dashboard config
+from src.visualization.dashboard_config import (
+    ACTIVITY_THRESHOLD,
+    CORRELATION_CELL_SAMPLE_RATE,
+    CORRELATION_DISPLAY_SECONDS,
+    CORRELATION_HISTORY_LENGTH,
+    CORRELATION_WINDOW_MS,
+    SYNCHRONOUS_EVENT_THRESHOLD,
+)
 
+# Import analysis delegate
+from src.visualization.dashboard_analysis import DashboardAnalysis
 
-class ConnectionKeyUtils:
-    """Utility for parsing and building connection keys."""
-
-    @staticmethod
-    def parse(conn_key: str):
-        """Parse connection key to (source_layer, source_cell, target_layer, target_cell).
-
-        Args:
-            conn_key: String like 'L23_E_to_L4_PV' or 'thalamus_to_L4_E'
-
-        Returns:
-            Tuple of (source_layer, source_cell, target_layer, target_cell)
-        """
-        parts = conn_key.split("_to_")
-        source_parts = parts[0].split("_")
-        target_parts = parts[1].split("_")
-
-        if source_parts[0] == "thalamus":
-            return "thalamus", None, target_parts[0], target_parts[1]
-        return source_parts[0], source_parts[1], target_parts[0], target_parts[1]
-
-    @staticmethod
-    def build(source_layer, source_cell, target_layer, target_cell):
-        """Build connection key from components.
-
-        Args:
-            source_layer: Source layer ('L23', 'L4', 'L5', 'Th', or 'thalamus')
-            source_cell: Source cell type ('E', 'SST', 'PV', or None for thalamus)
-            target_layer: Target layer ('L23', 'L4', 'L5')
-            target_cell: Target cell type ('E', 'SST', 'PV')
-
-        Returns:
-            Connection key string
-        """
-        if source_layer in ["Th", "thalamus"]:
-            return f"thalamus_to_{target_layer}_{target_cell}"
-        return f"{source_layer}_{source_cell}_to_{target_layer}_{target_cell}"
+logger = logging.getLogger(__name__)
 
 
 class DashboardApp:
@@ -266,6 +233,9 @@ class DashboardApp:
             Output("connection-matrix-container", "children"),
         ]
 
+        # Initialize analysis delegate for stability/gain computations
+        self.analysis = DashboardAnalysis(self)
+
         # Set up the layout and callbacks
         self.setup_layout()
         self.setup_callbacks()
@@ -329,25 +299,6 @@ class DashboardApp:
         """
         all_pops = [f"{layer}_{cell}" for layer in LAYERS for cell in CELL_TYPES]
         return np.array([all_pops.index(pop) for pop in selected_pops if pop in all_pops])
-
-    def _format_population_title(self, selected_pops: list | None) -> str:
-        """
-        Format a title suffix showing selected populations.
-
-        Args:
-            selected_pops: List of population IDs or None for full network
-
-        Returns:
-            Title string (e.g., " Full Network" or ": L23_E + L4_SST")
-        """
-        if selected_pops is None or len(selected_pops) == 9:
-            return " full network"
-        elif len(selected_pops) == 0:
-            return ""
-        elif len(selected_pops) <= 4:
-            return ": " + " + ".join(selected_pops)
-        else:
-            return f" {len(selected_pops)} populations"
 
     def _extract_mean_rates_from_simulation(self) -> np.ndarray | None:
         """
@@ -558,982 +509,119 @@ class DashboardApp:
         }
 
     def compute_stability_spectrum(self, preset: dict, selected_pops: list | None = None) -> tuple:
-        """
-        Compute stability spectrum (max Re(λ) vs k) for current network state.
+        """Compute stability spectrum (max Re(lambda) vs k) for current network state.
 
-        Linearizes around the current spatial-mean activity from the running simulation.
-        Optimized: scans only positive quadrant and caches exponentials.
+        Delegates to DashboardAnalysis.
 
         Args:
             preset: Preset dictionary with current network parameters
-            selected_pops: Optional list of population IDs to analyze (e.g., ['L23_E', 'L4_SST']).
-                          If None, analyzes full network. If provided, analyzes subset in isolation.
+            selected_pops: Optional list of population IDs to analyze.
 
         Returns:
             Tuple of (k_values, max_real_eigenvalues, eigenvalues_at_max_k, k_max)
-            - k_values: Array of k values
-            - max_real_eigenvalues: Array of max real parts for each k
-            - eigenvalues_at_max_k: Complex array of all eigenvalues at k with max instability
-            - k_max: The k value where maximum instability occurs
         """
-        try:
-            # Extract current spatial mean rates from simulation
-            steady_state = self._extract_mean_rates_from_simulation()
-
-            # Check if network is active
-            if steady_state is None:
-                # Network not yet active - return empty arrays
-                return np.array([]), np.array([]), np.array([]), 0.0
-
-            # Create network model for full network (all 3 layers)
-            network = NetworkModel(preset, layers=["L23", "L4", "L5"])
-
-            # Create stability analyzer with current simulation state
-            analyzer = StabilityAnalyzer(network, steady_state)
-
-            # Scan k modes and collect max Re(λ) for each k
-            from src.analysis.bifurcation.config import ANALYSIS_PARAMS
-
-            n_modes = ANALYSIS_PARAMS["n_modes"]
-            grid_size = ANALYSIS_PARAMS["grid_size"]
-            anatomical_grid_size = ANALYSIS_PARAMS["anatomical_grid_size"]  # μm
-            n_modes_effective = min(n_modes, int(0.6 * grid_size))
-
-            total_pops = len(network.tau)
-
-            # Pre-compute all unique k² values and cache exponentials
-            # Only scan positive quadrant: n1 >= 0, n2 >= 0
-            k_squared_set = set()
-            for n1 in range(0, n_modes_effective + 1):
-                for n2 in range(0, n_modes_effective + 1):
-                    k_squared_set.add(n1**2 + n2**2)
-
-            # Build cache: exp_cache[k²][i,j] = exp(-2π²k²σ²_ij)
-            # sigma values are in μm, normalize by anatomical_grid_size (also in μm)
-            exp_cache = {}
-            for k_squared in k_squared_set:
-                exp_cache[k_squared] = np.zeros((total_pops, total_pops))
-                for i in range(total_pops):
-                    for j in range(total_pops):
-                        sigma_ij = network.sigma[i, j] / anatomical_grid_size
-                        exp_cache[k_squared][i, j] = np.exp(-2 * np.pi**2 * k_squared * sigma_ij**2)
-
-            # Dictionary to store results by k^2
-            results_by_k2 = {}
-
-            # Scan only positive quadrant (reduces work by ~4×)
-            for n1 in range(0, n_modes_effective + 1):
-                for n2 in range(0, n_modes_effective + 1):
-                    k_squared = n1**2 + n2**2
-                    k = np.sqrt(k_squared)
-
-                    # Skip if k > n_modes (keep k in [0, n_modes])
-                    if k > n_modes:
-                        continue
-
-                    # Build Jacobian using cached exponentials
-                    J = np.zeros((total_pops, total_pops))
-                    exp_factors = exp_cache[k_squared]
-
-                    for i in range(total_pops):
-                        for j in range(total_pops):
-                            w_tilde = network.A[i, j] * exp_factors[i, j]
-                            if i == j:
-                                J[i, j] = (
-                                    -1.0 / network.tau[i]
-                                    + (analyzer.g_eff[i] * w_tilde) / network.tau[i]
-                                )
-                            else:
-                                J[i, j] = (analyzer.g_eff[i] * w_tilde) / network.tau[i]
-
-                    # Extract subset if selected_pops is provided
-                    if selected_pops is not None and len(selected_pops) > 0:
-                        indices = self._get_population_indices(selected_pops)
-                        if len(indices) == 0:
-                            continue  # Skip if no valid populations
-                        J_subset = J[np.ix_(indices, indices)]
-                        eigenvalues = np.linalg.eigvals(J_subset)
-                    else:
-                        # Full network analysis
-                        eigenvalues = np.linalg.eigvals(J)
-
-                    max_real = np.max(eigenvalues.real)
-
-                    # Store or update max real eigenvalue for this k
-                    if k_squared not in results_by_k2:
-                        results_by_k2[k_squared] = {
-                            "k": k,
-                            "max_real": max_real,
-                            "eigenvalues": eigenvalues,
-                        }
-                    else:
-                        # Update if this has a larger max real part
-                        if max_real > results_by_k2[k_squared]["max_real"]:
-                            results_by_k2[k_squared]["max_real"] = max_real
-                            results_by_k2[k_squared]["eigenvalues"] = eigenvalues
-
-            # Sort by k and extract arrays
-            sorted_results = sorted(results_by_k2.values(), key=lambda x: x["k"])
-            k_values = np.array([r["k"] for r in sorted_results])
-            max_real_values = np.array([r["max_real"] for r in sorted_results])
-
-            # Find k with maximum instability (most positive real part)
-            if len(max_real_values) > 0:
-                max_idx = np.argmax(max_real_values)
-                k_max = k_values[max_idx]
-                eigenvalues_at_max_k = sorted_results[max_idx]["eigenvalues"]
-            else:
-                k_max = 0.0
-                eigenvalues_at_max_k = np.array([])
-
-            return k_values, max_real_values, eigenvalues_at_max_k, k_max
-
-        except Exception as e:
-            print(f"Error computing stability spectrum: {e}")
-            return np.array([]), np.array([]), np.array([]), 0.0
-
-    def compute_B_fourier(
-        self, network: "NetworkModel", k_squared: float, anatomical_grid_size: float
-    ) -> np.ndarray:
-        """
-        Compute thalamic input B(k) in Fourier space with Gaussian spatial filtering.
-
-        Args:
-            network: NetworkModel instance containing thalamic parameters
-            k_squared: Square of the wavenumber k (mode number)
-            anatomical_grid_size: Anatomical grid size in μm
-
-        Returns:
-            B(k): Thalamic input vector in Fourier space (length = number of populations)
-        """
-        total_pops = len(network.thalamic_strengths)
-        B_k = np.zeros(total_pops)
-
-        for i in range(total_pops):
-            # Normalize thalamic width by anatomical grid size
-            # thalamic_widths are in μm, anatomical_grid_size is in μm, so ratio is dimensionless
-            sigma_thal_i = network.thalamic_widths[i] / anatomical_grid_size
-            # Apply Gaussian spatial filtering: B[i] = strength * exp(-2π²k²σ²)
-            B_k[i] = network.thalamic_strengths[i] * np.exp(
-                -2 * np.pi**2 * k_squared * sigma_thal_i**2
-            )
-
-        return B_k
+        return self.analysis.compute_stability_spectrum(preset, selected_pops)
 
     def compute_static_gain(self, preset: dict, selected_pops: list | None = None) -> tuple:
-        """
-        Compute static spatial gain curve G(k) = ||−J(k)^(−1) B(k)||.
+        """Compute static spatial gain curve G(k) = ||-J(k)^(-1) B(k)||.
 
-        Shows how strongly each spatial frequency is amplified by the cortical circuit.
+        Delegates to DashboardAnalysis.
 
         Args:
             preset: Network preset dictionary
-            selected_pops: Optional list of population IDs to analyze (e.g., ['L23_E', 'L4_SST']).
-                          If None, analyzes full network. If provided, analyzes subset in isolation.
+            selected_pops: Optional list of population IDs to analyze.
 
         Returns:
             (k_values, gain_values): Arrays of k and corresponding gains
         """
-        try:
-            # Get steady state from running simulation
-            steady_state = self._extract_mean_rates_from_simulation()
-            if steady_state is None:
-                return np.array([]), np.array([])
-
-            # Build network model and analyzer
-            network = NetworkModel(preset, layers=["L23", "L4", "L5"])
-            analyzer = StabilityAnalyzer(network, steady_state)
-
-            from src.analysis.bifurcation.config import ANALYSIS_PARAMS
-
-            n_modes = ANALYSIS_PARAMS["n_modes"]
-            grid_size = ANALYSIS_PARAMS["grid_size"]
-            anatomical_grid_size = ANALYSIS_PARAMS["anatomical_grid_size"]  # μm
-            n_modes_effective = min(n_modes, int(0.6 * grid_size))
-            total_pops = len(network.tau)
-
-            # Cache exponentials for cortical connections (reuse from stability spectrum)
-            k_squared_set = set()
-            for n1 in range(0, n_modes_effective + 1):
-                for n2 in range(0, n_modes_effective + 1):
-                    k_squared_set.add(n1**2 + n2**2)
-
-            # Cache for cortical connection exponentials
-            # sigma values are in μm, normalize by anatomical_grid_size (also in μm)
-            exp_cache = {}
-            for k_squared in k_squared_set:
-                exp_cache[k_squared] = np.zeros((total_pops, total_pops))
-                for i in range(total_pops):
-                    for j in range(total_pops):
-                        sigma_ij = network.sigma[i, j] / anatomical_grid_size
-                        exp_cache[k_squared][i, j] = np.exp(-2 * np.pi**2 * k_squared * sigma_ij**2)
-
-            # Aggregate results by k² (handle degenerate modes)
-            results_by_k2 = {}
-
-            for n1 in range(0, n_modes_effective + 1):
-                for n2 in range(0, n_modes_effective + 1):
-                    k_squared = n1**2 + n2**2
-                    k = np.sqrt(k_squared)
-                    if k > n_modes:
-                        continue
-
-                    # Build Jacobian J(k)
-                    J = np.zeros((total_pops, total_pops))
-                    exp_factors = exp_cache[k_squared]
-
-                    for i in range(total_pops):
-                        for j in range(total_pops):
-                            w_tilde = network.A[i, j] * exp_factors[i, j]
-                            if i == j:
-                                J[i, j] = (
-                                    -1.0 / network.tau[i]
-                                    + (analyzer.g_eff[i] * w_tilde) / network.tau[i]
-                                )
-                            else:
-                                J[i, j] = (analyzer.g_eff[i] * w_tilde) / network.tau[i]
-
-                    # Compute B(k) with thalamic spatial filtering
-                    B_k = self.compute_B_fourier(network, k_squared, anatomical_grid_size)
-
-                    # Extract subset if selected_pops is provided
-                    if selected_pops is not None and len(selected_pops) > 0:
-                        indices = self._get_population_indices(selected_pops)
-                        if len(indices) == 0:
-                            continue  # Skip if no valid populations
-                        J_subset = J[np.ix_(indices, indices)]
-                        B_subset = B_k[indices]
-                        J_to_use = J_subset
-                        B_to_use = B_subset
-                    else:
-                        J_to_use = J
-                        B_to_use = B_k
-
-                    # Check if B(k) is non-zero
-                    if np.linalg.norm(B_to_use) < 1e-10:
-                        continue
-
-                    # Compute gain: G(k) = ||−J(k)^(−1) B(k)||
-                    try:
-                        # Compute -J(k)^(-1) @ B(k)
-                        J_inv_B = np.linalg.solve(-J_to_use, B_to_use)
-                        # Spectral norm (largest singular value)
-                        gain = np.linalg.norm(J_inv_B)
-
-                        # Store maximum gain across degenerate modes
-                        if k_squared not in results_by_k2:
-                            results_by_k2[k_squared] = {"k": k, "gain": gain}
-                        else:
-                            results_by_k2[k_squared]["gain"] = max(
-                                results_by_k2[k_squared]["gain"], gain
-                            )
-                    except np.linalg.LinAlgError:
-                        # Singular matrix - skip this mode
-                        continue
-
-            # Sort by k and extract results
-            sorted_results = sorted(results_by_k2.values(), key=lambda x: x["k"])
-            k_values = np.array([r["k"] for r in sorted_results])
-            gain_values = np.array([r["gain"] for r in sorted_results])
-
-            return k_values, gain_values
-
-        except Exception as e:
-            print(f"Error computing static gain: {e}")
-            return np.array([]), np.array([])
+        return self.analysis.compute_static_gain(preset, selected_pops)
 
     def compute_spatiotemporal_gain(self, preset: dict, selected_pops: list | None = None) -> tuple:
-        """
-        Compute spatiotemporal amplification map A(k,ω) = ||(iωI − J(k))^(−1) B(k)||.
+        """Compute spatiotemporal amplification map A(k,omega).
 
-        Shows which spatial (k) and temporal (ω) frequencies the circuit amplifies most.
+        Delegates to DashboardAnalysis.
 
         Args:
             preset: Network preset dictionary
-            selected_pops: Optional list of population IDs to analyze (e.g., ['L23_E', 'L4_SST']).
-                          If None, analyzes full network. If provided, analyzes subset in isolation.
+            selected_pops: Optional list of population IDs to analyze.
 
         Returns:
-            (k_values, omega_values, gain_matrix): Arrays of k, ω, and gain[k,ω]
+            (k_values, omega_values, gain_matrix): Arrays of k, omega, and gain[k,omega]
         """
-        try:
-            # Get steady state from running simulation
-            steady_state = self._extract_mean_rates_from_simulation()
-            if steady_state is None:
-                return np.array([]), np.array([]), np.array([])
-
-            # Build network model and analyzer
-            network = NetworkModel(preset, layers=["L23", "L4", "L5"])
-            analyzer = StabilityAnalyzer(network, steady_state)
-
-            from src.analysis.bifurcation.config import ANALYSIS_PARAMS
-
-            n_modes = ANALYSIS_PARAMS["n_modes"]
-            grid_size = ANALYSIS_PARAMS["grid_size"]
-            anatomical_grid_size = ANALYSIS_PARAMS["anatomical_grid_size"]  # μm
-            n_modes_effective = min(n_modes, int(0.6 * grid_size))
-            total_pops = len(network.tau)
-
-            # Define temporal frequency range (0-1 Hz)
-            omega_values = np.linspace(0, 1, 21)  # 21 samples for smooth heatmap up to 1 Hz
-
-            # Cache exponentials for cortical connections
-            # sigma values are in μm, normalize by anatomical_grid_size (also in μm)
-            k_squared_set = set()
-            for n1 in range(0, n_modes_effective + 1):
-                for n2 in range(0, n_modes_effective + 1):
-                    k_squared_set.add(n1**2 + n2**2)
-
-            exp_cache = {}
-            for k_squared in k_squared_set:
-                exp_cache[k_squared] = np.zeros((total_pops, total_pops))
-                for i in range(total_pops):
-                    for j in range(total_pops):
-                        sigma_ij = network.sigma[i, j] / anatomical_grid_size
-                        exp_cache[k_squared][i, j] = np.exp(-2 * np.pi**2 * k_squared * sigma_ij**2)
-
-            # Aggregate k values (just scan positive quadrant for efficiency)
-            k_values_dict = {}
-            for n1 in range(0, n_modes_effective + 1):
-                for n2 in range(0, n_modes_effective + 1):
-                    k_squared = n1**2 + n2**2
-                    k = np.sqrt(k_squared)
-                    if k > n_modes:
-                        continue
-                    if k_squared not in k_values_dict:
-                        k_values_dict[k_squared] = k
-
-            # Sort k values
-            sorted_k_squared = sorted(k_values_dict.keys())
-            k_values = np.array([k_values_dict[k2] for k2 in sorted_k_squared])
-
-            # Initialize gain matrix
-            gain_matrix = np.zeros((len(k_values), len(omega_values)))
-
-            # Compute gain for each (k, ω)
-            for k_idx, k_squared in enumerate(sorted_k_squared):
-                # Build Jacobian J(k)
-                J = np.zeros((total_pops, total_pops))
-                exp_factors = exp_cache[k_squared]
-
-                for i in range(total_pops):
-                    for j in range(total_pops):
-                        w_tilde = network.A[i, j] * exp_factors[i, j]
-                        if i == j:
-                            J[i, j] = (
-                                -1.0 / network.tau[i]
-                                + (analyzer.g_eff[i] * w_tilde) / network.tau[i]
-                            )
-                        else:
-                            J[i, j] = (analyzer.g_eff[i] * w_tilde) / network.tau[i]
-
-                # Compute B(k) with thalamic spatial filtering
-                B_k = self.compute_B_fourier(network, k_squared, anatomical_grid_size)
-
-                # Extract subset if selected_pops is provided
-                if selected_pops is not None and len(selected_pops) > 0:
-                    indices = self._get_population_indices(selected_pops)
-                    if len(indices) == 0:
-                        continue  # Skip if no valid populations
-                    J_subset = J[np.ix_(indices, indices)]
-                    B_subset = B_k[indices]
-                    J_to_use = J_subset
-                    B_to_use = B_subset
-                    n_pops_subset = len(indices)
-                else:
-                    J_to_use = J
-                    B_to_use = B_k
-                    n_pops_subset = total_pops
-
-                # Check if B(k) is non-zero
-                if np.linalg.norm(B_to_use) < 1e-10:
-                    continue
-
-                # For each temporal frequency ω
-                for omega_idx, omega in enumerate(omega_values):
-                    # Convert Hz to rad/s
-                    omega_rad = 2 * np.pi * omega
-
-                    # Compute (iωI - J(k))
-                    M = 1j * omega_rad * np.eye(n_pops_subset) - J_to_use
-
-                    # Compute A(k,ω) = ||(iωI − J(k))^(−1) B(k)||
-                    try:
-                        M_inv_B = np.linalg.solve(M, B_to_use)
-                        # Spectral norm (use norm for complex vectors)
-                        gain = np.linalg.norm(M_inv_B)
-                        gain_matrix[k_idx, omega_idx] = gain
-                    except np.linalg.LinAlgError:
-                        # Singular matrix - set to 0
-                        gain_matrix[k_idx, omega_idx] = 0.0
-
-            return k_values, omega_values, gain_matrix
-
-        except Exception as e:
-            print(f"Error computing spatiotemporal gain: {e}")
-            return np.array([]), np.array([]), np.array([])
+        return self.analysis.compute_spatiotemporal_gain(preset, selected_pops)
 
     def create_stability_spectrum_figure(
         self, k_values: np.ndarray, max_real_values: np.ndarray
     ) -> go.Figure:
-        """
-        Create Plotly figure for stability spectrum (max Re(λ) vs wavelength).
+        """Create Plotly figure for stability spectrum.
+
+        Delegates to dashboard_plots.
 
         Args:
             k_values: Array of k values (mode numbers, dimensionless)
             max_real_values: Array of max real eigenvalues for each k
-            selected_pops: Optional list of selected population IDs for title
 
         Returns:
             Plotly Figure object
         """
-        fig = go.Figure()
-
-        highlight_data = None
-
-        # Check if we have data
-        if len(k_values) > 0 and len(max_real_values) > 0:
-            # Convert k (mode number) to wavelength: λ = anatomical_grid_size / k (μm)
-            from src.analysis.bifurcation.config import ANALYSIS_PARAMS
-
-            anatomical_grid_size = ANALYSIS_PARAMS["anatomical_grid_size"]
-
-            # Filter out k=0 first to avoid division by zero
-            nonzero_mask = k_values > 0
-            k_values_nonzero = k_values[nonzero_mask]
-            max_real_values_nonzero = max_real_values[nonzero_mask]
-
-            if len(k_values_nonzero) > 0:
-                # Now safe to divide
-                wavelength_values_finite = anatomical_grid_size / k_values_nonzero
-                max_real_values_finite = max_real_values_nonzero
-
-                # Add main spectrum line
-                fig.add_trace(
-                    go.Scatter(
-                        x=wavelength_values_finite,
-                        y=max_real_values_finite,
-                        mode="lines",
-                        name="max Re(λ)",
-                        line=dict(color="#2c3e50", width=2),
-                        hovertemplate="L=%{x:.0f} μm<br>max Re(λ)=%{y:.3f}<extra></extra>",
-                        showlegend=False,
-                    )
-                )
-
-                # Add horizontal line at y=0 (stability boundary)
-                fig.add_trace(
-                    go.Scatter(
-                        x=[wavelength_values_finite.min(), wavelength_values_finite.max()],
-                        y=[0, 0],
-                        mode="lines",
-                        name="Stability boundary",
-                        line=dict(color="gray", width=2, dash="dash"),
-                        showlegend=False,
-                        hoverinfo="skip",
-                    )
-                )
-
-                # Determine y-axis range
-                y_min = min(max_real_values_finite.min(), -0.5)
-                y_max = max(max_real_values_finite.max(), 0.5)
-                y_range = y_max - y_min
-                y_padding = y_range * 0.1
-
-                # Determine dominant mode (strict maximum)
-                max_idx = int(np.argmax(max_real_values_finite))
-                max_value = max_real_values_finite[max_idx]
-                if np.sum(np.isclose(max_real_values_finite, max_value)) == 1:
-                    highlight_wavelength = wavelength_values_finite[max_idx]
-                    highlight_color = "#e74c3c" if max_value > 0 else "#7f8c8d"
-                    highlight_data = (highlight_wavelength, max_value, highlight_color)
-
-                # Determine wavelength range dynamically from data
-                wavelength_min = wavelength_values_finite.min() * 0.9  # Add 10% padding
-                wavelength_max = wavelength_values_finite.max() * 1.1
-            else:
-                y_min, y_max, y_padding = -0.5, 0.5, 0
-                n_modes = ANALYSIS_PARAMS["n_modes"]
-                wavelength_min, wavelength_max = (
-                    anatomical_grid_size / n_modes,
-                    anatomical_grid_size,
-                )
-                fig.add_annotation(
-                    text="Network not yet active (run simulation to see spectrum)",
-                    xref="paper",
-                    yref="paper",
-                    x=0.5,
-                    y=0.5,
-                    showarrow=False,
-                    font=dict(size=SUBTITLE_FONT_SIZE, color="gray"),
-                )
-        else:
-            # No data - show empty plot with message
-            from src.analysis.bifurcation.config import ANALYSIS_PARAMS
-
-            anatomical_grid_size = ANALYSIS_PARAMS["anatomical_grid_size"]
-            n_modes = ANALYSIS_PARAMS["n_modes"]
-            y_min, y_max, y_padding = -0.5, 0.5, 0
-            wavelength_min, wavelength_max = anatomical_grid_size / n_modes, anatomical_grid_size
-            fig.add_annotation(
-                text="Network not yet active (run simulation to see spectrum)",
-                xref="paper",
-                yref="paper",
-                x=0.5,
-                y=0.5,
-                showarrow=False,
-                font=dict(size=SUBTITLE_FONT_SIZE, color="gray"),
-            )
-
-        # Add highlight marker if applicable
-        if highlight_data is not None:
-            highlight_wavelength, highlight_val, highlight_color = highlight_data
-            fig.add_trace(
-                go.Scatter(
-                    x=[highlight_wavelength],
-                    y=[highlight_val],
-                    mode="markers",
-                    marker=dict(
-                        size=11,
-                        color=highlight_color,
-                        symbol="star",
-                        line=dict(color="#ffffff", width=1),
-                    ),
-                    hovertemplate="Dominant L=%{x:.0f} μm<br>max Re(λ)=%{y:.3f}<extra></extra>",
-                    showlegend=False,
-                    cliponaxis=False,
-                )
-            )
-
-        # Generate title
-        title_text = "Stability Spectrum"
-
-        fig.update_layout(
-            title=dict(
-                text=title_text, x=0.5, xanchor="center", font=dict(size=SUBTITLE_FONT_SIZE)
-            ),
-            xaxis=dict(
-                title=dict(text="Wavelength (μm)", font=dict(size=AXIS_FONT_SIZE)),
-                tickfont=dict(size=AXIS_FONT_SIZE),
-                showgrid=True,
-                gridcolor="#e0e0e0",
-                zeroline=False,
-                range=[wavelength_min, wavelength_max],
-            ),
-            yaxis=dict(
-                title=dict(text="max Re(λ)", font=dict(size=AXIS_FONT_SIZE)),
-                tickfont=dict(size=AXIS_FONT_SIZE),
-                showgrid=True,
-                gridcolor="#e0e0e0",
-                zeroline=True,
-                zerolinecolor="gray",
-                zerolinewidth=1,
-                range=[y_min - y_padding, y_max + y_padding] if len(k_values) > 0 else [-0.5, 0.5],
-            ),
-            margin=dict(l=50, r=25, t=35, b=40),
-            height=280,
-            plot_bgcolor="white",
-            paper_bgcolor="white",
-            hovermode="closest",
-            showlegend=False,
+        anatomical_grid_size = ANALYSIS_PARAMS["anatomical_grid_size"]
+        n_modes = ANALYSIS_PARAMS["n_modes"]
+        return create_stability_spectrum_figure(
+            k_values, max_real_values, anatomical_grid_size, n_modes
         )
 
-        return fig
+    def create_eigenvalue_spectrum_figure(
+        self, eigenvalues: np.ndarray, k_max: float
+    ) -> go.Figure:
+        """Create Plotly figure for eigenvalue spectrum in the complex plane.
 
-    def create_eigenvalue_spectrum_figure(self, eigenvalues: np.ndarray, k_max: float) -> go.Figure:
-        """
-        Create Plotly figure for eigenvalue spectrum in the complex plane.
+        Delegates to dashboard_plots.
 
         Args:
             eigenvalues: Complex array of eigenvalues to plot
-            k_max: The k value (mode number, dimensionless) at which these eigenvalues were computed
-            selected_pops: Optional list of selected population IDs for title
+            k_max: The k value at which these eigenvalues were computed
 
         Returns:
             Plotly Figure object
         """
-        fig = go.Figure()
+        return create_eigenvalue_spectrum_figure(eigenvalues, k_max)
 
-        # Check if we have data
-        if len(eigenvalues) > 0:
-            # Extract real and imaginary parts
-            real_parts = eigenvalues.real
-            imag_parts = eigenvalues.imag
+    def create_static_gain_figure(
+        self, k_values: np.ndarray, gain_values: np.ndarray
+    ) -> go.Figure:
+        """Create Plotly figure for static spatial gain G(k).
 
-            # Add eigenvalue scatter plot
-            fig.add_trace(
-                go.Scatter(
-                    x=real_parts,
-                    y=imag_parts,
-                    mode="markers",
-                    name="Eigenvalues",
-                    marker=dict(
-                        size=8,
-                        color=real_parts,  # Color by real part
-                        colorscale="balance",  # Balance colormap
-                        cmin=-0.4,
-                        cmax=0.4,
-                        opacity=1.0,
-                        line=dict(color="black", width=0.5),
-                        showscale=False,
-                    ),
-                    hovertemplate="Re(λ)=%{x:.3f}<br>Im(λ)=%{y:.3f}<extra></extra>",
-                    showlegend=False,
-                )
-            )
-
-            # Add vertical line at Re(λ) = 0 (stability boundary)
-            fig.add_trace(
-                go.Scatter(
-                    x=[0, 0],
-                    y=[-0.4, 0.4],
-                    mode="lines",
-                    name="Stability boundary",
-                    line=dict(color="gray", width=2, dash="dash"),
-                    showlegend=False,
-                    hoverinfo="skip",
-                )
-            )
-        else:
-            # No data - show empty plot with message
-            fig.add_annotation(
-                text="Network not yet active",
-                xref="paper",
-                yref="paper",
-                x=0.5,
-                y=0.5,
-                showarrow=False,
-                font=dict(size=SUBTITLE_FONT_SIZE, color="gray"),
-            )
-
-        # Convert k (mode number) to wavelength and add annotation in top right corner (always show)
-        from src.analysis.bifurcation.config import ANALYSIS_PARAMS
-
-        anatomical_grid_size = ANALYSIS_PARAMS["anatomical_grid_size"]
-
-        wavelength_max = (anatomical_grid_size / k_max) if k_max > 0 else np.inf
-        if np.isfinite(wavelength_max):
-            wavelength_text = f"L = {wavelength_max:.0f} μm"
-        else:
-            wavelength_text = "L = ∞"
-
-        fig.add_annotation(
-            text=wavelength_text,
-            xref="paper",
-            yref="paper",
-            x=0.999,
-            y=0.999,
-            xanchor="right",
-            yanchor="top",
-            showarrow=False,
-            font=dict(size=AXIS_FONT_SIZE, color="black"),
-            bgcolor="rgba(220, 220, 220, 0.9)",  # Pale grey background
-            bordercolor="rgba(180, 180, 180, 0.8)",
-            borderwidth=1,
-            borderpad=3,
-        )
-
-        # Generate title
-        title_text = "Eigenvalue Spectrum"
-
-        fig.update_layout(
-            title=dict(
-                text=title_text, x=0.5, xanchor="center", font=dict(size=SUBTITLE_FONT_SIZE)
-            ),
-            xaxis=dict(
-                title=dict(text="Re(λ)", font=dict(size=AXIS_FONT_SIZE)),
-                tickfont=dict(size=AXIS_FONT_SIZE),
-                showgrid=True,
-                gridcolor="#e0e0e0",
-                zeroline=True,
-                zerolinecolor="gray",
-                zerolinewidth=2,
-                range=[-0.4, 0.4],
-                tickvals=[-0.4, 0, 0.4],
-            ),
-            yaxis=dict(
-                title=dict(text="Im(λ)", font=dict(size=AXIS_FONT_SIZE)),
-                tickfont=dict(size=AXIS_FONT_SIZE),
-                showgrid=True,
-                gridcolor="#e0e0e0",
-                zeroline=True,
-                zerolinecolor="#e0e0e0",
-                zerolinewidth=1,
-                range=[-0.4, 0.4],
-                tickvals=[-0.4, 0, 0.4],
-            ),
-            margin=dict(l=50, r=25, t=35, b=40),
-            height=280,
-            plot_bgcolor="white",
-            paper_bgcolor="white",
-            hovermode="closest",
-            showlegend=False,
-        )
-
-        return fig
-
-    def create_static_gain_figure(self, k_values: np.ndarray, gain_values: np.ndarray) -> go.Figure:
-        """
-        Create Plotly figure for static spatial gain G(λ).
+        Delegates to dashboard_plots.
 
         Args:
             k_values: Array of k values (mode numbers, dimensionless)
             gain_values: Array of gain values for each k
-            selected_pops: Optional list of selected population IDs for title
 
         Returns:
             Plotly Figure object
         """
-        fig = go.Figure()
-
-        highlight_data = None
-
-        # Check if we have data
-        if len(k_values) > 0 and len(gain_values) > 0:
-            # Convert k (mode number) to wavelength: λ = anatomical_grid_size / k (μm)
-            from src.analysis.bifurcation.config import ANALYSIS_PARAMS
-
-            anatomical_grid_size = ANALYSIS_PARAMS["anatomical_grid_size"]
-
-            # Filter out k=0 first to avoid division by zero
-            nonzero_mask = k_values > 0
-            k_values_nonzero = k_values[nonzero_mask]
-            gain_values_nonzero = gain_values[nonzero_mask]
-
-            if len(k_values_nonzero) > 0:
-                # Now safe to divide
-                wavelength_values_finite = anatomical_grid_size / k_values_nonzero
-                gain_values_finite = gain_values_nonzero
-
-                # Add main gain curve
-                fig.add_trace(
-                    go.Scatter(
-                        x=wavelength_values_finite,
-                        y=gain_values_finite,
-                        mode="lines",
-                        name="G(L)",
-                        line=dict(color="#2c3e50", width=2),
-                        hovertemplate="L=%{x:.0f} μm<br>Gain=%{y:.2f}<extra></extra>",
-                        showlegend=False,
-                    )
-                )
-
-                # Determine y-axis range
-                y_min = 0
-                y_max = max(gain_values_finite.max() * 1.1, 1.0)
-
-                # Determine dominant gain mode (unique maximum)
-                max_idx = int(np.argmax(gain_values_finite))
-                max_value = gain_values_finite[max_idx]
-                if np.sum(np.isclose(gain_values_finite, max_value)) == 1:
-                    highlight_data = (wavelength_values_finite[max_idx], max_value)
-
-                # Determine wavelength range dynamically from data
-                wavelength_min = wavelength_values_finite.min() * 0.9  # Add 10% padding
-                wavelength_max = wavelength_values_finite.max() * 1.1
-            else:
-                y_min, y_max = 0, 10
-                n_modes = ANALYSIS_PARAMS["n_modes"]
-                wavelength_min, wavelength_max = (
-                    anatomical_grid_size / n_modes,
-                    anatomical_grid_size,
-                )
-                fig.add_annotation(
-                    text="Network not yet active (run simulation to see gain)",
-                    xref="paper",
-                    yref="paper",
-                    x=0.5,
-                    y=0.5,
-                    showarrow=False,
-                    font=dict(size=SUBTITLE_FONT_SIZE, color="gray"),
-                )
-        else:
-            # No data - show empty plot with message
-            from src.analysis.bifurcation.config import ANALYSIS_PARAMS
-
-            anatomical_grid_size = ANALYSIS_PARAMS["anatomical_grid_size"]
-            n_modes = ANALYSIS_PARAMS["n_modes"]
-            y_min, y_max = 0, 10
-            wavelength_min, wavelength_max = anatomical_grid_size / n_modes, anatomical_grid_size
-            fig.add_annotation(
-                text="Network not yet active (run simulation to see gain)",
-                xref="paper",
-                yref="paper",
-                x=0.5,
-                y=0.5,
-                showarrow=False,
-                font=dict(size=SUBTITLE_FONT_SIZE, color="gray"),
-            )
-
-        # Add highlight marker if applicable
-        if highlight_data is not None:
-            highlight_wavelength, highlight_val = highlight_data
-            fig.add_trace(
-                go.Scatter(
-                    x=[highlight_wavelength],
-                    y=[highlight_val],
-                    mode="markers",
-                    marker=dict(
-                        size=11, color="#7f8c8d", symbol="star", line=dict(color="#ffffff", width=1)
-                    ),
-                    hovertemplate="Dominant L=%{x:.0f} μm<br>Gain=%{y:.2f}<extra></extra>",
-                    showlegend=False,
-                    cliponaxis=False,
-                )
-            )
-
-        # Generate title
-        title_text = "Static Gain"
-
-        fig.update_layout(
-            title=dict(
-                text=title_text, x=0.5, xanchor="center", font=dict(size=SUBTITLE_FONT_SIZE)
-            ),
-            xaxis=dict(
-                title=dict(text="Wavelength (μm)", font=dict(size=AXIS_FONT_SIZE)),
-                tickfont=dict(size=AXIS_FONT_SIZE),
-                showgrid=True,
-                gridcolor="#e0e0e0",
-                zeroline=False,
-                range=[wavelength_min, wavelength_max],
-            ),
-            yaxis=dict(
-                title=dict(text="Gain G(L)", font=dict(size=AXIS_FONT_SIZE)),
-                tickfont=dict(size=AXIS_FONT_SIZE),
-                showgrid=True,
-                gridcolor="#e0e0e0",
-                zeroline=False,
-                range=[y_min, y_max],
-            ),
-            margin=dict(l=50, r=25, t=35, b=40),
-            height=280,
-            plot_bgcolor="white",
-            paper_bgcolor="white",
-            hovermode="closest",
-            showlegend=False,
-        )
-
-        return fig
+        anatomical_grid_size = ANALYSIS_PARAMS["anatomical_grid_size"]
+        return create_static_gain_figure(k_values, gain_values, anatomical_grid_size)
 
     def create_spatiotemporal_gain_figure(
         self, k_values: np.ndarray, omega_values: np.ndarray, gain_matrix: np.ndarray
     ) -> go.Figure:
-        """
-        Create Plotly figure for spatiotemporal amplification map A(λ,ω).
+        """Create Plotly figure for spatiotemporal amplification map.
+
+        Delegates to dashboard_plots.
 
         Args:
-            k_values: Array of spatial frequencies k (mode numbers, dimensionless)
-            omega_values: Array of temporal frequencies ω (Hz)
+            k_values: Array of spatial frequencies k
+            omega_values: Array of temporal frequencies omega (Hz)
             gain_matrix: 2D array of gain values [k_idx, omega_idx]
-            selected_pops: Optional list of selected population IDs for title
 
         Returns:
             Plotly Figure object
         """
-        fig = go.Figure()
-
-        # Check if we have data
-        if len(k_values) > 0 and len(omega_values) > 0 and gain_matrix.size > 0:
-            # Convert k (mode number) to wavelength: λ = anatomical_grid_size / k (μm)
-            from src.analysis.bifurcation.config import ANALYSIS_PARAMS
-
-            anatomical_grid_size = ANALYSIS_PARAMS["anatomical_grid_size"]
-
-            # Filter out k=0 first to avoid division by zero
-            nonzero_mask = k_values > 0
-            k_values_nonzero = k_values[nonzero_mask]
-            gain_matrix_nonzero = gain_matrix[nonzero_mask, :]
-
-            if len(k_values_nonzero) > 0:
-                # Now safe to divide
-                wavelength_values_finite = anatomical_grid_size / k_values_nonzero
-                gain_matrix_finite = gain_matrix_nonzero
-                # Flip gain matrix left-right since wavelength is inverse of k
-                gain_matrix_flipped = np.flipud(gain_matrix_finite)
-                wavelength_min = wavelength_values_finite.min()
-                wavelength_max = wavelength_values_finite.max()
-
-                # Create heatmap
-                fig.add_trace(
-                    go.Heatmap(
-                        x=wavelength_values_finite[
-                            ::-1
-                        ],  # Reverse so larger wavelengths are on left
-                        y=omega_values,
-                        z=gain_matrix_flipped.T,  # Transpose so wavelength is on x-axis
-                        colorscale="Hot",
-                        colorbar=dict(
-                            title=dict(
-                                text="Amplification", side="right", font=dict(size=AXIS_FONT_SIZE)
-                            ),
-                            tickfont=dict(size=AXIS_FONT_SIZE),
-                            len=1.0,
-                            thickness=12,
-                        ),
-                        hovertemplate="L=%{x:.0f} μm<br>ω=%{y:.2f} Hz<br>Gain=%{z:.2f}<extra></extra>",
-                    )
-                )
-
-                # Determine wavelength range dynamically from data
-                wavelength_range = [wavelength_min * 0.9, wavelength_max * 1.1]
-            else:
-                from src.analysis.bifurcation.config import ANALYSIS_PARAMS
-
-                anatomical_grid_size = ANALYSIS_PARAMS["anatomical_grid_size"]
-                n_modes = ANALYSIS_PARAMS["n_modes"]
-                wavelength_range = [anatomical_grid_size / n_modes, anatomical_grid_size]
-                fig.add_annotation(
-                    text="Network not yet active (run simulation to see amplification)",
-                    xref="paper",
-                    yref="paper",
-                    x=0.5,
-                    y=0.5,
-                    showarrow=False,
-                    font=dict(size=SUBTITLE_FONT_SIZE, color="gray"),
-                )
-        else:
-            # No data - show empty plot with message
-            from src.analysis.bifurcation.config import ANALYSIS_PARAMS
-
-            anatomical_grid_size = ANALYSIS_PARAMS["anatomical_grid_size"]
-            n_modes = ANALYSIS_PARAMS["n_modes"]
-            wavelength_range = [anatomical_grid_size / n_modes, anatomical_grid_size]
-            fig.add_annotation(
-                text="Network not yet active (run simulation to see amplification)",
-                xref="paper",
-                yref="paper",
-                x=0.5,
-                y=0.5,
-                showarrow=False,
-                font=dict(size=SUBTITLE_FONT_SIZE, color="gray"),
-            )
-
-        # Generate title
-        title_text = "Spatiotemporal Gain"
-
-        fig.update_layout(
-            title=dict(
-                text=title_text, x=0.5, xanchor="center", font=dict(size=SUBTITLE_FONT_SIZE)
-            ),
-            xaxis=dict(
-                title=dict(text="Wavelength (μm)", font=dict(size=AXIS_FONT_SIZE)),
-                tickfont=dict(size=AXIS_FONT_SIZE),
-                showgrid=False,
-                range=wavelength_range,
-            ),
-            yaxis=dict(
-                title=dict(text="Temporal freq ω (Hz)", font=dict(size=AXIS_FONT_SIZE)),
-                tickfont=dict(size=AXIS_FONT_SIZE),
-                showgrid=False,
-                range=[0, 1],
-            ),
-            margin=dict(l=50, r=25, t=35, b=40),
-            height=280,
-            plot_bgcolor="white",
-            paper_bgcolor="white",
+        anatomical_grid_size = ANALYSIS_PARAMS["anatomical_grid_size"]
+        return create_spatiotemporal_gain_figure(
+            k_values, omega_values, gain_matrix, anatomical_grid_size
         )
-
-        return fig
 
     def _initialize_correlation_figures(self):
         """Initialize correlation line plot figures."""
@@ -2155,7 +1243,7 @@ class DashboardApp:
         Returns:
             Tuple of (source_layer, source_cell, target_layer, target_cell)
         """
-        return ConnectionKeyUtils.parse(conn_key)
+        return parse_connection_key(conn_key)
 
     def _apply_preset(self, preset):
         """Apply a preset configuration to the simulation."""
@@ -2184,7 +1272,7 @@ class DashboardApp:
 
     def get_connection_key(self, source_layer, source_cell, target_layer, target_cell):
         """Generate a connection key based on source and target information."""
-        return ConnectionKeyUtils.build(source_layer, source_cell, target_layer, target_cell)
+        return build_connection_key(source_layer, source_cell, target_layer, target_cell)
 
     def get_max_scaled_strength_magnitude(self):
         """Get the maximum absolute scaled connection strength across all presets.
@@ -2674,687 +1762,18 @@ class DashboardApp:
             )
 
     def setup_callbacks(self):
-        """Set up the dashboard callbacks for interactivity."""
-        # Add callbacks for preset buttons
-        self._create_preset_callback("P0", P0_PRESET)
-        self._create_preset_callback("P5", P5_PRESET, allow_duplicate=True)
-        self._create_preset_callback("P10", P10_PRESET, allow_duplicate=True)
-        self._create_preset_callback("P15", P15_PRESET, allow_duplicate=True)
-
-        # Initialize slider container (hidden)
-        @self.app.callback(
-            [
-                Output("slider-container", "style"),
-                Output("slider-container", "children"),
-                Output("selected-cell", "data"),
-            ],
-            [Input("connection-matrix-container", "children")],
-            [State("selected-cell", "data")],
-        )
-        def initialize_slider_container(_, current_data):  # pylint: disable=unused-argument
-            """Initialize the slider container as hidden when the dashboard loads."""
-            return SLIDER_HIDDEN_STYLE, [], None
-
-        # Handle cell clicks to show the slider
-        @self.app.callback(
-            [
-                Output("slider-container", "style", allow_duplicate=True),
-                Output("slider-container", "children", allow_duplicate=True),
-                Output("selected-cell", "data", allow_duplicate=True),
-            ],
-            [Input({"type": "connection-cell", "id": ALL}, "n_clicks")],
-            [State("selected-cell", "data")],
-            prevent_initial_call=True,
-        )
-        def handle_cell_click(clicks, current_data):  # pylint: disable=unused-argument
-            """Show the connection strength slider when a matrix cell is clicked."""
-            # Early return if not a valid click
-            triggered_prop_id = get_triggered_id()
-            if not triggered_prop_id or not is_valid_click(get_triggered_value()):
-                return no_update_tuple(3)
-
-            # Parse the pattern-match ID
-            cell_data = parse_pattern_match_id(triggered_prop_id)
-            if not cell_data or "id" not in cell_data:
-                return no_update_tuple(3)
-
-            clicked_id = cell_data["id"]
-
-            # Parse connection info from the cell ID
-            parsed = parse_connection_cell_id(clicked_id)
-            if not parsed:
-                print(f"Invalid cell ID format: {clicked_id}")
-                return no_update_tuple(3)
-
-            source_layer, source_cell, target_layer, target_cell = parsed
-
-            # Get current connection value and create slider
-            value = self.get_connection_value(source_layer, source_cell, target_layer, target_cell)
-            slider = self.create_slider_for_cell(
-                source_layer, source_cell, target_layer, target_cell, value
-            )
-
-            # Build connection state data
-            connection_data = {
-                "source_layer": source_layer,
-                "source_cell": source_cell,
-                "target_layer": target_layer,
-                "target_cell": target_cell,
-                "slider_id": clicked_id,
-            }
-
-            return SLIDER_POPUP_STYLE, slider, connection_data
-
-        # Update connection strength when slider changes
-        @self.app.callback(
-            Output({"type": "slider-value", "id": MATCH}, "children"),
-            Input({"type": "matrix-slider", "id": MATCH}, "value"),
-            State("selected-cell", "data"),
-        )
-        def update_connection_value(value, connection_data):
-            """Update the connection strength value display and simulation when slider changes."""
-            if not connection_data:
-                return ""
-
-            try:
-                # Update connection in simulation
-                source_layer = connection_data["source_layer"]
-                source_cell = connection_data["source_cell"]
-                target_layer = connection_data["target_layer"]
-                target_cell = connection_data["target_cell"]
-
-                # Handle thalamus special case
-                if source_layer == "Th":
-                    source_layer = "thalamus"
-
-                # Update simulation connection strength
-                self.simulation.connectivity.set_connection_strength(
-                    source_layer, source_cell, target_layer, target_cell, value
-                )
-
-                return f"Value: {value:.1f}"
-            except (KeyError, AttributeError, ValueError) as e:
-                print(f"Error updating connection value: {e!s}")
-                return f"Error: {e!s}"
-
-        # Update connection cell in matrix when slider changes
-        @self.app.callback(
-            [
-                Output({"type": "connection-cell", "id": MATCH}, "children"),
-                Output({"type": "connection-cell", "id": MATCH}, "style"),
-                Output({"type": "connection-cell", "id": MATCH}, "data-highlight-color"),
-            ],
-            Input({"type": "matrix-slider", "id": MATCH}, "value"),
-            [
-                State({"type": "connection-cell", "id": MATCH}, "style"),
-                State({"type": "connection-cell", "id": MATCH}, "id"),
-                State("selected-cell", "data"),
-            ],
-        )
-        def update_matrix_cell(
-            raw_value, current_style, cell_id, connection_data
-        ):  # pylint: disable=unused-argument
-            """Update the matrix cell appearance and value when the slider changes."""
-            if raw_value is None:
-                return no_update_tuple(3)
-
-            try:
-                # Parse cell ID from the dictionary
-                cell_id_str = cell_id["id"]
-                parsed = parse_connection_cell_id(cell_id_str)
-                if not parsed:
-                    return no_update_tuple(3)
-
-                source_layer, source_cell, target_layer, target_cell = parsed
-
-                # Convert to thalamus if needed
-                source_layer_sim = "thalamus" if source_layer == "Th" else source_layer
-
-                # Get the scaled value to display (raw_value * strength_scaling)
-                if hasattr(self, "simulation") and hasattr(self.simulation, "connectivity"):
-                    scaled_value = self.simulation.connectivity.get_scaled_connection_strength(
-                        source_layer_sim, source_cell, target_layer, target_cell
-                    )
-                else:
-                    # Fallback: compute scaled value manually
-                    if source_layer_sim == "thalamus":
-                        scaling = INITIAL_STRENGTH_SCALING.get("thalamus", 1.0)
-                    else:
-                        scaling = INITIAL_STRENGTH_SCALING.get(source_cell, 1.0)
-                    scaled_value = raw_value * scaling
-
-                # Get max magnitude for color normalization
-                max_magnitude = self.get_max_scaled_strength_magnitude()
-
-                # Determine cell colors based on scaled connection strength and source cell type
-                bg_color, hover_color = self._get_connection_colors(
-                    source_layer, source_cell, scaled_value, max_magnitude
-                )
-
-                # Update style with new background color while preserving other styles
-                updated_style = {
-                    **CELL_STYLE,
-                    "backgroundColor": bg_color,
-                    "cursor": "pointer",
-                    "transition": "background-color 0.2s",
-                    "padding": "5px",
-                    "fontSize": "0.8rem",
-                    "borderRight": "1px solid #ddd" if target_cell == "PV" else "none",
-                    "color": "#2c3e50",
-                }
-
-                # Return updated text (scaled value), style, and hover color
-                return f"{scaled_value:.2f}", updated_style, hover_color
-            except (KeyError, ValueError) as e:
-                print(f"Error updating matrix cell: {e!s}")
-                return no_update_tuple(3)
-
-        # Reset the slider when clicking the reset button
-        @self.app.callback(
-            [
-                Output("slider-container", "style", allow_duplicate=True),
-                Output("slider-container", "children", allow_duplicate=True),
-                Output("selected-cell", "data", allow_duplicate=True),
-            ],
-            Input("reset-slider-state-btn", "n_clicks"),
-            prevent_initial_call=True,
-        )
-        def reset_slider_state(n_clicks):  # pylint: disable=unused-argument
-            """Reset the slider state when clicking outside the slider or matrix."""
-            return SLIDER_HIDDEN_STYLE, [], None
-
-        # JavaScript to position the slider near the clicked cell
-        self.app.clientside_callback(
-            """
-            function(styles, children, data) {
-                // Skip if no data or slider is hidden
-                if (!data || styles.display === 'none') {
-                    return window.dash_clientside.no_update;
-                }
-
-                // Find the cell that was clicked
-                const cellId = data.slider_id;
-                const cell = document.querySelector(`[id*="${cellId}"]`);
-
-                if (cell) {
-                    const rect = cell.getBoundingClientRect();
-                    const sliderContainer = document.getElementById('slider-container');
-
-                    if (sliderContainer) {
-                        // Position below the cell
-                        sliderContainer.style.top = (rect.bottom + window.scrollY + 5) + 'px';
-                        sliderContainer.style.left = (rect.left + window.scrollX - 75) + 'px';
-
-                        // Highlight the active cell
-                        document.querySelectorAll('.connection-cell').forEach(c => c.style.outline = 'none');
-                        cell.style.outline = '2px solid white';
-
-                        // Clean up any existing click handler
-                        if (window.outsideClickHandler) {
-                            document.removeEventListener('click', window.outsideClickHandler);
-                            window.outsideClickHandler = null;
-                        }
-
-                        // Create new document click handler for closing the slider
-                        window.outsideClickHandler = function(e) {
-                            if (!e.target.closest('.connection-cell') &&
-                                !e.target.closest('#slider-container')) {
-
-                                // Reset with the button
-                                const resetBtn = document.getElementById('reset-slider-state-btn');
-                                if (resetBtn) resetBtn.click();
-
-                                // Clear active cell highlighting
-                                document.querySelectorAll('.connection-cell').forEach(c => {
-                                    c.style.outline = 'none';
-                                });
-                            }
-                        };
-
-                        // Add handler with slight delay to avoid immediate trigger
-                        setTimeout(() => {
-                            document.addEventListener('click', window.outsideClickHandler);
-                        }, 50);
-                    }
-                }
-
-                return window.dash_clientside.no_update;
-            }
-            """,
-            Output("slider-container", "id"),
-            [
-                Input("slider-container", "style"),
-                Input("slider-container", "children"),
-                Input("selected-cell", "data"),
-            ],
-        )
-
-        # Add callback for updating connectivity widths in simulation
-        @self.app.callback(
-            [Output("interval-component", "n_intervals", allow_duplicate=True)],
-            [
-                Input("thalamic-width-e-slider", "value"),
-                Input("thalamic-width-sst-slider", "value"),
-                Input("thalamic-width-pv-slider", "value"),
-                Input("outgoing-width-e-slider", "value"),
-                Input("outgoing-width-sst-slider", "value"),
-                Input("outgoing-width-pv-slider", "value"),
-            ],
-            [State("interval-component", "n_intervals")],
-            prevent_initial_call=True,
-        )
-        def update_connectivity_parameters(
-            sigma_thal_e,
-            sigma_thal_sst,
-            sigma_thal_pv,
-            sigma_e_out,
-            sigma_sst_out,
-            sigma_pv_out,
-            n_intervals,
-        ):
-            """Update all connectivity parameters in the simulation."""
-            # Update thalamic connections
-            thalamic_params = [("E", sigma_thal_e), ("SST", sigma_thal_sst), ("PV", sigma_thal_pv)]
-            for layer in LAYERS:
-                for cell_type, sigma in thalamic_params:
-                    self.simulation.set_connection_sigma("thalamus", None, layer, cell_type, sigma)
-
-            # Update cell type outgoing connections
-            outgoing_params = [
-                ("E", sigma_e_out, CELL_TYPES),  # E connects to all cell types
-                ("SST", sigma_sst_out, ["E", "PV"]),  # SST only connects to E and PV
-                ("PV", sigma_pv_out, CELL_TYPES),  # PV connects to all cell types
-            ]
-
-            for source_layer in LAYERS:
-                for target_layer in LAYERS:
-                    for source_cell, sigma, target_cells in outgoing_params:
-                        for target_cell in target_cells:
-                            if (source_cell, target_cell) in CONNECTIONS:
-                                self.simulation.set_connection_sigma(
-                                    source_layer, source_cell, target_layer, target_cell, sigma
-                                )
-
-            # Return unchanged intervals to not disrupt the update loop
-            return [n_intervals]
-
-        # Update the graphs with neural activity
-        @self.app.callback(
-            # Outputs: all graph figures
-            [
-                Output({"type": "graph", "id": f"{layer}_{cell_type}"}, "figure")
-                for layer in LAYERS
-                for cell_type in CELL_TYPES
-            ]
-            + [
-                Output("graph-thalamus", "figure"),
-                Output("correlation-by-layer", "figure"),
-                Output("correlation-by-celltype", "figure"),
-                Output("events-by-layer", "figure"),
-                Output("events-by-celltype", "figure"),
-            ],
-            # Input: only interval trigger (parameter sliders update state via separate callbacks)
-            [Input("interval-component", "n_intervals")],
-            # States: all parameters and pause button state
-            [
-                State("alpha-slider", "value"),
-                State("tau-e-slider", "value"),
-                State("tau-sst-slider", "value"),
-                State("tau-pv-slider", "value"),
-                State("thalamic-width-e-slider", "value"),
-                State("thalamic-width-sst-slider", "value"),
-                State("thalamic-width-pv-slider", "value"),
-                State("outgoing-width-e-slider", "value"),
-                State("outgoing-width-sst-slider", "value"),
-                State("outgoing-width-pv-slider", "value"),
-                State("pause-button", "n_clicks"),
-            ],
-        )
-        def update_graphs(
-            n_intervals,
-            alpha,
-            tau_e,
-            tau_sst,
-            tau_pv,  # pylint: disable=unused-argument
-            sigma_thal_e,
-            sigma_thal_sst,
-            sigma_thal_pv,
-            sigma_e_out,
-            sigma_sst_out,
-            sigma_pv_out,
-            pause_clicks,
-        ):
-            """Update all graphs based on current simulation state."""
-            # Check if simulation is paused
-            is_paused = pause_clicks is not None and pause_clicks % 2 == 1
-            if is_paused:
-                # Return current figures without updating if paused
-                return [
-                    self.figures[f"graph-{layer}-{cell_type}"]
-                    for layer in LAYERS
-                    for cell_type in CELL_TYPES
-                ] + [
-                    self.figures["graph-thalamus"],
-                    self.figures["correlation-by-layer"],
-                    self.figures["correlation-by-celltype"],
-                    self.figures["events-by-layer"],
-                    self.figures["events-by-celltype"],
-                ]
-
-            # Update neuron parameters
-            self.simulation.set_time_constant("E", tau_e)
-            self.simulation.set_time_constant("SST", tau_sst)
-            self.simulation.set_time_constant("PV", tau_pv)
-            # Note: gains are set by presets, not sliders
-
-            # Update all connectivity widths
-            for layer in LAYERS:
-                # Update thalamic inputs
-                self.simulation.set_connection_sigma("thalamus", None, layer, "E", sigma_thal_e)
-                self.simulation.set_connection_sigma("thalamus", None, layer, "SST", sigma_thal_sst)
-                self.simulation.set_connection_sigma("thalamus", None, layer, "PV", sigma_thal_pv)
-
-                # Update outgoing connections for each source layer
-                for source_layer in LAYERS:
-                    for source_cell, sigma in [
-                        ("E", sigma_e_out),
-                        ("SST", sigma_sst_out),
-                        ("PV", sigma_pv_out),
-                    ]:
-                        for target_cell in CELL_TYPES:
-                            if (source_cell, target_cell) in CONNECTIONS:
-                                self.simulation.set_connection_sigma(
-                                    source_layer, source_cell, layer, target_cell, sigma
-                                )
-
-            # Update simulation state
-            activities = self.simulation.update(alpha=alpha)
-
-            # Update all figures
-            updated_figures = []
-
-            # Update each layer-cell type figure
-            for layer in LAYERS:
-                for cell_type in CELL_TYPES:
-                    fig_id = f"graph-{layer}-{cell_type}"
-                    fig = self.figures[fig_id]
-
-                    # Update the figure data
-                    with fig.batch_update():
-                        # Get the layer's activity for this cell type
-                        data = activities[layer][cell_type].reshape(
-                            self.simulation.grid_size, self.simulation.grid_size
-                        )
-                        fig.data[0]["z"] = data
-
-                        # Keep consistent scaling for fair comparison across heatmaps
-                        fig.update_traces(zmin=HEATMAP_ZMIN, zmax=HEATMAP_ZMAX)
-
-                    updated_figures.append(fig)
-
-            # Update thalamus figure
-            thal_fig = self.figures["graph-thalamus"]
-            with thal_fig.batch_update():
-                thal_data = activities["thalamus"]
-                thal_fig.data[0]["z"] = thal_data
-                # Keep consistent scaling for fair comparison with cortical heatmaps
-                thal_fig.update_traces(zmin=HEATMAP_ZMIN, zmax=HEATMAP_ZMAX)
-
-            updated_figures.append(thal_fig)
-
-            # Update correlation tracking
-            self.simulation_time += UPDATE_INTERVAL / 1000.0
-            self.correlation_activity_buffer.append(activities)
-            # Keep buffer size limited to prevent memory issues
-            max_buffer_size = CORRELATION_HISTORY_LENGTH + 10
-            if len(self.correlation_activity_buffer) > max_buffer_size:
-                # Remove oldest entries to maintain buffer size
-                self.correlation_activity_buffer = self.correlation_activity_buffer[
-                    -max_buffer_size:
-                ]
-
-            # Compute correlations and events every N updates for efficiency
-            if n_intervals % CORRELATION_UPDATE_INTERVAL == 0:
-                self._update_time_series_data(
-                    self._compute_rolling_correlations(), self.correlation_time_series
-                )
-                self._update_time_series_data(
-                    self._compute_synchronous_events(), self.event_time_series
-                )
-
-            # Update correlation figures (always, for smooth rendering)
-            corr_fig_layer, corr_fig_celltype = self._update_correlation_figures()
-            updated_figures.extend([corr_fig_layer, corr_fig_celltype])
-
-            # Update event figures
-            event_fig_layer, event_fig_celltype = self._update_event_figures()
-            updated_figures.extend([event_fig_layer, event_fig_celltype])
-
-            return updated_figures
-
-        # Toggle simulation pause state
-        @self.app.callback(
-            Output("interval-component", "disabled"), [Input("pause-button", "n_clicks")]
-        )
-        def toggle_simulation(n_clicks):
-            return n_clicks is not None and n_clicks % 2 == 1
-
-        # Add callback for updating strength scaling factors
-        @self.app.callback(
-            [
-                Output("interval-component", "n_intervals", allow_duplicate=True),
-                Output("connection-matrix-container", "children", allow_duplicate=True),
-            ],
-            [
-                Input("strength-scaling-e-slider", "value"),
-                Input("strength-scaling-sst-slider", "value"),
-                Input("strength-scaling-pv-slider", "value"),
-                Input("strength-scaling-thalamus-slider", "value"),
-            ],
-            [State("interval-component", "n_intervals")],
-            prevent_initial_call=True,
-        )
-        def update_strength_scaling_parameters(
-            e_scaling, sst_scaling, pv_scaling, thalamus_scaling, n_intervals
-        ):
-            """Update all strength scaling parameters in the simulation."""
-            # Update strength scaling parameters
-            self.simulation.set_strength_scaling("E", e_scaling)
-            self.simulation.set_strength_scaling("SST", sst_scaling)
-            self.simulation.set_strength_scaling("PV", pv_scaling)
-            self.simulation.set_strength_scaling("thalamus", thalamus_scaling)
-
-            # Regenerate the connection matrix with updated scaled values
-            updated_matrix = self.create_connection_matrix()
-
-            # Return unchanged intervals and updated matrix
-            return [n_intervals, updated_matrix]
-
-        # Add callback for updating background input parameters
-        @self.app.callback(
-            [Output("interval-component", "n_intervals", allow_duplicate=True)],
-            [
-                Input("background-input-e-slider", "value"),
-                Input("background-input-sst-slider", "value"),
-                Input("background-input-pv-slider", "value"),
-            ],
-            [State("interval-component", "n_intervals")],
-            prevent_initial_call=True,
-        )
-        def update_background_input_parameters(bg_e, bg_sst, bg_pv, n_intervals):
-            """Update all background input parameters in the simulation."""
-            # Update background input for each cell type
-            self.simulation.set_background_input("E", bg_e)
-            self.simulation.set_background_input("SST", bg_sst)
-            self.simulation.set_background_input("PV", bg_pv)
-
-            # Return unchanged intervals to not disrupt the update loop
-            return [n_intervals]
-
-        # Update stability spectrum and eigenvalue spectrum periodically only
-        # Remove parameter inputs to prevent multiple rapid firings on preset changes
-        @self.app.callback(
-            [
-                Output("stability-spectrum-graph", "figure"),
-                Output("eigenvalue-spectrum-graph", "figure"),
-            ],
-            [Input("spectrum-interval", "n_intervals"), Input("selected-populations", "data")],
-        )
-        def update_stability_spectrum(
-            n_intervals, selected_pops
-        ):  # pylint: disable=unused-argument
-            """Update the stability spectrum and eigenvalue spectrum graphs periodically."""
-            # Prevent concurrent computation
-            if self._computing_stability:
-                return no_update_tuple(2)
-
-            try:
-                self._computing_stability = True
-
-                # Check if any populations are selected
-                if not selected_pops or len(selected_pops) == 0:
-                    fig = create_empty_message_figure("Select populations by clicking heatmaps")
-                    return fig, fig
-
-                # Build preset from current simulation state
-                preset = self.build_current_preset()
-
-                # Compute stability spectrum for selected populations
-                k_values, max_real_values, eigenvalues_at_max_k, k_max = (
-                    self.compute_stability_spectrum(preset, selected_pops)
-                )
-
-                # Create both figures
-                stability_fig = self.create_stability_spectrum_figure(k_values, max_real_values)
-                eigenvalue_fig = self.create_eigenvalue_spectrum_figure(eigenvalues_at_max_k, k_max)
-
-                return stability_fig, eigenvalue_fig
-
-            except Exception as e:
-                print(f"Error updating stability spectrum: {e}")
-                # Return empty figures on error
-                empty_stability = self.create_stability_spectrum_figure(np.array([]), np.array([]))
-                empty_eigenvalue = self.create_eigenvalue_spectrum_figure(np.array([]), 0.0)
-                return empty_stability, empty_eigenvalue
-            finally:
-                self._computing_stability = False
-
-        # Update forced response graphs periodically only
-        # Remove parameter inputs to prevent multiple rapid firings on preset changes
-        @self.app.callback(
-            [Output("static-gain-graph", "figure"), Output("spatiotemporal-gain-graph", "figure")],
-            [Input("spectrum-interval", "n_intervals"), Input("selected-populations", "data")],
-        )
-        def update_forced_response(n_intervals, selected_pops):  # pylint: disable=unused-argument
-            """Update the forced response graphs periodically."""
-            # Prevent concurrent computation
-            if self._computing_forced_response:
-                return no_update_tuple(2)
-
-            try:
-                self._computing_forced_response = True
-
-                # Check if any populations are selected
-                if not selected_pops or len(selected_pops) == 0:
-                    fig = create_empty_message_figure("Select populations by clicking heatmaps")
-                    return fig, fig
-
-                # Build preset from current simulation state
-                preset = self.build_current_preset()
-
-                # Compute static gain for selected populations
-                k_values_static, gain_values = self.compute_static_gain(preset, selected_pops)
-                static_fig = self.create_static_gain_figure(k_values_static, gain_values)
-
-                # Compute spatiotemporal gain for selected populations
-                k_values_st, omega_values, gain_matrix = self.compute_spatiotemporal_gain(
-                    preset, selected_pops
-                )
-                spatiotemporal_fig = self.create_spatiotemporal_gain_figure(
-                    k_values_st, omega_values, gain_matrix
-                )
-
-                return static_fig, spatiotemporal_fig
-
-            except Exception as e:
-                print(f"Error updating forced response: {e}")
-                # Return empty figures on error
-                empty_static = self.create_static_gain_figure(np.array([]), np.array([]))
-                empty_st = self.create_spatiotemporal_gain_figure(
-                    np.array([]), np.array([]), np.array([])
-                )
-                return empty_static, empty_st
-            finally:
-                self._computing_forced_response = False
-
-        # Handle heatmap clicks for population selection using n_clicks on containers
-        @self.app.callback(
-            [
-                Output("selected-populations", "data", allow_duplicate=True),
-                Output({"type": "graph-container", "id": ALL}, "style"),
-            ],
-            [Input({"type": "graph-container", "id": ALL}, "n_clicks")],
-            [
-                State("selected-populations", "data"),
-                State({"type": "graph-container", "id": ALL}, "id"),
-            ],
-            prevent_initial_call=True,
-        )
-        def toggle_population_selection(
-            n_clicks_list, selected_pops, container_ids
-        ):  # pylint: disable=unused-argument
-            """Toggle population selection when clicking on heatmaps."""
-            # Parse the triggered input
-            triggered_prop_id = get_triggered_id()
-            if not triggered_prop_id or "n_clicks" not in triggered_prop_id:
-                return no_update_tuple(2)
-
-            # Extract the population ID from the pattern-match callback
-            triggered_dict = parse_pattern_match_id(triggered_prop_id)
-            if not triggered_dict or "id" not in triggered_dict:
-                return no_update_tuple(2)
-
-            pop_id = triggered_dict["id"]
-
-            # Toggle the population in the selection
-            selected_pops = list(selected_pops) if selected_pops else []
-            if pop_id in selected_pops:
-                selected_pops.remove(pop_id)
-            else:
-                selected_pops.append(pop_id)
-
-            # Update styles for all graph containers
-            updated_styles = []
-            for container_id in container_ids:
-                pop_id_for_style = container_id["id"]
-                if pop_id_for_style in selected_pops:
-                    # Selected: grey border
-                    style = {
-                        "display": "inline-block",
-                        "border": "3px solid #7f8c8d",
-                        "transition": "border-color 0.2s",
-                        "cursor": "pointer",
-                    }
-                else:
-                    # Not selected: transparent border
-                    style = {
-                        "display": "inline-block",
-                        "border": "3px solid transparent",
-                        "transition": "border-color 0.2s",
-                        "cursor": "pointer",
-                    }
-                updated_styles.append(style)
-
-            return selected_pops, updated_styles
-
-        # Update the selected populations display text
-        @self.app.callback(
-            Output("selected-populations-display", "children"),
-            [Input("selected-populations", "data")],
-        )
-        def update_selected_populations_display(selected_pops):
-            """Update the display showing which populations are selected for analysis."""
-            return format_analysis_display(selected_pops)
+        """Set up the dashboard callbacks for interactivity.
+
+        Dispatches to dedicated callback modules for better organization:
+        - dashboard_callbacks_core: interval updates, pause/play
+        - dashboard_callbacks_presets: P0/P5/P10/P15 preset buttons
+        - dashboard_callbacks_connectivity: connection matrix interactions
+        - dashboard_callbacks_analysis: stability/gain spectra, population selection
+        """
+        dashboard_callbacks_core.register_callbacks(self.app, self)
+        dashboard_callbacks_presets.register_callbacks(self.app, self)
+        dashboard_callbacks_connectivity.register_callbacks(self.app, self)
+        dashboard_callbacks_analysis.register_callbacks(self.app, self)
 
     def create_control_panel(self):
         """Create the control panel with all sliders and controls."""

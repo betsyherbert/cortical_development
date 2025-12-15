@@ -6,122 +6,56 @@ from typing import Any
 import numpy as np
 from tqdm import tqdm
 
-from src.main import CorticalSimulation
-from src.model.config import DT, seed_random
+from src.analysis.common import DEVELOPMENTAL_STAGES, PRESETS
+from src.simulation import CorticalSimulation
+from src.model.config import DT, INTEGRATION_STEPS
 
-from .config import ANALYSIS_PARAMS, CELL_TYPES, DEVELOPMENTAL_STAGES, LAYERS, PRESETS
+from .config import ANALYSIS_PARAMS, CELL_TYPES, LAYERS
 
 
 class DescriptiveAnalysis:
-    """Analyzes network activity patterns across developmental stages."""
+    """Analyzes network activity patterns across developmental stages.
+
+    Timing semantics:
+    - All durations and intervals are in simulation-time milliseconds.
+    - Each simulation.update() advances time by `update_dt_ms = DT * INTEGRATION_STEPS`.
+    - Samples are recorded at the closest achievable times to the target sampling grid.
+    """
 
     def __init__(self) -> None:
         """Initialize the analysis with simulation parameters."""
         self.simulation = CorticalSimulation()
-        self.dt = DT  # From model config
+
+        # The time quantum: each update() advances this many ms of simulation time
+        self.update_dt_ms = DT * INTEGRATION_STEPS
 
         # Calculate sampling parameters
         self._setup_sampling_parameters()
 
+        # Print concise timing info
         print(
-            f"Analysis setup: {self.warmup_ms}ms warmup + {self._get_duration_ms()}ms duration, "
-            f"{self.n_timepoints} timepoints, sampling every {self.sampling_interval}ms"
+            f"Analysis setup: warmup={self.warmup_ms:.1f}ms, duration={self.duration_ms:.1f}ms, "
+            f"target_interval={self.sampling_interval_ms:.1f}ms"
         )
+        print(
+            f"  Update quantum: {self.update_dt_ms:.1f}ms (DT={DT}ms × INTEGRATION_STEPS={INTEGRATION_STEPS})"
+        )
+        print(f"  Expected samples: ~{self.n_samples} (recorded at nearest achievable times)")
 
     def _setup_sampling_parameters(self) -> None:
-        """Set up timing and sampling parameters."""
-        duration_ms = self._get_duration_ms()
+        """Set up timing and sampling parameters.
+
+        All times are in simulation-time milliseconds.
+        """
+        # Convert config durations (in seconds) to milliseconds
         self.warmup_ms = ANALYSIS_PARAMS["warmup_duration"] * 1000
-        self.sampling_interval = ANALYSIS_PARAMS["sampling_interval"]
-        self.n_warmup_steps = int(self.warmup_ms / self.sampling_interval)
-        self.n_timepoints = int(duration_ms / self.sampling_interval)
-        self.steps_per_sample = int(self.sampling_interval / self.dt)
+        self.duration_ms = ANALYSIS_PARAMS["simulation_duration"] * 1000
 
-    def _get_duration_ms(self) -> float:
-        """Get simulation duration in milliseconds."""
-        return ANALYSIS_PARAMS["simulation_duration"] * 1000
+        # Target sampling interval in ms (from config)
+        self.sampling_interval_ms = ANALYSIS_PARAMS["sampling_interval"]
 
-    def _apply_preset(self, preset: dict[str, Any]) -> None:
-        """Apply developmental stage preset to simulation."""
-        self._update_connection_strengths(preset)
-        self._update_scaling(preset)
-        self._update_time_constants(preset)
-        self._update_background_input(preset)
-        self._update_thalamic_widths(preset)
-        self._update_outgoing_widths(preset)
-        self._update_thalamic_params(preset)
-
-    def _update_connection_strengths(self, preset: dict[str, Any]) -> None:
-        """Update connection strengths from preset."""
-        if "connection_strengths" not in preset:
-            return
-
-        for conn_key, strength in preset["connection_strengths"].items():
-            source_layer, source_cell, target_layer, target_cell = self._parse_connection_key(
-                conn_key
-            )
-            self.simulation.connectivity.set_connection_strength(
-                source_layer, source_cell, target_layer, target_cell, strength
-            )
-
-    def _update_scaling(self, preset: dict[str, Any]) -> None:
-        """Update strength scaling parameters."""
-        if "strength_scaling" in preset:
-            for cell_type, scaling in preset["strength_scaling"].items():
-                self.simulation.set_strength_scaling(cell_type, scaling)
-
-    def _update_time_constants(self, preset: dict[str, Any]) -> None:
-        """Update time constants from preset."""
-        if "time_constants" in preset:
-            for cell_type, tau in preset["time_constants"].items():
-                self.simulation.set_time_constant(cell_type, tau)
-
-    def _update_background_input(self, preset: dict[str, Any]) -> None:
-        """Update background input from preset."""
-        if "background_input" not in preset:
-            return
-
-        for cell_type, value in preset["background_input"].items():
-            self.simulation.set_background_input(cell_type, value)
-
-    def _update_thalamic_widths(self, preset: dict[str, Any]) -> None:
-        """Update thalamic connection widths (sigma values)."""
-        if "thalamic_widths" not in preset:
-            return
-
-        for cell_type, sigma in preset["thalamic_widths"].items():
-            for target_layer in LAYERS:
-                self.simulation.set_connection_sigma(
-                    "thalamus", None, target_layer, cell_type, sigma
-                )
-
-    def _update_thalamic_params(self, preset: dict[str, Any]) -> None:
-        """Update thalamic developmental parameters."""
-        self.simulation.update_thalamic_params(preset)
-
-    def _update_outgoing_widths(self, preset: dict[str, Any]) -> None:
-        """Update outgoing connection widths (sigma values for lateral connections)."""
-        if "outgoing_widths" not in preset:
-            return
-
-        for cell_type, sigma in preset["outgoing_widths"].items():
-            for source_layer in LAYERS:
-                for target_layer in LAYERS:
-                    for target_cell in CELL_TYPES:
-                        self.simulation.set_connection_sigma(
-                            source_layer, cell_type, target_layer, target_cell, sigma
-                        )
-
-    def _parse_connection_key(self, conn_key: str) -> tuple[str, str, str, str]:
-        """Parse connection key into source and target components."""
-        parts = conn_key.split("_to_")
-        source_parts = parts[0].split("_")
-        target_parts = parts[1].split("_")
-
-        if source_parts[0] == "thalamus":
-            return "thalamus", None, target_parts[0], target_parts[1]
-        else:
-            return source_parts[0], source_parts[1], target_parts[0], target_parts[1]
+        # Estimate number of samples (actual count depends on time accumulator)
+        self.n_samples = int(self.duration_ms / self.sampling_interval_ms)
 
     def run_simulation_for_stage(self, stage_name: str) -> dict[str, Any]:
         """Run simulation for a single developmental stage and collect timeseries."""
@@ -129,11 +63,8 @@ class DescriptiveAnalysis:
 
         # Apply preset and reset simulation
         preset = PRESETS[stage_name]
-        self._apply_preset(preset)
+        self.simulation.apply_preset(preset)
         self.simulation.reset()
-
-        # Set random seed for reproducibility
-        seed_random()
 
         # Get thalamic alpha for this stage
         alpha = preset["thalamic_alpha"]
@@ -156,30 +87,55 @@ class DescriptiveAnalysis:
         }
 
     def _collect_timeseries_data(self, timeseries: dict[str, Any], alpha: float) -> None:
-        """Collect timeseries data by running simulation."""
+        """Collect timeseries data by running simulation.
+
+        Uses a time-accumulator scheme:
+        - Warmup: advance simulation while elapsed_ms < warmup_ms
+        - Recording: advance until reaching next sample time, then record
+        """
+        elapsed_ms = 0.0
+
         # Warmup period: let network settle to equilibrium
-        if self.n_warmup_steps > 0:
+        if self.warmup_ms > 0:
+            n_warmup_updates = int(np.ceil(self.warmup_ms / self.update_dt_ms))
             for _ in tqdm(
-                range(self.n_warmup_steps),
+                range(n_warmup_updates),
                 desc=f"  {timeseries['stage']} warmup",
-                unit="steps",
+                unit="updates",
                 leave=False,
             ):
                 self.simulation.update(alpha=alpha)
+                elapsed_ms += self.update_dt_ms
 
-        # Data collection period
-        for t_idx in tqdm(
-            range(self.n_timepoints),
+        # Reset elapsed time for recording phase (warmup doesn't count toward recorded time)
+        elapsed_ms = 0.0
+        next_sample_time_ms = 0.0
+
+        # Data collection period using time accumulator
+        with tqdm(
+            total=self.n_samples,
             desc=f"  {timeseries['stage']} recording",
-            unit="steps",
+            unit="samples",
             leave=False,
-        ):
-            # Update simulation
-            activities = self.simulation.update(alpha=alpha)
+        ) as pbar:
+            while len(timeseries["activities"]) < self.n_samples:
+                # Advance simulation by one update quantum
+                activities = self.simulation.update(alpha=alpha)
+                elapsed_ms += self.update_dt_ms
 
-            # Store activities and time
-            timeseries["activities"].append(activities.copy())
-            timeseries["time"].append(t_idx * self.sampling_interval)
+                # Check if we've reached or passed the next sample time
+                if elapsed_ms >= next_sample_time_ms:
+                    # Record sample at the current (closest achievable) time
+                    timeseries["activities"].append(activities.copy())
+                    timeseries["time"].append(elapsed_ms)
+
+                    # Advance to next target sample time
+                    next_sample_time_ms += self.sampling_interval_ms
+                    pbar.update(1)
+
+                # Safety: stop if we've simulated far beyond expected duration
+                if elapsed_ms > self.duration_ms + self.sampling_interval_ms:
+                    break
 
     def process_activity_data(self, timeseries_data: dict[str, Any]) -> dict[str, Any]:
         """Process timeseries data to extract key metrics."""

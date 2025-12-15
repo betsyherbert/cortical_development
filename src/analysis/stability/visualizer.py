@@ -14,13 +14,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import BoundaryNorm, ListedColormap
 
+from src.analysis.common import DEVELOPMENTAL_STAGES
 from src.model.config import GRID_SIZE
 
 from .config import (
     ANALYSIS_PARAMS,
     COLORBAR_PARAMS,
     COLORMAP,
-    DEVELOPMENTAL_STAGES,
     FONT_CONFIG,
     LAYERS,
     OUTPUT_DIR,

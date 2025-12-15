@@ -13,6 +13,8 @@ from matplotlib import colors
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import MaxNLocator
 
+from src.analysis.common import DEVELOPMENTAL_STAGES
+
 from .config import (
     BIFURCATION_COLORMAP,
     GAIN_CLIP_MAX,
@@ -983,7 +985,7 @@ class BifurcationVisualizer:
         output_dir = Path(OUTPUT_DIR)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        stages = ["P0", "P5", "P10", "P15"]
+        stages = DEVELOPMENTAL_STAGES
 
         # Generate stability map figures (one figure with all parameter pairs)
         if "stability" in results:

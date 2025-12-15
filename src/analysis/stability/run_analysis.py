@@ -9,9 +9,11 @@ import argparse
 import time
 from pathlib import Path
 
+from src.analysis.common import DEVELOPMENTAL_STAGES
 from src.analysis.common import make_run_metadata, save_with_version
+from src.model.config import seed_random
 
-from .config import ANALYSIS_PARAMS, DEVELOPMENTAL_STAGES, OUTPUT_DIR, REGIMES
+from .config import ANALYSIS_PARAMS, OUTPUT_DIR, REGIMES
 from .stability_analysis import StabilityAnalysis
 from .visualizer import StabilityVisualizer
 
@@ -27,6 +29,7 @@ class StabilityPipeline:
                    If None, uses default configuration.
         """
         self.config = config or self._default_config()
+        self._seed_used = None  # Track the actual seed used for metadata
 
     def _default_config(self) -> dict:
         """Get default configuration.
@@ -48,9 +51,13 @@ class StabilityPipeline:
         Returns:
             Dictionary with analysis results organized by stage and regime
         """
+        # Seed RNG once at the start of the pipeline for reproducibility
+        self._seed_used = seed_random()
+
         print("\n" + "=" * 70)
         print("STABILITY ANALYSIS PIPELINE")
         print("=" * 70)
+        print(f"Random seed: {self._seed_used}")
         print(
             f"Duration: {self.config['duration']}s | "
             f"Snapshots: {self.config['n_snapshots']} | "
@@ -88,6 +95,7 @@ class StabilityPipeline:
 
         results_file = output_dir / "stability_analysis_results.pkl"
         metadata = make_run_metadata(
+            seed=self._seed_used,
             stages=self.config["stages"],
             params={
                 "duration": self.config["duration"],
@@ -157,8 +165,8 @@ Examples:
     parser.add_argument(
         "--stages",
         nargs="+",
-        choices=["P0", "P5", "P10", "P15"],
-        default=["P0", "P5", "P10", "P15"],
+        choices=DEVELOPMENTAL_STAGES,
+        default=list(DEVELOPMENTAL_STAGES),
         help="Developmental stages to analyze (default: all)",
     )
 

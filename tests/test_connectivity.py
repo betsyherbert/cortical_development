@@ -5,10 +5,11 @@ Default anatomical grid size is 1000 μm × 1000 μm.
 """
 
 import numpy as np
-import pytest
 
-from src.model.config import ANATOMICAL_GRID_SIZE, CELL_TYPES, GRID_SIZE, LAYERS
+from src.model.config import ANATOMICAL_GRID_SIZE, LAYERS
 from src.model.connectivity import ConnectivityProfile, LayerConnectivity
+from src.model.presets import P0_PRESET
+from src.simulation import CorticalSimulation
 
 
 def test_connectivity_profile_initialization(grid_size):
@@ -135,3 +136,36 @@ def test_spatial_scale_conversion():
     grid = um_to_grid(original_um)
     back_to_um = grid_to_um(grid)
     assert abs(back_to_um - original_um) < 1e-10
+
+
+def test_thalamic_connections_are_built_from_preset(grid_size):
+    """Regression test: thalamus_to_* preset keys must populate connectivity.W.
+
+    This ensures offline analyses receive thalamic drive (matching the dashboard).
+    """
+    sim = CorticalSimulation(grid_size=grid_size, preset=P0_PRESET)
+
+    # Spot-check a few expected thalamic connections.
+    expected_keys = [
+        ("thalamus", None, "L23", "E"),
+        ("thalamus", None, "L4", "E"),
+        ("thalamus", None, "L5", "E"),
+    ]
+    for key in expected_keys:
+        assert key in sim.circuit.connectivity.W
+
+
+def test_thalamic_drive_can_activate_cortex_from_rest(grid_size):
+    """Regression test: thalamic input should produce nonzero cortical activity.
+
+    Use a deterministic synthetic thalamus pattern to avoid relying on random burst timing.
+    """
+    sim = CorticalSimulation(grid_size=grid_size, preset=P0_PRESET)
+    sim.reset()
+
+    # P0 has zero background input; without thalamic weights this would stay silent.
+    sim.circuit.thalamus = np.ones((grid_size, grid_size))
+    activities = sim.circuit.update(n_steps=1)
+
+    max_e = max(float(np.max(activities[layer]["E"])) for layer in LAYERS)
+    assert max_e > 0.0

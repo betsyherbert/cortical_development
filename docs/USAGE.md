@@ -195,6 +195,22 @@ pipeline.save_results(results)
 pipeline.generate_visualizations(results)
 ```
 
+### Simulation core (no dashboard imports)
+
+For programmatic access to the simulation without importing Dash/dashboard code, import
+`CorticalSimulation` from `src.simulation`:
+
+```python
+from src.model.config import seed_random
+from src.simulation import CorticalSimulation
+
+seed_random(4)  # callers own seeding for reproducibility
+sim = CorticalSimulation()
+activities = sim.update()
+```
+
+Note: the analysis pipelines seed explicitly and save the used seed in the result metadata.
+
 ## Output Format
 
 All pipelines save results using `save_with_version()` which wraps data in a versioned structure:

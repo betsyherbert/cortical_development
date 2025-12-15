@@ -555,6 +555,94 @@ def create_event_time_series_figure(
     return fig
 
 
+def create_spatiotemporal_gain_figure(
+    k_values: np.ndarray,
+    omega_values: np.ndarray,
+    gain_matrix: np.ndarray,
+    anatomical_grid_size: float,
+) -> go.Figure:
+    """Create Plotly figure for spatiotemporal amplification map A(k,omega).
+
+    Args:
+        k_values: Array of spatial frequencies k (mode numbers, dimensionless)
+        omega_values: Array of temporal frequencies omega (Hz)
+        gain_matrix: 2D array of gain values [k_idx, omega_idx]
+        anatomical_grid_size: Anatomical grid size in micrometers
+
+    Returns:
+        Plotly Figure object
+    """
+    fig = go.Figure()
+
+    if len(k_values) > 0 and len(omega_values) > 0 and gain_matrix.size > 0:
+        # Filter out k=0 to avoid division by zero
+        nonzero_mask = k_values > 0
+        k_values_nonzero = k_values[nonzero_mask]
+        gain_matrix_nonzero = gain_matrix[nonzero_mask, :]
+
+        if len(k_values_nonzero) > 0:
+            wavelength_values = anatomical_grid_size / k_values_nonzero
+            # Flip gain matrix since wavelength is inverse of k
+            gain_matrix_flipped = np.flipud(gain_matrix_nonzero)
+            wavelength_min = wavelength_values.min()
+            wavelength_max = wavelength_values.max()
+
+            fig.add_trace(
+                go.Heatmap(
+                    x=wavelength_values[::-1],  # Reverse so larger wavelengths on left
+                    y=omega_values,
+                    z=gain_matrix_flipped.T,  # Transpose so wavelength is on x-axis
+                    colorscale="Hot",
+                    colorbar=dict(
+                        title=dict(
+                            text="Amplification",
+                            side="right",
+                            font=dict(size=AXIS_FONT_SIZE),
+                        ),
+                        tickfont=dict(size=AXIS_FONT_SIZE),
+                        len=1.0,
+                        thickness=12,
+                    ),
+                    hovertemplate="L=%{x:.0f} μm<br>ω=%{y:.2f} Hz<br>Gain=%{z:.2f}<extra></extra>",
+                )
+            )
+
+            wavelength_range = [wavelength_min * 0.9, wavelength_max * 1.1]
+        else:
+            wavelength_range = [100, 1000]
+            _add_no_data_annotation(fig, "Network not yet active")
+    else:
+        wavelength_range = [100, 1000]
+        _add_no_data_annotation(fig, "Network not yet active")
+
+    fig.update_layout(
+        title=dict(
+            text="Spatiotemporal Gain",
+            x=0.5,
+            xanchor="center",
+            font=dict(size=SUBTITLE_FONT_SIZE),
+        ),
+        xaxis=dict(
+            title=dict(text="Wavelength (μm)", font=dict(size=AXIS_FONT_SIZE)),
+            tickfont=dict(size=AXIS_FONT_SIZE),
+            showgrid=False,
+            range=wavelength_range,
+        ),
+        yaxis=dict(
+            title=dict(text="Temporal freq ω (Hz)", font=dict(size=AXIS_FONT_SIZE)),
+            tickfont=dict(size=AXIS_FONT_SIZE),
+            showgrid=False,
+            range=[0, 1],
+        ),
+        margin=dict(l=50, r=25, t=35, b=40),
+        height=280,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+    )
+
+    return fig
+
+
 # =============================================================================
 # Empty/Initial Figure Creators
 # =============================================================================

@@ -158,3 +158,45 @@ def format_analysis_display(selected_pops: list[str] | None) -> str:
     else:
         return f"Currently analysing: {len(selected_pops)} populations"
 
+
+# =============================================================================
+# Connection Key Utilities
+# =============================================================================
+
+
+def parse_connection_key(conn_key: str) -> tuple[str, str | None, str, str]:
+    """Parse connection key to (source_layer, source_cell, target_layer, target_cell).
+
+    Args:
+        conn_key: String like 'L23_E_to_L4_PV' or 'thalamus_to_L4_E'
+
+    Returns:
+        Tuple of (source_layer, source_cell, target_layer, target_cell)
+    """
+    parts = conn_key.split("_to_")
+    source_parts = parts[0].split("_")
+    target_parts = parts[1].split("_")
+
+    if source_parts[0] == "thalamus":
+        return "thalamus", None, target_parts[0], target_parts[1]
+    return source_parts[0], source_parts[1], target_parts[0], target_parts[1]
+
+
+def build_connection_key(
+    source_layer: str, source_cell: str | None, target_layer: str, target_cell: str
+) -> str:
+    """Build connection key from components.
+
+    Args:
+        source_layer: Source layer ('L23', 'L4', 'L5', 'Th', or 'thalamus')
+        source_cell: Source cell type ('E', 'SST', 'PV', or None for thalamus)
+        target_layer: Target layer ('L23', 'L4', 'L5')
+        target_cell: Target cell type ('E', 'SST', 'PV')
+
+    Returns:
+        Connection key string
+    """
+    if source_layer in ["Th", "thalamus"]:
+        return f"thalamus_to_{target_layer}_{target_cell}"
+    return f"{source_layer}_{source_cell}_to_{target_layer}_{target_cell}"
+

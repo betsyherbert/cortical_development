@@ -11,13 +11,12 @@ Main exports:
 """
 
 from .activity_analysis import DescriptiveAnalysis
+from src.analysis.common import DEVELOPMENTAL_STAGES, PRESETS
 from .config import (
     ANALYSIS_PARAMS,
-    DEVELOPMENTAL_STAGES,
     FONT_SIZES,
     LAYER_COLORS,
     POSTER_CELL_TYPES,
-    PRESETS,
 )
 from .run_analysis import DescriptivePipeline
 from .visualizer import ActivityVisualizer

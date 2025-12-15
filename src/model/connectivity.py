@@ -237,29 +237,40 @@ class LayerConnectivity:
 
         # Create weight matrices for each layer-specific connection
         for conn_key, params in self.layer_params.items():
-            # Split the connection key into its components
-            # Format: {source_layer}_{source_cell}_to_{target_layer}_{target_cell}
-            parts = conn_key.split("_to_")
-            if len(parts) != 2:
-                continue  # Skip invalid connection keys
+            # Handle thalamic connections explicitly.
+            #
+            # Preset keys are stored as: "thalamus_to_<target_layer>_<target_cell>"
+            # which do NOT include a source_cell field, so they must be parsed
+            # separately from the generic "<src_layer>_<src_cell>_to_<tgt_layer>_<tgt_cell>" format.
+            if conn_key.startswith("thalamus_to_"):
+                parts = conn_key.split("_")
+                # Expected: ["thalamus", "to", "<target_layer>", "<target_cell>"]
+                if len(parts) != 4:
+                    continue
 
-            source_part, target_part = parts
-
-            # Split source and target parts
-            source_parts = source_part.split("_")
-            target_parts = target_part.split("_")
-
-            if len(source_parts) != 2 or len(target_parts) != 2:
-                continue  # Skip invalid connection keys
-
-            source_layer, source_cell = source_parts
-            target_layer, target_cell = target_parts
-
-            # Handle thalamic connections
-            if source_layer == "thalamus":
+                source_layer = "thalamus"
                 source_cell = None
+                target_layer = parts[2]
+                target_cell = parts[3]
                 cell_type_for_scaling = "thalamus"
             else:
+                # Split the connection key into its components
+                # Format: {source_layer}_{source_cell}_to_{target_layer}_{target_cell}
+                parts = conn_key.split("_to_")
+                if len(parts) != 2:
+                    continue  # Skip invalid connection keys
+
+                source_part, target_part = parts
+
+                # Split source and target parts
+                source_parts = source_part.split("_")
+                target_parts = target_part.split("_")
+
+                if len(source_parts) != 2 or len(target_parts) != 2:
+                    continue  # Skip invalid connection keys
+
+                source_layer, source_cell = source_parts
+                target_layer, target_cell = target_parts
                 cell_type_for_scaling = source_cell
 
             # Apply strength scaling factor
