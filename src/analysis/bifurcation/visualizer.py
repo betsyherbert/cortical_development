@@ -16,6 +16,7 @@ from matplotlib.ticker import MaxNLocator
 from src.analysis.common import DEVELOPMENTAL_STAGES
 
 from .config import (
+    ANALYSIS_PARAMS,
     BIFURCATION_COLORMAP,
     GAIN_CLIP_MAX,
     GAIN_COLORMAP,
@@ -204,31 +205,26 @@ class BifurcationVisualizer:
 
                 ax = fig.add_subplot(gs[row_idx, stage_idx])
 
-                # Transpose matrices (swap axes: x=first param, y=second param)
-                k_matrix_T = k_matrix.T
-                stability_matrix_T = stability_matrix.T
-                flatness_matrix_T = flatness_matrix.T if flatness_matrix is not None else None
-
                 # Convert k to wavelength: λ = 1/k (μm)
-                wavelength_matrix_T = np.where(k_matrix_T > 0, 1.0 / k_matrix_T, np.inf)
+                wavelength_matrix = np.where(k_matrix > 0, 1.0 / k_matrix, np.inf)
 
                 # Compute alpha values based on stability
-                alpha_matrix = np.zeros_like(stability_matrix_T)
-                alpha_matrix[stability_matrix_T < STABILITY_THRESHOLD] = OPACITY_STABLE_FAR
+                alpha_matrix = np.zeros_like(stability_matrix)
+                alpha_matrix[stability_matrix < STABILITY_THRESHOLD] = OPACITY_STABLE_FAR
                 alpha_matrix[
-                    (stability_matrix_T >= STABILITY_THRESHOLD) & (stability_matrix_T < 0)
+                    (stability_matrix >= STABILITY_THRESHOLD) & (stability_matrix < 0)
                 ] = OPACITY_STABLE_NEAR
-                alpha_matrix[stability_matrix_T >= 0] = OPACITY_UNSTABLE
+                alpha_matrix[stability_matrix >= 0] = OPACITY_UNSTABLE
 
                 # Create RGBA image (grey for flat spectra, colormap otherwise)
-                rgba_image = np.zeros((*wavelength_matrix_T.shape, 4))
+                rgba_image = np.zeros((*wavelength_matrix.shape, 4))
                 grey_color = (0.5, 0.5, 0.5)
-                for i in range(wavelength_matrix_T.shape[0]):
-                    for j in range(wavelength_matrix_T.shape[1]):
-                        if flatness_matrix_T is not None and flatness_matrix_T[i, j]:
+                for i in range(wavelength_matrix.shape[0]):
+                    for j in range(wavelength_matrix.shape[1]):
+                        if flatness_matrix is not None and flatness_matrix[i, j]:
                             color_rgb = grey_color
                         else:
-                            color_rgb = cmap(norm(wavelength_matrix_T[i, j]))[:3]
+                            color_rgb = cmap(norm(wavelength_matrix[i, j]))[:3]
                         rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
 
                 # Display image
@@ -240,7 +236,7 @@ class BifurcationVisualizer:
                     ax.contour(
                         x_values,
                         y_values,
-                        stability_matrix_T,
+                        stability_matrix,
                         levels=[0],
                         colors="white",
                         linewidths=1.5,
@@ -263,8 +259,15 @@ class BifurcationVisualizer:
                 )
 
                 # Apply consistent axis limits for this row
-                ax.set_xlim(x_lim)
-                ax.set_ylim(y_lim)
+                if mode == "fixed_ratio":
+                    # In fixed_ratio mode, each stage uses a different *absolute* scan range.
+                    # Using a cross-stage intersection in absolute units can collapse the visible
+                    # region to a sliver and make plots appear blank.
+                    ax.set_xlim(x_values[0], x_values[-1])
+                    ax.set_ylim(y_values[0], y_values[-1])
+                else:
+                    ax.set_xlim(x_lim)
+                    ax.set_ylim(y_lim)
                 ax.set_aspect("auto")
                 ax.locator_params(axis="x", nbins=4)
                 ax.locator_params(axis="y", nbins=5)
@@ -597,16 +600,11 @@ class BifurcationVisualizer:
 
                 ax = fig.add_subplot(gs[row_idx, stage_idx])
 
-                # Transpose matrices
-                k_matrix_T = k_matrix.T
-                gain_matrix_T = gain_matrix.T
-                flatness_matrix_T = flatness_matrix.T if flatness_matrix is not None else None
-
                 # Convert k to wavelength: λ = 1/k (μm)
-                wavelength_matrix_T = np.where(k_matrix_T > 0, 1.0 / k_matrix_T, np.inf)
+                wavelength_matrix = np.where(k_matrix > 0, 1.0 / k_matrix, np.inf)
 
                 # Compute alpha values based on gain (log-scale)
-                gain_valid = np.where(np.isnan(gain_matrix_T), 1.0, gain_matrix_T)
+                gain_valid = np.where(np.isnan(gain_matrix), 1.0, gain_matrix)
                 gain_clipped = np.clip(gain_valid, 1.0, GAIN_CLIP_MAX)
                 log_gain = np.log10(gain_clipped)
 
@@ -616,17 +614,17 @@ class BifurcationVisualizer:
                 normalized = np.clip(normalized, 0, 1)
 
                 alpha_matrix = GAIN_OPACITY_MIN + normalized * (GAIN_OPACITY_MAX - GAIN_OPACITY_MIN)
-                alpha_matrix = np.where(np.isnan(gain_matrix_T), 0.1, alpha_matrix)
+                alpha_matrix = np.where(np.isnan(gain_matrix), 0.1, alpha_matrix)
 
                 # Create RGBA image
-                rgba_image = np.zeros((*wavelength_matrix_T.shape, 4))
+                rgba_image = np.zeros((*wavelength_matrix.shape, 4))
                 grey_color = (0.5, 0.5, 0.5)
-                for i in range(wavelength_matrix_T.shape[0]):
-                    for j in range(wavelength_matrix_T.shape[1]):
-                        if flatness_matrix_T is not None and flatness_matrix_T[i, j]:
+                for i in range(wavelength_matrix.shape[0]):
+                    for j in range(wavelength_matrix.shape[1]):
+                        if flatness_matrix is not None and flatness_matrix[i, j]:
                             color_rgb = grey_color
                         else:
-                            color_rgb = cmap(norm(wavelength_matrix_T[i, j]))[:3]
+                            color_rgb = cmap(norm(wavelength_matrix[i, j]))[:3]
                         rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
 
                 # Display image
@@ -648,8 +646,12 @@ class BifurcationVisualizer:
                 )
 
                 # Apply consistent axis limits for this row
-                ax.set_xlim(x_lim)
-                ax.set_ylim(y_lim)
+                if mode == "fixed_ratio":
+                    ax.set_xlim(x_values[0], x_values[-1])
+                    ax.set_ylim(y_values[0], y_values[-1])
+                else:
+                    ax.set_xlim(x_lim)
+                    ax.set_ylim(y_lim)
                 ax.set_aspect("auto")
                 ax.locator_params(axis="x", nbins=4)
                 ax.locator_params(axis="y", nbins=5)
@@ -858,14 +860,19 @@ class BifurcationVisualizer:
 
             param_results = results[param_key]
 
+            anatomical_grid_size_um = ANALYSIS_PARAMS["anatomical_grid_size"]
+
             # Determine consistent wavelength-axis limits across all stages in this row
-            # Convert k (cycles/μm) to wavelength λ (μm): λ = 1/k
+            # Here, k_values are mode numbers (dimensionless). Physical wavelength is:
+            #   λ (μm) = L (μm) / k_mode
             all_wavelength_values = []
             for stage in stages:
                 if stage in param_results:
                     k_values = param_results[stage]["k_values"]
-                    # Convert k to wavelength (excluding k=0)
-                    wavelength_values = np.where(k_values > 0, 1.0 / k_values, np.inf)
+                    # Convert k_mode to wavelength (excluding k=0)
+                    wavelength_values = np.where(
+                        k_values > 0, anatomical_grid_size_um / k_values, np.inf
+                    )
                     finite_wavelengths = wavelength_values[np.isfinite(wavelength_values)]
                     if len(finite_wavelengths) > 0:
                         all_wavelength_values.extend(
@@ -889,8 +896,10 @@ class BifurcationVisualizer:
 
                 ax = fig.add_subplot(gs[row_idx, stage_idx])
 
-                # Convert k to wavelength: λ = 1/k (μm)
-                wavelength_values = np.where(k_values > 0, 1.0 / k_values, np.inf)
+                # Convert k_mode to wavelength: λ (μm) = L (μm) / k_mode
+                wavelength_values = np.where(
+                    k_values > 0, anatomical_grid_size_um / k_values, np.inf
+                )
                 # Filter out infinite values for extent
                 finite_mask = np.isfinite(wavelength_values)
                 if np.sum(finite_mask) > 0:
@@ -908,9 +917,8 @@ class BifurcationVisualizer:
                 else:
                     plot_data = gain_matrix
 
-                # Create heatmap (flip data left-right since wavelength is inverse of k)
-                # Larger wavelength (smaller k) should be on the left
-                plot_data_flipped = np.fliplr(plot_data)
+                # Create heatmap. We display wavelength on the x-axis; larger wavelength
+                # (smaller k) should appear on the left, so we reverse the x-axis below.
                 extent = [
                     wavelength_extent[0],
                     wavelength_extent[1],
@@ -918,7 +926,7 @@ class BifurcationVisualizer:
                     param_values[-1],
                 ]
                 ax.imshow(
-                    plot_data_flipped,
+                    plot_data,
                     origin="lower",
                     extent=extent,
                     aspect="auto",
@@ -928,7 +936,7 @@ class BifurcationVisualizer:
                 )
 
                 # Apply axis limits: wavelength-axis consistent across row, y-axis adaptive per stage
-                ax.set_xlim(wavelength_lim)
+                ax.set_xlim(wavelength_lim[1], wavelength_lim[0])
 
                 # Set y-axis limits based on preset value with fixed margin
                 param_lim_min = preset_value * SPECTRUM_Y_MARGIN[0]

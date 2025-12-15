@@ -88,7 +88,8 @@ SCANNABLE_PARAMETERS = {
         display_name="τ_E",
         units="ms",
         use_ratio=False,
-        default_range=(1.0, 28.0),
+        # Must include preset values (E: 25–50 ms across stages)
+        default_range=(10.0, 70.0),
     ),
     "tau_SST": ParameterSpec(
         path=["time_constants", "SST"],
@@ -96,7 +97,8 @@ SCANNABLE_PARAMETERS = {
         units="ms",
         use_ratio=True,
         reference_param="tau_E",
-        default_range=(1.0, 28.0),
+        # Must include preset values (SST: 30–60 ms across stages)
+        default_range=(10.0, 70.0),
     ),
     "tau_PV": ParameterSpec(
         path=["time_constants", "PV"],
@@ -104,7 +106,8 @@ SCANNABLE_PARAMETERS = {
         units="ms",
         use_ratio=True,
         reference_param="tau_E",
-        default_range=(1.0, 28.0),
+        # Must include preset values (PV: 12–40 ms across stages)
+        default_range=(5.0, 60.0),
     ),
     # Spatial widths (outgoing connections) - in μm
     "sigma_E": ParameterSpec(
@@ -112,7 +115,8 @@ SCANNABLE_PARAMETERS = {
         display_name="σ_E",
         units="μm",
         use_ratio=False,
-        default_range=(5.0, 325.0),
+        # Must include preset values (E: 200–300 μm across stages)
+        default_range=(50.0, 450.0),
     ),
     "sigma_SST": ParameterSpec(
         path=["outgoing_widths", "SST"],
@@ -120,7 +124,8 @@ SCANNABLE_PARAMETERS = {
         units="μm",
         use_ratio=True,
         reference_param="sigma_E",
-        default_range=(5.0, 325.0),
+        # Must include preset values (SST: 200–400 μm across stages)
+        default_range=(50.0, 450.0),
     ),
     "sigma_PV": ParameterSpec(
         path=["outgoing_widths", "PV"],
@@ -128,7 +133,8 @@ SCANNABLE_PARAMETERS = {
         units="μm",
         use_ratio=True,
         reference_param="sigma_E",
-        default_range=(5.0, 325.0),
+        # Must include preset values (PV: 100–250 μm across stages)
+        default_range=(50.0, 450.0),
     ),
     # Thalamic widths (for spectrum analysis) - in μm
     "thalamic_width_E": ParameterSpec(
@@ -180,11 +186,11 @@ DEFAULT_SPECTRUM_SWEEPS = [
 # Developmental Bifurcation Maps Configuration
 # ============================================================================
 
-# Parameter space scan ranges (matching dashboard limits)
-TAU_MIN = 1.0  # Minimum time constant (ms)
-TAU_MAX = 28.0  # Maximum time constant (ms)
-SIGMA_MIN = 5.0  # Minimum spatial width (μm)
-SIGMA_MAX = 325.0  # Maximum spatial width (μm), must be >= max preset σ value
+# Parameter space scan ranges (must include all preset values across stages)
+TAU_MIN = 5.0  # Minimum time constant (ms)
+TAU_MAX = 70.0  # Maximum time constant (ms)
+SIGMA_MIN = 50.0  # Minimum spatial width (μm)
+SIGMA_MAX = 450.0  # Maximum spatial width (μm), must be >= max preset σ value
 
 # Fixed ratio mode limits (applied to τ_inh/τ_E and σ_inh/σ_E ratios)
 FIXED_RATIO_TAU_MIN = 0.1  # Minimum tau ratio
