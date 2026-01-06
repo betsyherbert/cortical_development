@@ -205,13 +205,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Run complete analysis with default parameters
+  # Run complete analysis with default parameters (both modes)
   python -m src.analysis.bifurcation
 
   # Run only stability analysis
   python -m src.analysis.bifurcation --analysis stability
 
-  # Run with fixed ratio mode
+  # Run with fixed ratio mode only
   python -m src.analysis.bifurcation --mode fixed_ratio
 
   # Run for specific stages
@@ -239,9 +239,9 @@ Examples:
 
     parser.add_argument(
         "--mode",
-        choices=["fixed_absolute", "fixed_ratio"],
-        default="fixed_absolute",
-        help="Parameter range mode (default: fixed_absolute)",
+        choices=["fixed_absolute", "fixed_ratio", "all"],
+        default="all",
+        help="Parameter range mode (default: all - runs both modes)",
     )
 
     parser.add_argument(
@@ -262,88 +262,96 @@ Examples:
 
     args = parser.parse_args()
 
-    # Build configuration
-    config = {
-        "stages": args.stages,
-        "mode": args.mode,
-        "n_processes": args.n_processes,
-        "stability_pairs": DEFAULT_STABILITY_PAIRS,
-        "gain_pairs": DEFAULT_GAIN_PAIRS,
-        "spectrum_sweeps": DEFAULT_SPECTRUM_SWEEPS,
-        "output_dir": args.output_dir,
-    }
+    # Determine which modes to run
+    if args.mode == "all":
+        modes_to_run = ["fixed_absolute", "fixed_ratio"]
+    else:
+        modes_to_run = [args.mode]
 
-    # Initialize analyzer
-    analyzer = BifurcationPipeline(config)
-
-    # Run requested analysis
+    # Run analysis for each mode
     try:
-        if args.analysis == "all":
-            results = analyzer.run_all()
-        elif args.analysis == "stability":
-            results = {"stability": analyzer.run_stability_analysis()}
-        elif args.analysis == "gain":
-            results = {"gain": analyzer.run_gain_analysis()}
-        elif args.analysis == "gain_maps":
-            # Run only 2D maps (seed RNG for reproducibility)
-            seed_used = seed_random()
-            print("\n" + "=" * 70)
-            print("GAIN MAPS ONLY")
-            print("=" * 70)
-            print(f"Random seed: {seed_used}")
-            map_results = compute_gain_maps_all_stages(
-                parameter_pairs=config["gain_pairs"],
-                stages=config["stages"],
-                mode=config["mode"],
-                n_processes=config["n_processes"],
-            )
-            output_dir = Path(config["output_dir"])
-            output_dir.mkdir(parents=True, exist_ok=True)
-            maps_file = output_dir / f'gain_maps_{config["mode"]}.pkl'
-            map_metadata = make_run_metadata(
-                seed=seed_used,
-                stages=config["stages"],
-                params={"mode": config["mode"], "pairs": config["gain_pairs"]},
-            )
-            save_with_version(map_results, str(maps_file), metadata=map_metadata)
-            print(f"Gain maps saved to: {maps_file}")
-            results = {"gain_maps": map_results}
-        elif args.analysis == "gain_spectra":
-            # Run only 1D spectra (seed RNG for reproducibility)
-            seed_used = seed_random()
-            print("\n" + "=" * 70)
-            print("GAIN SPECTRA ONLY")
-            print("=" * 70)
-            print(f"Random seed: {seed_used}")
-            spectrum_results = compute_gain_spectra_all_stages(
-                parameter_keys=config["spectrum_sweeps"],
-                stages=config["stages"],
-                n_processes=config["n_processes"],
-            )
-            output_dir = Path(config["output_dir"])
-            output_dir.mkdir(parents=True, exist_ok=True)
-            spectra_file = output_dir / "gain_spectra.pkl"
-            spectra_metadata = make_run_metadata(
-                seed=seed_used,
-                stages=config["stages"],
-                params={"sweeps": config["spectrum_sweeps"]},
-            )
-            save_with_version(spectrum_results, str(spectra_file), metadata=spectra_metadata)
-            print(f"Gain spectra saved to: {spectra_file}")
-            results = {"gain_spectra": spectrum_results}
+        for mode in modes_to_run:
+            # Build configuration for this mode
+            config = {
+                "stages": args.stages,
+                "mode": mode,
+                "n_processes": args.n_processes,
+                "stability_pairs": DEFAULT_STABILITY_PAIRS,
+                "gain_pairs": DEFAULT_GAIN_PAIRS,
+                "spectrum_sweeps": DEFAULT_SPECTRUM_SWEEPS,
+                "output_dir": args.output_dir,
+            }
 
-        # Generate visualizations if requested
-        if not args.no_viz:
-            print("\n" + "=" * 70)
-            print("GENERATING VISUALIZATIONS")
-            print("=" * 70)
+            # Initialize analyzer
+            analyzer = BifurcationPipeline(config)
 
-            from .visualizer import BifurcationVisualizer
+            # Run requested analysis
+            if args.analysis == "all":
+                results = analyzer.run_all()
+            elif args.analysis == "stability":
+                results = {"stability": analyzer.run_stability_analysis()}
+            elif args.analysis == "gain":
+                results = {"gain": analyzer.run_gain_analysis()}
+            elif args.analysis == "gain_maps":
+                # Run only 2D maps (seed RNG for reproducibility)
+                seed_used = seed_random()
+                print("\n" + "=" * 70)
+                print("GAIN MAPS ONLY")
+                print("=" * 70)
+                print(f"Random seed: {seed_used}")
+                map_results = compute_gain_maps_all_stages(
+                    parameter_pairs=config["gain_pairs"],
+                    stages=config["stages"],
+                    mode=config["mode"],
+                    n_processes=config["n_processes"],
+                )
+                output_dir = Path(config["output_dir"])
+                output_dir.mkdir(parents=True, exist_ok=True)
+                maps_file = output_dir / f'gain_maps_{config["mode"]}.pkl'
+                map_metadata = make_run_metadata(
+                    seed=seed_used,
+                    stages=config["stages"],
+                    params={"mode": config["mode"], "pairs": config["gain_pairs"]},
+                )
+                save_with_version(map_results, str(maps_file), metadata=map_metadata)
+                print(f"Gain maps saved to: {maps_file}")
+                results = {"gain_maps": map_results}
+            elif args.analysis == "gain_spectra":
+                # Run only 1D spectra (seed RNG for reproducibility)
+                seed_used = seed_random()
+                print("\n" + "=" * 70)
+                print("GAIN SPECTRA ONLY")
+                print("=" * 70)
+                print(f"Random seed: {seed_used}")
+                spectrum_results = compute_gain_spectra_all_stages(
+                    parameter_keys=config["spectrum_sweeps"],
+                    stages=config["stages"],
+                    n_processes=config["n_processes"],
+                )
+                output_dir = Path(config["output_dir"])
+                output_dir.mkdir(parents=True, exist_ok=True)
+                spectra_file = output_dir / "gain_spectra.pkl"
+                spectra_metadata = make_run_metadata(
+                    seed=seed_used,
+                    stages=config["stages"],
+                    params={"sweeps": config["spectrum_sweeps"]},
+                )
+                save_with_version(spectrum_results, str(spectra_file), metadata=spectra_metadata)
+                print(f"Gain spectra saved to: {spectra_file}")
+                results = {"gain_spectra": spectrum_results}
 
-            visualizer = BifurcationVisualizer()
-            visualizer.generate_all_figures(results, mode=args.mode)
+            # Generate visualizations if requested
+            if not args.no_viz:
+                print("\n" + "=" * 70)
+                print("GENERATING VISUALIZATIONS")
+                print("=" * 70)
 
-            print("\nVisualization complete!")
+                from .visualizer import BifurcationVisualizer
+
+                visualizer = BifurcationVisualizer()
+                visualizer.generate_all_figures(results, mode=mode)
+
+                print("\nVisualization complete!")
 
         print("\n" + "=" * 70)
         print("BIFURCATION ANALYSIS COMPLETE")

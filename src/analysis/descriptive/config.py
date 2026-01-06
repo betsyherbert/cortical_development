@@ -7,12 +7,14 @@ Note:
 """
 
 from src.analysis.common import (
+    DOUBLE_COLUMN_WIDTH_MM,
     DPI,
     ERROR_BAR_ALPHA,
-    FIGSIZE_TRENDS,
+    FIGURE_FONT_SIZES_PT,
     LINE_WIDTH,
     MARKER_SIZE,
     SEM_FACTOR,
+    compute_figsize_inches,
     get_output_dir,
 )
 from src.model.config import CELL_COLORS, CELL_TYPES, LAYER_COLORS, LAYERS
@@ -54,11 +56,20 @@ ANALYSIS_PARAMS = {
     "sampling_interval": 20.0,  # Sampling interval (ms)
 }
 
-# Visualization constants
-FIGSIZE_TIMESERIES = (10, 4)  # Optimized for 3x4 subplot layout (wider for better readability)
+# Visualization constants (mm-based, Nature double-column standard)
+# Timeseries: wide figure for 3x4 subplot layout
+FIGSIZE_TIMESERIES = compute_figsize_inches(DOUBLE_COLUMN_WIDTH_MM, 60.0)
+# Trends: narrower figure for 1x3 subplot layout
+FIGSIZE_TRENDS = compute_figsize_inches(DOUBLE_COLUMN_WIDTH_MM, 50.0)
 
 # Font sizes for poster format - optimized for readability
-FONT_SIZES = {"title": 14, "subtitle": 12, "ylabel": 11, "xlabel": 11, "tick_labels": 9}
+FONT_SIZES = {
+    "title": FIGURE_FONT_SIZES_PT["figure_title"],
+    "subtitle": FIGURE_FONT_SIZES_PT["axes_title"],
+    "ylabel": FIGURE_FONT_SIZES_PT["axis_label"],
+    "xlabel": FIGURE_FONT_SIZES_PT["axis_label"],
+    "tick_labels": FIGURE_FONT_SIZES_PT["tick_label"],
+}
 
 # Poster layout configuration
 POSTER_CELL_TYPES = ["SST", "E", "PV"]  # Reordered for poster layout

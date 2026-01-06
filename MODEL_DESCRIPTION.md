@@ -17,7 +17,7 @@ The simulation behavior is controlled by several key parameters defined in `mode
 
 **Grid and Spatial:**
 - `GRID_SIZE = 20`: Number of grid points in each dimension (20×20 grid)
-- `ANATOMICAL_GRID_SIZE = 1000.0`: Physical size of cortical patch in μm (1000×1000 μm)
+- `ANATOMICAL_GRID_SIZE = 2000.0`: Physical size of cortical patch in μm (2000×2000 μm)
 - Grid scale: 50 μm per grid unit (automatically derived)
 
 **Temporal:**

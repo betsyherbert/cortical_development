@@ -24,6 +24,7 @@ from .config import (
     FIXED_RATIO_TAU_MIN,
     GRID_RESOLUTION,
     SCANNABLE_PARAMETERS,
+    THALAMIC_MAGNITUDE,
     ParameterSpec,
 )
 from .core import (
@@ -40,33 +41,27 @@ def compute_stability_for_point(preset: dict, verbose: bool = False) -> tuple[fl
 
     Args:
         preset: Network preset dictionary with parameters
-        verbose: If True, print diagnostic information
+        verbose: If True, print diagnostic information (currently unused)
 
     Returns:
         Tuple of (k_critical, max_real_eigenvalue, is_flat)
-        - k_critical: Wavenumber with maximum Re(λ)
-        - max_real_eigenvalue: Maximum Re(λ) across all k
+        - k_critical: Wavenumber with maximum Re(λ) (NaN if steady state failed)
+        - max_real_eigenvalue: Maximum Re(λ) across all k (NaN if steady state failed)
         - is_flat: True if spectrum is flat (all k have similar Re(λ))
     """
+    _ = verbose  # Suppress unused argument warning (reserved for future use)
     network = NetworkModel(preset, layers=ALL_LAYERS)
     finder = SteadyStateFinder(network)
 
-    # Use weak thalamic input to avoid divergence
-    thalamic_magnitude = 0.2
-    thalamic_input = network.compute_thalamic_input(thalamic_magnitude)
+    # Use consistent thalamic input magnitude from config
+    thalamic_input = network.compute_thalamic_input(THALAMIC_MAGNITUDE)
 
     # Find steady state
     r_star, status = finder.find_steady_state(thalamic_input=thalamic_input)
 
-    # Handle failed convergence: use minimal activity state
+    # Handle failed convergence: return NaN to mark invalid parameter point
     if status in ["diverged", "not_converged"] or np.any(r_star > 100):
-        r_star = np.ones(len(network.tau)) * 0.15
-        weak_input = network.mu + thalamic_input * 0.1
-        for _ in range(10):
-            input_vec = network.A @ r_star + weak_input
-            r_new = np.maximum(0.0, network.gain * input_vec)
-            r_star = 0.9 * r_star + 0.1 * r_new
-            r_star = np.clip(r_star, 0.05, 0.5)
+        return np.nan, np.nan, False
 
     analyzer = StabilityAnalyzer(network, r_star)
 
@@ -141,7 +136,7 @@ def compute_stability_for_point(preset: dict, verbose: bool = False) -> tuple[fl
         max_real_eigenvalue = max_entry["max_real"]
 
         spectrum_range = max_entry["max_real"] - min_entry["max_real"]
-        is_flat = spectrum_range < 0.001
+        is_flat = spectrum_range < 0.01
     else:
         k_critical = 0.0
         max_real_eigenvalue = -np.inf
@@ -223,7 +218,7 @@ def scan_parameter_space_parallel(
     with mp.Pool(n_processes) as pool:
         results = pool.map(_stability_worker, tasks)
 
-    # Unpack results into matrices
+    # Unpack results into matrices (NaN values will be preserved)
     for x_val, y_val, (k_crit, max_real, is_flat) in results:
         # Find indices
         i = np.argmin(np.abs(y_values - y_val))

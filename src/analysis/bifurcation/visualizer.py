@@ -13,7 +13,15 @@ from matplotlib import colors
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import MaxNLocator
 
-from src.analysis.common import DEVELOPMENTAL_STAGES
+from src.analysis.common import (
+    DOUBLE_COLUMN_WIDTH_MM,
+    FIGURE_FONT_SIZES_PT,
+    DEVELOPMENTAL_STAGES,
+    apply_matplotlib_style,
+    compute_figsize_inches,
+    mm_to_inches,
+    save_figure,
+)
 
 from .config import (
     ANALYSIS_PARAMS,
@@ -40,35 +48,33 @@ class BifurcationVisualizer:
 
     def __init__(self):
         """Initialize visualizer with default style settings."""
-        # Configure matplotlib font settings
-        plt.rcParams.update(
-            {
-                "font.family": "sans-serif",
-                "font.sans-serif": ["Latin Modern Sans", "Arial", "DejaVu Sans", "Helvetica"],
-                "mathtext.fontset": "stixsans",  # Sans-serif math font with all glyphs
-                "axes.unicode_minus": False,
-            }
-        )
+        apply_matplotlib_style()
 
-        # Figure dimensions
-        self.fig_width = 13.7
-        self.fig_height_per_row = 3.5
+        # Figure dimensions (mm-based, Nature double-column standard)
+        self.fig_width_mm = DOUBLE_COLUMN_WIDTH_MM  # 183 mm
+        self.fig_height_per_row_mm = 45.0  # Height per row in mm
 
-        # Spine widths
+        # Convert to inches for Matplotlib
+        self.fig_width = mm_to_inches(self.fig_width_mm)
+        self.fig_height_per_row = mm_to_inches(self.fig_height_per_row_mm)
+
+        # Spine widths (figure-specific, not in global rcParams)
         self.default_spine_width = 0.8
-        self.bold_spine_width = 1.6
+        # Slightly emphasized, but not visually heavy (used to indicate fixed axis)
+        self.bold_spine_width = 1.3
 
-        # Font sizes
-        self.title_fontsize = 14
-        self.subtitle_fontsize = 13
-        self.label_fontsize = 11
-        self.secondary_label_fontsize = 10
-        self.tick_fontsize = 9
-        self.secondary_tick_fontsize = 8
+        # Font sizes (from centralized spec)
+        self.title_fontsize = FIGURE_FONT_SIZES_PT["figure_title"]
+        self.subtitle_fontsize = FIGURE_FONT_SIZES_PT["axes_title"]
+        self.label_fontsize = FIGURE_FONT_SIZES_PT["axis_label"]
+        self.secondary_label_fontsize = FIGURE_FONT_SIZES_PT["axis_label"]
+        self.tick_fontsize = FIGURE_FONT_SIZES_PT["tick_label"]
+        self.secondary_tick_fontsize = FIGURE_FONT_SIZES_PT["tick_label"]
 
         # Layout parameters
         self.hspace = 0.45
-        self.wspace = 0.18
+        # Slightly more horizontal breathing room between stage panels
+        self.wspace = 0.30
         self.left_margin = 0.07
         self.right_margin = 0.83
         self.top_margin = 0.74
@@ -122,7 +128,7 @@ class BifurcationVisualizer:
             hspace=self.hspace,
             wspace=self.wspace,
             left=self.left_margin,
-            right=0.88,
+            right=0.83,
             top=0.80,
             bottom=0.08,
         )
@@ -208,6 +214,9 @@ class BifurcationVisualizer:
                 # Convert k to wavelength: λ = 1/k (μm)
                 wavelength_matrix = np.where(k_matrix > 0, 1.0 / k_matrix, np.inf)
 
+                # Identify NaN values (failed steady-state convergence)
+                nan_mask = np.isnan(k_matrix) | np.isnan(stability_matrix)
+
                 # Compute alpha values based on stability
                 alpha_matrix = np.zeros_like(stability_matrix)
                 alpha_matrix[stability_matrix < STABILITY_THRESHOLD] = OPACITY_STABLE_FAR
@@ -216,16 +225,21 @@ class BifurcationVisualizer:
                 ] = OPACITY_STABLE_NEAR
                 alpha_matrix[stability_matrix >= 0] = OPACITY_UNSTABLE
 
-                # Create RGBA image (grey for flat spectra, colormap otherwise)
+                # Create RGBA image (grey for flat spectra, colormap otherwise, white for NaN)
                 rgba_image = np.zeros((*wavelength_matrix.shape, 4))
                 grey_color = (0.5, 0.5, 0.5)
+                white_color = (1.0, 1.0, 1.0)
                 for i in range(wavelength_matrix.shape[0]):
                     for j in range(wavelength_matrix.shape[1]):
-                        if flatness_matrix is not None and flatness_matrix[i, j]:
+                        if nan_mask[i, j]:
+                            # NaN values render as white (failed convergence)
+                            rgba_image[i, j] = (*white_color, 1.0)
+                        elif flatness_matrix is not None and flatness_matrix[i, j]:
                             color_rgb = grey_color
+                            rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
                         else:
                             color_rgb = cmap(norm(wavelength_matrix[i, j]))[:3]
-                        rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
+                            rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
 
                 # Display image
                 extent = [x_values[0], x_values[-1], y_values[0], y_values[-1]]
@@ -239,7 +253,7 @@ class BifurcationVisualizer:
                         stability_matrix,
                         levels=[0],
                         colors="white",
-                        linewidths=1.5,
+                        linewidths=1.0,
                         linestyles="--",
                         alpha=0.8,
                     )
@@ -251,9 +265,9 @@ class BifurcationVisualizer:
                     preset_x,
                     preset_y,
                     marker="o",
-                    s=120,
+                    s=30,
                     edgecolor="black",
-                    linewidth=1.5,
+                    linewidth=1.2,
                     facecolor="white",
                     zorder=10,
                 )
@@ -279,26 +293,42 @@ class BifurcationVisualizer:
                 ax.spines["right"].set_visible(False)
 
                 # Axis labels (primary axes)
+                # Make labels grey if not dominant, black if dominant
+                primary_label_color = "black" if primary_width == self.bold_spine_width else "0.5"
                 if stage_idx == 0:
                     ax.set_ylabel(
                         param_y_spec.get_axis_label(absolute=primary_absolute),
                         fontsize=self.label_fontsize,
-                        labelpad=8,
+                        labelpad=6,
+                        color=primary_label_color,
                     )
                 else:
                     ax.set_ylabel("")
 
-                # Only show x-labels on bottom row
-                if row_idx == n_rows - 1:
+                # Show x-labels on bottom row and top row (tau_SST)
+                if row_idx == n_rows - 1 or row_idx == 0:
                     ax.set_xlabel(
                         param_x_spec.get_axis_label(absolute=primary_absolute),
                         fontsize=self.label_fontsize,
-                        labelpad=8,
+                        labelpad=6,
+                        color=primary_label_color,
                     )
                 else:
                     ax.set_xlabel("")
 
-                ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.5)
+                # Set tick styling - make dominant axis ticks/labels black
+                if primary_width == self.bold_spine_width:
+                    # Primary axis is dominant - make ticks and labels black
+                    ax.tick_params(
+                        labelsize=self.tick_fontsize,
+                        length=3,
+                        width=0.5,
+                        color="black",
+                        labelcolor="black",
+                    )
+                else:
+                    # Primary axis is not dominant - use default grey
+                    ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.5)
 
                 # Secondary axes - always convert absolute to ratio
                 # Get reference values for ratio conversion
@@ -319,13 +349,26 @@ class BifurcationVisualizer:
                 ax2 = ax.secondary_yaxis("right", functions=(conv_y_fwd, conv_y_inv))
                 # Reduce number of ticks on secondary y-axis to allow 1 d.p. formatting
                 ax2.yaxis.set_major_locator(MaxNLocator(nbins=4))
+                # Make labels grey if not dominant, black if dominant
+                secondary_label_color = "black" if secondary_width == self.bold_spine_width else "0.5"
                 if stage_idx == n_stages - 1:
                     ax2.set_ylabel(
                         param_y_spec.get_axis_label(absolute=secondary_absolute),
                         fontsize=self.secondary_label_fontsize,
-                        labelpad=8,
+                        labelpad=10,
+                        color=secondary_label_color,
                     )
-                    ax2.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
+                    # Make ticks/labels black if secondary axis is dominant
+                    if secondary_width == self.bold_spine_width:
+                        ax2.tick_params(
+                            labelsize=self.secondary_tick_fontsize,
+                            length=2,
+                            width=0.5,
+                            color="black",
+                            labelcolor="black",
+                        )
+                    else:
+                        ax2.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
                 else:
                     ax2.set_ylabel("")
                     ax2.tick_params(labelright=False, length=0)
@@ -352,9 +395,20 @@ class BifurcationVisualizer:
                     ax3.set_xlabel(
                         param_x_spec.get_axis_label(absolute=secondary_absolute),
                         fontsize=self.secondary_label_fontsize,
-                        labelpad=8,
+                        labelpad=6,
+                        color=secondary_label_color,
                     )
-                    ax3.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
+                    # Make ticks/labels black if secondary axis is dominant
+                    if secondary_width == self.bold_spine_width:
+                        ax3.tick_params(
+                            labelsize=self.secondary_tick_fontsize,
+                            length=2,
+                            width=0.5,
+                            color="black",
+                            labelcolor="black",
+                        )
+                    else:
+                        ax3.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
                 else:
                     ax3.set_xlabel("")
                     ax3.tick_params(labeltop=False, length=0)
@@ -365,7 +419,7 @@ class BifurcationVisualizer:
                 # Stage label - only on top row
                 if row_idx == 0:
                     ax.set_title(
-                        stage_name, fontsize=self.subtitle_fontsize, fontweight="bold", pad=21
+                        stage_name, fontsize=self.subtitle_fontsize, fontweight="bold", pad=10
                     )
 
         # Add 2D opacity legend (replacing colorbar)
@@ -375,7 +429,7 @@ class BifurcationVisualizer:
         cbar_top = 0.80
         cbar_height = cbar_top - cbar_bottom
         cbar_width = 0.05  # Wider to accommodate 3 columns and rotated labels
-        cbar_ax = fig.add_axes([0.94, cbar_bottom, cbar_width, cbar_height])
+        cbar_ax = fig.add_axes([0.95, cbar_bottom, cbar_width, cbar_height])
 
         # Create 2D opacity legend: 3 columns for the three opacity levels
         # Each column shows the full viridis colormap, with only opacity varying
@@ -428,7 +482,7 @@ class BifurcationVisualizer:
             [f"{w:.0f}" for w in wavelength_tick_values], fontsize=self.tick_fontsize
         )
         cbar_ax.set_ylabel(
-            r"Wavelength w/ max Re($\lambda$) ($\mu$m)", fontsize=self.label_fontsize, labelpad=18
+            r"Wavelength w/ max Re($\lambda$) ($\mu$m)", fontsize=self.label_fontsize, labelpad=15
         )
         cbar_ax.yaxis.set_label_position("right")
         cbar_ax.yaxis.tick_right()
@@ -443,7 +497,7 @@ class BifurcationVisualizer:
 
         # Add grey legend at bottom of colorbar (aligned with 2D legend, full width)
         grey_legend_bottom = 0.08 + 0.01
-        stable_ax = fig.add_axes([0.94, grey_legend_bottom, cbar_width, 0.03])
+        stable_ax = fig.add_axes([0.95, grey_legend_bottom, cbar_width, 0.03])
         stable_ax.imshow(
             np.full((10, 1), 0.5), cmap="Greys", vmin=0, vmax=1, origin="lower", aspect="auto"
         )
@@ -465,7 +519,7 @@ class BifurcationVisualizer:
 
         # Overall title (positioned above stage titles)
         title = f'Stability Landscapes: {mode.replace("_", " ").title()} Values'
-        fig.suptitle(title, fontsize=self.title_fontsize, fontweight="bold", y=0.995)
+        fig.suptitle(title, fontsize=self.title_fontsize, fontweight="bold", y=1.03)
 
         return fig
 
@@ -517,7 +571,7 @@ class BifurcationVisualizer:
             hspace=self.hspace,
             wspace=self.wspace,
             left=self.left_margin,
-            right=0.88,
+            right=0.83,
             top=0.80,
             bottom=0.08,
         )
@@ -603,6 +657,9 @@ class BifurcationVisualizer:
                 # Convert k to wavelength: λ = 1/k (μm)
                 wavelength_matrix = np.where(k_matrix > 0, 1.0 / k_matrix, np.inf)
 
+                # Identify NaN values (failed steady-state convergence)
+                nan_mask = np.isnan(k_matrix) | np.isnan(gain_matrix)
+
                 # Compute alpha values based on gain (log-scale)
                 gain_valid = np.where(np.isnan(gain_matrix), 1.0, gain_matrix)
                 gain_clipped = np.clip(gain_valid, 1.0, GAIN_CLIP_MAX)
@@ -614,18 +671,22 @@ class BifurcationVisualizer:
                 normalized = np.clip(normalized, 0, 1)
 
                 alpha_matrix = GAIN_OPACITY_MIN + normalized * (GAIN_OPACITY_MAX - GAIN_OPACITY_MIN)
-                alpha_matrix = np.where(np.isnan(gain_matrix), 0.1, alpha_matrix)
 
-                # Create RGBA image
+                # Create RGBA image (white for NaN values)
                 rgba_image = np.zeros((*wavelength_matrix.shape, 4))
                 grey_color = (0.5, 0.5, 0.5)
+                white_color = (1.0, 1.0, 1.0)
                 for i in range(wavelength_matrix.shape[0]):
                     for j in range(wavelength_matrix.shape[1]):
-                        if flatness_matrix is not None and flatness_matrix[i, j]:
+                        if nan_mask[i, j]:
+                            # NaN values render as white (failed convergence)
+                            rgba_image[i, j] = (*white_color, 1.0)
+                        elif flatness_matrix is not None and flatness_matrix[i, j]:
                             color_rgb = grey_color
+                            rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
                         else:
                             color_rgb = cmap(norm(wavelength_matrix[i, j]))[:3]
-                        rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
+                            rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
 
                 # Display image
                 extent = [x_values[0], x_values[-1], y_values[0], y_values[-1]]
@@ -638,9 +699,9 @@ class BifurcationVisualizer:
                     preset_x,
                     preset_y,
                     marker="o",
-                    s=120,
+                    s=30,
                     edgecolor="black",
-                    linewidth=1.5,
+                    linewidth=1.2,
                     facecolor="white",
                     zorder=10,
                 )
@@ -662,26 +723,42 @@ class BifurcationVisualizer:
                 ax.spines["top"].set_visible(False)
                 ax.spines["right"].set_visible(False)
 
+                # Make labels grey if not dominant, black if dominant
+                primary_label_color = "black" if primary_width == self.bold_spine_width else "0.5"
                 if stage_idx == 0:
                     ax.set_ylabel(
                         param_y_spec.get_axis_label(absolute=primary_absolute),
                         fontsize=self.label_fontsize,
-                        labelpad=8,
+                        labelpad=6,
+                        color=primary_label_color,
                     )
                 else:
                     ax.set_ylabel("")
 
-                # Only show x-labels on bottom row
-                if row_idx == n_rows - 1:
+                # Show x-labels on bottom row and top row (tau_SST)
+                if row_idx == n_rows - 1 or row_idx == 0:
                     ax.set_xlabel(
                         param_x_spec.get_axis_label(absolute=primary_absolute),
                         fontsize=self.label_fontsize,
-                        labelpad=8,
+                        labelpad=6,
+                        color=primary_label_color,
                     )
                 else:
                     ax.set_xlabel("")
 
-                ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.5)
+                # Set tick styling - make dominant axis ticks/labels black
+                if primary_width == self.bold_spine_width:
+                    # Primary axis is dominant - make ticks and labels black
+                    ax.tick_params(
+                        labelsize=self.tick_fontsize,
+                        length=3,
+                        width=0.5,
+                        color="black",
+                        labelcolor="black",
+                    )
+                else:
+                    # Primary axis is not dominant - use default grey
+                    ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.5)
 
                 # Secondary axes - always convert absolute to ratio
                 if param_y_spec.use_ratio and param_y_spec.reference_param:
@@ -700,13 +777,26 @@ class BifurcationVisualizer:
                 ax2 = ax.secondary_yaxis("right", functions=(conv_y_fwd, conv_y_inv))
                 # Reduce number of ticks on secondary y-axis to allow 1 d.p. formatting
                 ax2.yaxis.set_major_locator(MaxNLocator(nbins=4))
+                # Make labels grey if not dominant, black if dominant
+                secondary_label_color = "black" if secondary_width == self.bold_spine_width else "0.5"
                 if stage_idx == n_stages - 1:
                     ax2.set_ylabel(
                         param_y_spec.get_axis_label(absolute=secondary_absolute),
                         fontsize=self.secondary_label_fontsize,
-                        labelpad=8,
+                        labelpad=10,
+                        color=secondary_label_color,
                     )
-                    ax2.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
+                    # Make ticks/labels black if secondary axis is dominant
+                    if secondary_width == self.bold_spine_width:
+                        ax2.tick_params(
+                            labelsize=self.secondary_tick_fontsize,
+                            length=2,
+                            width=0.5,
+                            color="black",
+                            labelcolor="black",
+                        )
+                    else:
+                        ax2.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
                 else:
                     ax2.set_ylabel("")
                     ax2.tick_params(labelright=False, length=0)
@@ -733,9 +823,20 @@ class BifurcationVisualizer:
                     ax3.set_xlabel(
                         param_x_spec.get_axis_label(absolute=secondary_absolute),
                         fontsize=self.secondary_label_fontsize,
-                        labelpad=8,
+                        labelpad=6,
+                        color=secondary_label_color,
                     )
-                    ax3.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
+                    # Make ticks/labels black if secondary axis is dominant
+                    if secondary_width == self.bold_spine_width:
+                        ax3.tick_params(
+                            labelsize=self.secondary_tick_fontsize,
+                            length=2,
+                            width=0.5,
+                            color="black",
+                            labelcolor="black",
+                        )
+                    else:
+                        ax3.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
                 else:
                     ax3.set_xlabel("")
                     ax3.tick_params(labeltop=False, length=0)
@@ -746,7 +847,7 @@ class BifurcationVisualizer:
                 # Stage label - only on top row
                 if row_idx == 0:
                     ax.set_title(
-                        stage_name, fontsize=self.subtitle_fontsize, fontweight="bold", pad=21
+                        stage_name, fontsize=self.subtitle_fontsize, fontweight="bold", pad=10
                     )
 
         # Add shared colorbar spanning all rows
@@ -757,16 +858,16 @@ class BifurcationVisualizer:
         cbar_bottom = 0.14
         cbar_top = 0.80
         cbar_height = cbar_top - cbar_bottom
-        cbar_ax = fig.add_axes([0.92, cbar_bottom, 0.015, cbar_height])
+        cbar_ax = fig.add_axes([0.93, cbar_bottom, 0.015, cbar_height])
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation="vertical")
         cbar.set_label(
-            r"Wavelength w/ max gain ($\mu$m)", fontsize=self.label_fontsize, labelpad=18
+            r"Wavelength w/ max gain ($\mu$m)", fontsize=self.label_fontsize, labelpad=15
         )
         cbar.ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.6)
 
         # Add grey legend at bottom of colorbar
         grey_legend_bottom = 0.08 + 0.01
-        stable_ax = fig.add_axes([0.92, grey_legend_bottom, 0.015, 0.03])
+        stable_ax = fig.add_axes([0.93, grey_legend_bottom, 0.015, 0.03])
         stable_ax.imshow(
             np.full((10, 1), 0.5), cmap="Greys", vmin=0, vmax=1, origin="lower", aspect="auto"
         )
@@ -788,7 +889,7 @@ class BifurcationVisualizer:
 
         # Overall title (positioned above stage titles)
         title = f'Gain Landscapes: {mode.replace("_", " ").title()} Mode'
-        fig.suptitle(title, fontsize=self.title_fontsize, fontweight="bold", y=0.995)
+        fig.suptitle(title, fontsize=self.title_fontsize, fontweight="bold", y=1.03)
 
         return fig
 
@@ -809,8 +910,12 @@ class BifurcationVisualizer:
         n_stages = len(stages)
 
         # Create figure with n_rows×(n_stages+1) grid (extra column for colorbar)
-        fig_width = 3.5 * n_stages
-        fig_height = 3.5 * n_rows
+        # Use mm-based sizing: width per stage, height per row
+        width_per_stage_mm = 40.0  # mm per stage column
+        height_per_row_mm = 40.0  # mm per row
+        fig_width_mm = width_per_stage_mm * n_stages
+        fig_height_mm = height_per_row_mm * n_rows
+        fig_width, fig_height = compute_figsize_inches(fig_width_mm, fig_height_mm)
         fig = plt.figure(figsize=(fig_width, fig_height))
         gs = GridSpec(
             n_rows,
@@ -1004,11 +1109,10 @@ class BifurcationVisualizer:
             if param_pairs:
                 fig = self.create_stability_map_figure(stability_results, param_pairs, stages, mode)
 
-                filename = f"stability_maps_{mode}.svg"
+                filename = f"stability_maps_{mode}.pdf"
                 filepath = output_dir / filename
-                fig.savefig(filepath, format="svg", bbox_inches="tight")
+                save_figure(fig, filepath)
                 print(f"  Saved: {filepath}")
-                plt.close(fig)
 
         # Generate gain map figures (one figure with all parameter pairs)
         if "gain_maps" in results:
@@ -1019,11 +1123,10 @@ class BifurcationVisualizer:
             if param_pairs:
                 fig = self.create_gain_map_figure(gain_map_results, param_pairs, stages, mode)
 
-                filename = f"gain_maps_{mode}.svg"
+                filename = f"gain_maps_{mode}.pdf"
                 filepath = output_dir / filename
-                fig.savefig(filepath, format="svg", bbox_inches="tight")
+                save_figure(fig, filepath)
                 print(f"  Saved: {filepath}")
-                plt.close(fig)
 
         # Generate gain spectrum figures (one figure with all parameters)
         if "gain_spectra" in results:
@@ -1034,10 +1137,9 @@ class BifurcationVisualizer:
             if param_keys:
                 fig = self.create_gain_spectrum_figure(spectrum_results, param_keys, stages)
 
-                filename = "gain_spectra.svg"
+                filename = "gain_spectra.pdf"
                 filepath = output_dir / filename
-                fig.savefig(filepath, format="svg", bbox_inches="tight", dpi=300)
+                save_figure(fig, filepath)
                 print(f"  Saved: {filepath}")
-                plt.close(fig)
 
         print(f"\nAll figures saved to: {output_dir}")

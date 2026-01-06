@@ -4,7 +4,12 @@ All constants for both analysis and visualization live here.
 Import from here, not from visualizer.py or other modules.
 """
 
-from src.analysis.common import get_output_dir
+from src.analysis.common import (
+    DOUBLE_COLUMN_WIDTH_MM,
+    FIGURE_FONT_SIZES_PT,
+    compute_figsize_inches,
+    get_output_dir,
+)
 from src.model.config import CELL_TYPES, DT, LAYERS
 
 # Re-export for convenience (single import point)
@@ -71,25 +76,28 @@ REGIME_LABELS = [
 ]
 
 # Publication-quality font and figure settings
+# Figure sizes are defined in mm (Nature double-column standard) and converted to inches
 FONT_CONFIG = {
-    "font_family": "Latin Modern Sans",
+    "font_family": "DejaVu Sans",  # Matches centralized style
     "font_sizes": {
-        "title": 18,
-        "ylabel": 16,
-        "colorbar": 14,
-        "colorbar_ticks": 12,
-        "tick_labels": 12,
-        "condition_labels": 14,
+        "title": FIGURE_FONT_SIZES_PT["figure_title"],
+        "ylabel": FIGURE_FONT_SIZES_PT["axis_label"],
+        "colorbar": FIGURE_FONT_SIZES_PT["colorbar_label"],
+        "colorbar_ticks": FIGURE_FONT_SIZES_PT["colorbar_tick"],
+        "tick_labels": FIGURE_FONT_SIZES_PT["tick_label"],
+        "condition_labels": FIGURE_FONT_SIZES_PT["axes_title"],
     },
     "figure_sizes": {
-        "layer_wise": (16, 4),
-        "column_wise": (8, 10),
-        "effectiveness": (5, 5),
-        "effectiveness_2x2": (8, 8),
-        "phase_diagram": (16, 4),
-        "regime_percentages": (10, 10),
-        "heatmap_single": (8, 6),
-        "heatmap_dual": (10, 5),
+        # All sizes in inches (converted from mm for Matplotlib)
+        # Widths use double-column (183 mm) or appropriate fraction
+        "layer_wise": compute_figsize_inches(DOUBLE_COLUMN_WIDTH_MM, 40.0),  # Wide, short
+        "column_wise": compute_figsize_inches(90.0, 120.0),  # Narrow, tall
+        "effectiveness": compute_figsize_inches(90.0, 90.0),  # Square
+        "effectiveness_2x2": compute_figsize_inches(DOUBLE_COLUMN_WIDTH_MM, DOUBLE_COLUMN_WIDTH_MM),  # Square, full width
+        "phase_diagram": compute_figsize_inches(DOUBLE_COLUMN_WIDTH_MM, 40.0),  # Wide, short
+        "regime_percentages": compute_figsize_inches(120.0, 120.0),  # Square, medium
+        "heatmap_single": compute_figsize_inches(90.0, 70.0),  # Medium rectangle
+        "heatmap_dual": compute_figsize_inches(120.0, 60.0),  # Wide rectangle
     },
     "dpi": 300,
     "colorbar_width": 0.008,

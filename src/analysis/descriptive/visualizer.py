@@ -11,7 +11,7 @@ from typing import Any
 
 from tqdm import tqdm
 
-from src.analysis.common import DEVELOPMENTAL_STAGES
+from src.analysis.common import DEVELOPMENTAL_STAGES, apply_matplotlib_style, save_figure
 
 from .config import (
     ANALYSIS_PARAMS,
@@ -47,20 +47,7 @@ class ActivityVisualizer:
 
     def _setup_matplotlib_style(self) -> None:
         """Configure matplotlib style for consistent poster-format plots."""
-        plt.rcParams.update(
-            {
-                "font.family": "sans-serif",
-                "font.sans-serif": ["Latin Modern Sans", "Arial", "DejaVu Sans", "Helvetica"],
-                "font.size": FONT_SIZES["tick_labels"],
-                "axes.titlesize": FONT_SIZES["ylabel"],
-                "axes.labelsize": FONT_SIZES["ylabel"],
-                "figure.titlesize": FONT_SIZES["title"],
-                "axes.grid": False,
-                "figure.dpi": DPI,
-                "mathtext.fontset": "cm",
-                "axes.unicode_minus": False,
-            }
-        )
+        apply_matplotlib_style(overrides={"axes.grid": False})
 
     def _convert_time_to_seconds(self, time_ms: list[float]) -> np.ndarray:
         """Convert time from milliseconds to seconds."""
@@ -306,7 +293,7 @@ class ActivityVisualizer:
                     ax.set_xticks([])
 
         self._add_colorbar_to_heatmap(fig, axes, images)
-        self._save_plot("activity_heatmaps.svg")
+        self._save_plot("activity_heatmaps.pdf")
 
     def _calculate_global_ylim(self, results: dict[str, Any], data_key: str) -> list[float]:
         """Calculate global y-limits for consistent scaling across subplots."""
@@ -361,7 +348,7 @@ class ActivityVisualizer:
                 self._format_time_axis(ax, time, row, len(POSTER_CELL_TYPES))
 
         self._setup_subplot_layout(fig, axes, len(POSTER_CELL_TYPES))
-        self._save_plot("average_firing_rates.svg")
+        self._save_plot("average_firing_rates.pdf")
 
     def create_active_cell_fraction_plots(self, results: dict[str, Any]) -> None:
         """Create 3x4 active cell fraction timeseries plots."""
@@ -383,7 +370,7 @@ class ActivityVisualizer:
                 self._format_time_axis(ax, time, row, len(POSTER_CELL_TYPES))
 
         self._setup_subplot_layout(fig, axes, len(POSTER_CELL_TYPES))
-        self._save_plot("active_cell_fractions.svg")
+        self._save_plot("active_cell_fractions.pdf")
 
     def _plot_trend_with_errorbars(
         self, ax: plt.Axes, x_pos: list[int], means: list[float], color: str, label: str = None
@@ -534,7 +521,7 @@ class ActivityVisualizer:
 
         plt.tight_layout()
         self._add_trend_legends(fig, axes)
-        self._save_plot("correlation_trends.svg")
+        self._save_plot("correlation_trends.pdf")
 
     def _collect_correlation_values(self, results: dict[str, Any]) -> list[float]:
         """Collect all correlation values for consistent scaling (excluding NaN)."""
@@ -636,7 +623,7 @@ class ActivityVisualizer:
 
         plt.tight_layout()
         self._add_trend_legends(fig, axes)
-        self._save_plot("synchronous_event_trends.svg")
+        self._save_plot("synchronous_event_trends.pdf")
 
     def _collect_event_values(self, results: dict[str, Any], sim_duration: float) -> list[float]:
         """Collect all event values (as rates) for consistent scaling."""
@@ -666,10 +653,12 @@ class ActivityVisualizer:
 
     def _save_plot(self, filename: str) -> None:
         """Save plot with consistent settings."""
-        plt.savefig(
-            os.path.join(self.output_dir, filename), format="svg", dpi=DPI, bbox_inches="tight"
-        )
-        plt.close()
+        # Ensure .pdf extension
+        if not filename.endswith(".pdf"):
+            filename = filename.replace(".svg", ".pdf")
+        filepath = os.path.join(self.output_dir, filename)
+        fig = plt.gcf()  # Get current figure
+        save_figure(fig, filepath, dpi=DPI)
 
     def generate_all_plots(self, results: dict[str, Any]) -> None:
         """Generate all visualization plots."""

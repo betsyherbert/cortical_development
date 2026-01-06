@@ -12,9 +12,12 @@ ANALYSIS_PARAMS = {
     "n_modes": 10,  # Number of Fourier modes to scan in each direction
     "tolerance": 1e-6,  # Convergence tolerance for steady state finder
     "max_iters": 1000,  # Maximum iterations for steady state finder
-    "grid_size": 20,  # Standard grid size (number of grid points) for Fourier normalization
-    "anatomical_grid_size": ANATOMICAL_GRID_SIZE,  # Anatomical size in μm (default: 1000 μm)
+    "grid_size": 50,  # Standard grid size (number of grid points) for Fourier normalization
+    "anatomical_grid_size": ANATOMICAL_GRID_SIZE,  # Anatomical size in μm
 }
+
+# Operating point configuration
+THALAMIC_MAGNITUDE = 0.2  # Thalamic input magnitude for steady-state computation (used by both stability and gain maps)
 
 # Output directory (use shared helper for consistency)
 OUTPUT_DIR = str(get_output_dir("bifurcation", create=False))
@@ -85,7 +88,7 @@ SCANNABLE_PARAMETERS = {
     # Time constants
     "tau_E": ParameterSpec(
         path=["time_constants", "E"],
-        display_name="τ_E",
+        display_name=r"$\tau_{\mathrm{E}}$",
         units="ms",
         use_ratio=False,
         # Must include preset values (E: 25–50 ms across stages)
@@ -93,7 +96,7 @@ SCANNABLE_PARAMETERS = {
     ),
     "tau_SST": ParameterSpec(
         path=["time_constants", "SST"],
-        display_name="τ_SST",
+        display_name=r"$\tau_{\mathrm{SST}}$",
         units="ms",
         use_ratio=True,
         reference_param="tau_E",
@@ -102,7 +105,7 @@ SCANNABLE_PARAMETERS = {
     ),
     "tau_PV": ParameterSpec(
         path=["time_constants", "PV"],
-        display_name="τ_PV",
+        display_name=r"$\tau_{\mathrm{PV}}$",
         units="ms",
         use_ratio=True,
         reference_param="tau_E",
@@ -112,7 +115,7 @@ SCANNABLE_PARAMETERS = {
     # Spatial widths (outgoing connections) - in μm
     "sigma_E": ParameterSpec(
         path=["outgoing_widths", "E"],
-        display_name="σ_E",
+        display_name=r"$\sigma_{\mathrm{E}}$",
         units="μm",
         use_ratio=False,
         # Must include preset values (E: 200–300 μm across stages)
@@ -120,7 +123,7 @@ SCANNABLE_PARAMETERS = {
     ),
     "sigma_SST": ParameterSpec(
         path=["outgoing_widths", "SST"],
-        display_name="σ_SST",
+        display_name=r"$\sigma_{\mathrm{SST}}$",
         units="μm",
         use_ratio=True,
         reference_param="sigma_E",
@@ -129,7 +132,7 @@ SCANNABLE_PARAMETERS = {
     ),
     "sigma_PV": ParameterSpec(
         path=["outgoing_widths", "PV"],
-        display_name="σ_PV",
+        display_name=r"$\sigma_{\mathrm{PV}}$",
         units="μm",
         use_ratio=True,
         reference_param="sigma_E",
@@ -139,21 +142,21 @@ SCANNABLE_PARAMETERS = {
     # Thalamic widths (for spectrum analysis) - in μm
     "thalamic_width_E": ParameterSpec(
         path=["thalamic_widths", "E"],
-        display_name="σ_thal→E",
+        display_name=r"$\sigma_{\mathrm{thal}\to\mathrm{E}}$",
         units="μm",
         use_ratio=False,
         default_range=(25.0, 500.0),
     ),
     "thalamic_width_SST": ParameterSpec(
         path=["thalamic_widths", "SST"],
-        display_name="σ_thal→SST",
+        display_name=r"$\sigma_{\mathrm{thal}\to\mathrm{SST}}$",
         units="μm",
         use_ratio=False,
         default_range=(25.0, 500.0),
     ),
     "thalamic_width_PV": ParameterSpec(
         path=["thalamic_widths", "PV"],
-        display_name="σ_thal→PV",
+        display_name=r"$\sigma_{\mathrm{thal}\to\mathrm{PV}}$",
         units="μm",
         use_ratio=False,
         default_range=(25.0, 500.0),

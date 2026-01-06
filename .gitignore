@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-dev_env/
 build/
 develop-eggs/
 dist/
@@ -23,9 +22,26 @@ wheels/
 resources/
 
 # Virtual Environment
+.venv/
 dev_env/
 venv/
 ENV/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.ruff_cache/
+.tox/
+
+# Environment variables (security)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
 
 # IDE
 .idea/

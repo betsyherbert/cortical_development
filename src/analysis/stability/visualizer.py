@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import BoundaryNorm, ListedColormap
 
-from src.analysis.common import DEVELOPMENTAL_STAGES
+from src.analysis.common import DEVELOPMENTAL_STAGES, apply_matplotlib_style, save_figure
 from src.model.config import GRID_SIZE
 
 from .config import (
@@ -48,23 +48,13 @@ QUADRANT_ALPHA = 0.2
 PHASE_DIAGRAM_ALPHA = 0.4
 PHASE_DIAGRAM_MARKER_SIZE = 10
 
-# Configure matplotlib for publication styling
-plt.rcParams["font.family"] = "sans-serif"
-plt.rcParams["font.sans-serif"] = ["Latin Modern Sans", "Arial", "DejaVu Sans", "Helvetica"]
-plt.rcParams["font.size"] = FONT_SIZES["tick_labels"]
-plt.rcParams["axes.labelsize"] = FONT_SIZES["tick_labels"]
-plt.rcParams["xtick.labelsize"] = FONT_SIZES["tick_labels"]
-plt.rcParams["ytick.labelsize"] = FONT_SIZES["tick_labels"]
-plt.rcParams["legend.fontsize"] = FONT_SIZES["colorbar"]
-plt.rcParams["mathtext.fontset"] = "cm"
-plt.rcParams["axes.unicode_minus"] = False
-
 
 class StabilityVisualizer:
     """Creates publication-quality visualizations for stability analysis results."""
 
     def __init__(self):
         """Initialize visualizer with publication-quality parameters and color schemes."""
+        apply_matplotlib_style()
         os.makedirs(OUTPUT_DIR, exist_ok=True)
 
         # Font and figure configuration
@@ -244,11 +234,9 @@ class StabilityVisualizer:
 
     def _save_figure(self, fig, regime: str, snapshot_idx: int, plot_type: str):
         """Save figure to appropriate directory."""
-        del fig  # Unused - plt.savefig uses current figure
-        filename = f"{plot_type}_{regime}_snapshot{snapshot_idx}.svg"
+        filename = f"{plot_type}_{regime}_snapshot{snapshot_idx}.pdf"
         filepath = os.path.join(self.snapshots_dir, filename)
-        plt.savefig(filepath, format="svg", dpi=self.dpi, bbox_inches="tight", facecolor="white")
-        plt.close()
+        save_figure(fig, filepath, dpi=self.dpi)
         print(f"Saved figure: {filepath}")
 
     def _add_layer_wise_colorbars(self, fig, axes, ims):
@@ -648,9 +636,8 @@ class StabilityVisualizer:
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.3, wspace=0.3)
 
-        filepath = os.path.join(self.summary_dir, "regime_percentages.svg")
-        plt.savefig(filepath, format="svg", dpi=self.dpi, bbox_inches="tight", facecolor="white")
-        plt.close()
+        filepath = os.path.join(self.summary_dir, "regime_percentages.pdf")
+        save_figure(fig, filepath, dpi=self.dpi)
         print(f"Saved figure: {filepath}")
 
     def _calculate_inhibition_effectiveness(self, results: dict) -> dict:
@@ -755,7 +742,7 @@ class StabilityVisualizer:
 
         effectiveness = self._calculate_inhibition_effectiveness(results)
 
-        _, ax = plt.subplots(1, 1, figsize=self.figure_sizes["effectiveness"])
+        fig, ax = plt.subplots(1, 1, figsize=self.figure_sizes["effectiveness"])
         self._plot_effectiveness_timeseries(
             ax,
             effectiveness,
@@ -764,9 +751,8 @@ class StabilityVisualizer:
         )
 
         plt.tight_layout()
-        filepath = os.path.join(self.summary_dir, "inhibition_effectiveness.svg")
-        plt.savefig(filepath, format="svg", dpi=self.dpi, bbox_inches="tight", facecolor="white")
-        plt.close()
+        filepath = os.path.join(self.summary_dir, "inhibition_effectiveness.pdf")
+        save_figure(fig, filepath, dpi=self.dpi)
         print(f"Saved figure: {filepath}")
 
     def create_layer_effectiveness_plot(self, results: dict):
@@ -778,7 +764,7 @@ class StabilityVisualizer:
         # Use standardized layer colors
         LAYER_COLORS_CLEAN = STANDARD_COLORS["layers"]
 
-        _, ax = plt.subplots(1, 1, figsize=self.figure_sizes["effectiveness"])
+        fig, ax = plt.subplots(1, 1, figsize=self.figure_sizes["effectiveness"])
         x_positions = range(len(DEVELOPMENTAL_STAGES))
 
         # Plot each layer with updated colors and markers
@@ -847,9 +833,8 @@ class StabilityVisualizer:
         self._set_custom_yticks(ax)
 
         plt.tight_layout()
-        filepath = os.path.join(self.summary_dir, "layer_specific_inhibition_effectiveness.svg")
-        plt.savefig(filepath, format="svg", dpi=self.dpi, bbox_inches="tight", facecolor="white")
-        plt.close()
+        filepath = os.path.join(self.summary_dir, "layer_specific_inhibition_effectiveness.pdf")
+        save_figure(fig, filepath, dpi=self.dpi)
         print(f"Saved figure: {filepath}")
 
     def _calculate_layer_effectiveness(self, results: dict) -> dict:
@@ -1055,9 +1040,8 @@ class StabilityVisualizer:
             ax.set_title(stage, fontsize=self.font_sizes["ylabel"], fontweight="bold")
 
         plt.tight_layout()
-        filepath = os.path.join(self.summary_dir, "phase_diagrams.svg")
-        plt.savefig(filepath, format="svg", dpi=self.dpi, bbox_inches="tight", facecolor="white")
-        plt.close()
+        filepath = os.path.join(self.summary_dir, "phase_diagrams.pdf")
+        save_figure(fig, filepath, dpi=self.dpi)
         print(f"Saved figure: {filepath}")
 
     def generate_all_figures(self, results: dict):
@@ -1291,7 +1275,7 @@ class StabilityVisualizer:
         effectiveness = self._calculate_celltype_effectiveness(results)
 
         # Create 2x2 subplot layout
-        _, axes = plt.subplots(2, 2, figsize=self.figure_sizes["effectiveness_2x2"])
+        fig, axes = plt.subplots(2, 2, figsize=self.figure_sizes["effectiveness_2x2"])
         x_positions = range(len(DEVELOPMENTAL_STAGES))
 
         # Use standardized colors
@@ -1441,9 +1425,8 @@ class StabilityVisualizer:
 
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.3, wspace=0.3)
-        filepath = os.path.join(self.summary_dir, "celltype_specific_inhibition_effectiveness.svg")
-        plt.savefig(filepath, format="svg", dpi=self.dpi, bbox_inches="tight", facecolor="white")
-        plt.close()
+        filepath = os.path.join(self.summary_dir, "celltype_specific_inhibition_effectiveness.pdf")
+        save_figure(fig, filepath, dpi=self.dpi)
         print(f"Saved figure: {filepath}")
 
     def create_layer_specific_heatmaps(self, results: dict):
@@ -1507,7 +1490,7 @@ class StabilityVisualizer:
                             ]["mean"]
 
         # Create figure with two subplots
-        _, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figure_sizes["heatmap_dual"])
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figure_sizes["heatmap_dual"])
 
         # Make both subplots square
         ax1.set_aspect("equal", adjustable="box")
@@ -1582,9 +1565,6 @@ class StabilityVisualizer:
         plt.subplots_adjust(wspace=0.4)
 
         # Save effectiveness heatmap
-        filepath_eff = os.path.join(self.summary_dir, "layer_specific_effectiveness_driven.svg")
-        plt.savefig(
-            filepath_eff, format="svg", dpi=self.dpi, bbox_inches="tight", facecolor="white"
-        )
-        plt.close()
+        filepath_eff = os.path.join(self.summary_dir, "layer_specific_effectiveness_driven.pdf")
+        save_figure(fig, filepath_eff, dpi=self.dpi)
         print(f"Saved effectiveness heatmap: {filepath_eff}")

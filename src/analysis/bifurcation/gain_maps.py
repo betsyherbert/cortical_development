@@ -27,6 +27,7 @@ from .config import (
     SPECTRUM_K_MAX,
     SPECTRUM_PARAM_RESOLUTION,
     SPECTRUM_PARAM_SWEEP_RANGE,
+    THALAMIC_MAGNITUDE,
     ParameterSpec,
 )
 from .core import (
@@ -52,29 +53,22 @@ def compute_gain_for_point(preset: dict, verbose: bool = False) -> tuple[float, 
 
     Returns:
         Tuple of (k_critical, max_gain, is_flat)
-        - k_critical: Wavenumber with maximum gain G(k)
-        - max_gain: Maximum gain value across all k
+        - k_critical: Wavenumber with maximum gain G(k) (NaN if steady state failed)
+        - max_gain: Maximum gain value across all k (NaN if steady state failed)
         - is_flat: True if gain spectrum is flat (no dominant k)
     """
     network = NetworkModel(preset, layers=ALL_LAYERS)
     finder = SteadyStateFinder(network)
 
-    # Use weak thalamic input to avoid divergence
-    thalamic_magnitude = 0.2
-    thalamic_input = network.compute_thalamic_input(thalamic_magnitude)
+    # Use consistent thalamic input magnitude from config
+    thalamic_input = network.compute_thalamic_input(THALAMIC_MAGNITUDE)
 
     # Find steady state
     r_star, status = finder.find_steady_state(thalamic_input=thalamic_input)
 
-    # Handle failed convergence: use minimal activity state
+    # Handle failed convergence: return NaN to mark invalid parameter point
     if status in ["diverged", "not_converged"] or np.any(r_star > 100):
-        r_star = np.ones(len(network.tau)) * 0.15
-        weak_input = network.mu + thalamic_input * 0.1
-        for _ in range(10):
-            input_vec = network.A @ r_star + weak_input
-            r_new = np.maximum(0.0, network.gain * input_vec)
-            r_star = 0.9 * r_star + 0.1 * r_new
-            r_star = np.clip(r_star, 0.05, 0.5)
+        return np.nan, np.nan, False
 
     analyzer = StabilityAnalyzer(network, r_star)
 
@@ -165,9 +159,9 @@ def compute_gain_for_point(preset: dict, verbose: bool = False) -> tuple[float, 
         is_flat = gain_range < 0.2
     else:
         # Failed computation: all modes skipped or singular
-        k_critical = 0.0
+        k_critical = np.nan
         max_gain = np.nan
-        is_flat = True  # Mark as flat (will be grey in visualization)
+        is_flat = False
 
     return k_critical, max_gain, is_flat
 
@@ -416,22 +410,15 @@ def compute_gain_spectrum(preset: dict, k_values: np.ndarray, verbose: bool = Fa
     network = NetworkModel(preset, layers=ALL_LAYERS)
     finder = SteadyStateFinder(network)
 
-    # Use weak thalamic input to avoid divergence
-    thalamic_magnitude = 0.2
-    thalamic_input = network.compute_thalamic_input(thalamic_magnitude)
+    # Use consistent thalamic input magnitude from config
+    thalamic_input = network.compute_thalamic_input(THALAMIC_MAGNITUDE)
 
     # Find steady state
     r_star, status = finder.find_steady_state(thalamic_input=thalamic_input)
 
-    # Handle failed convergence
+    # Handle failed convergence: return all NaN to mark invalid parameter point
     if status in ["diverged", "not_converged"] or np.any(r_star > 100):
-        r_star = np.ones(len(network.tau)) * 0.15
-        weak_input = network.mu + thalamic_input * 0.1
-        for _ in range(10):
-            input_vec = network.A @ r_star + weak_input
-            r_new = np.maximum(0.0, network.gain * input_vec)
-            r_star = 0.9 * r_star + 0.1 * r_new
-            r_star = np.clip(r_star, 0.05, 0.5)
+        return np.full(len(k_values), np.nan)
 
     analyzer = StabilityAnalyzer(network, r_star)
 

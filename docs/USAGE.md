@@ -19,7 +19,7 @@ Analyzes network stability and gain through eigenvalue analysis and parameter sp
 ### Basic Usage
 
 ```bash
-# Run complete analysis (all stages, all analyses)
+# Run complete analysis (all stages, all analyses, both modes)
 python -m src.analysis.bifurcation
 
 # Run only stability analysis
@@ -36,7 +36,7 @@ python -m src.analysis.bifurcation --analysis gain_spectra
 
 - `--analysis`: Type of analysis (`all`, `stability`, `gain`, `gain_maps`, `gain_spectra`)
 - `--stages`: Developmental stages to analyze (`P0`, `P5`, `P10`, `P15`)
-- `--mode`: Parameter range mode (`fixed_absolute`, `fixed_ratio`)
+- `--mode`: Parameter range mode (`fixed_absolute`, `fixed_ratio`, `all`). Default: `all` (runs both modes)
 - `--n-processes`: Number of parallel processes (default: cpu_count - 1)
 - `--output-dir`: Custom output directory
 - `--no-viz`: Skip visualization generation
@@ -47,8 +47,11 @@ python -m src.analysis.bifurcation --analysis gain_spectra
 # Run for specific stages
 python -m src.analysis.bifurcation --stages P0 P5
 
-# Use fixed ratio mode
+# Use fixed ratio mode only
 python -m src.analysis.bifurcation --mode fixed_ratio
+
+# Use fixed absolute mode only
+python -m src.analysis.bifurcation --mode fixed_absolute
 
 # Skip visualization
 python -m src.analysis.bifurcation --no-viz

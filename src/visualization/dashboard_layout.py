@@ -118,6 +118,11 @@ SLIDER_CONTAINER_STYLE = {
 GRAPH_CONFIG = {"displayModeBar": False}
 
 GRAPH_LAYOUT = {
+    "font": dict(
+        family="Helvetica, Arial, DejaVu Sans, sans-serif",
+        size=AXIS_FONT_SIZE,
+        color="#2c3e50",
+    ),
     "margin": dict(l=0, r=0, t=0, b=0),
     "height": 150,
     "width": 150,
