@@ -282,7 +282,7 @@ class DashboardApp:
             "background_input": background_input,
             "outgoing_widths": outgoing_widths,
             "thalamic_widths": thalamic_widths,
-            "thalamic_alpha": THALAMIC_ALPHA,  # Not used in bifurcation analysis but included
+            "thalamic_alpha": self.simulation.preset.get("thalamic_alpha", THALAMIC_ALPHA),
         }
 
         return preset
@@ -1267,8 +1267,8 @@ class DashboardApp:
             for cell_type, value in preset["background_input"].items():
                 self.simulation.set_background_input(cell_type, value)
 
-        # Update thalamic developmental parameters
-        self.simulation.update_thalamic_params(preset)
+        # Note: Thalamic burst statistics are controlled by alpha parameter
+        # passed to simulation.update(), not by preset parameters
 
     def get_connection_key(self, source_layer, source_cell, target_layer, target_cell):
         """Generate a connection key based on source and target information."""

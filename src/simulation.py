@@ -44,7 +44,7 @@ class CorticalSimulation:
         # Initialize circuit
         self.circuit = CorticalCircuit(grid_size)
 
-        # Initialize thalamus (developmental params will be set by apply_preset)
+        # Initialize thalamus (burst stats controlled by alpha in update())
         self.thalamus = ThalamicInput(grid_size=grid_size)
 
         # Apply the preset to initialize all parameters from a single source of truth
@@ -59,7 +59,8 @@ class CorticalSimulation:
         """Update the simulation state for one step.
 
         Args:
-            alpha: Weight of intrinsic vs sensory thalamic activity (0-1)
+            alpha: Developmental time parameter [0=early, 1=late] controlling
+                   thalamic burst statistics (spatial width, duration, frequency)
 
         Returns:
             Dictionary containing all population activities
@@ -177,25 +178,13 @@ class CorticalSimulation:
         """
         self.circuit.set_background_input(cell_type, value)
 
-    def update_thalamic_params(self, preset: dict) -> None:
-        """Update thalamic parameters from a new developmental preset.
-
-        Args:
-            preset: Developmental preset dictionary with thalamic parameters
-        """
-        self.preset = preset
-        self.thalamus.update_developmental_params(
-            thalamic_spatial_scales=preset.get("thalamic_spatial_scales"),
-            thalamic_temporal_scales=preset.get("thalamic_temporal_scales"),
-            thalamic_modules=preset.get("thalamic_modules"),
-        )
-
     def apply_preset(self, preset: dict) -> None:
         """Apply a developmental preset to configure all simulation parameters.
 
         This is the single canonical way to configure simulation parameters from
         a preset. It sets connection strengths, widths, time constants, background
-        input, strength scaling, and thalamic parameters.
+        input, and strength scaling. Thalamic burst statistics are controlled by
+        the alpha parameter passed to update().
 
         Args:
             preset: Developmental preset dictionary (e.g., P0_PRESET, P5_PRESET)
@@ -214,10 +203,3 @@ class CorticalSimulation:
         if "background_input" in preset:
             for cell_type, value in preset["background_input"].items():
                 self.set_background_input(cell_type, value)
-
-        # Apply thalamic developmental parameters
-        self.thalamus.update_developmental_params(
-            thalamic_spatial_scales=preset.get("thalamic_spatial_scales"),
-            thalamic_temporal_scales=preset.get("thalamic_temporal_scales"),
-            thalamic_modules=preset.get("thalamic_modules"),
-        )

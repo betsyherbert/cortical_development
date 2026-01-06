@@ -100,13 +100,11 @@ CONNECTIONS = [
 # Thalamic Input Parameters
 # ------------------------------------------------------------------------------
 
-# Fixed amplitude parameters
-THALAMIC_INTRINSIC_AMP = 1.0  # Fixed amplitude of intrinsic bursts
-THALAMIC_SENSORY_AMP = 1.0  # Fixed amplitude of sensory bursts
+# Amplitude range for thalamic bursts (min, max)
+THALAMIC_AMP_RANGE = (0.6, 1.0)
 
 # Module lattice parameters for spatial organization
 THALAMIC_N_MODULES_PER_DIM = 4  # Number of modules per dimension (creates 4x4 grid)
-THALAMIC_JITTER_FACTOR = 0.4  # Jitter factor for module centers (× module spacing)
 
 # ------------------------------------------------------------------------------
 # Initial Network Parameters
@@ -118,7 +116,7 @@ INITIAL_TIME_CONSTANTS = P0_PRESET["time_constants"]
 INITIAL_BACKGROUND_INPUT = P0_PRESET["background_input"]
 THALAMIC_ALPHA = P0_PRESET[
     "thalamic_alpha"
-]  # Balance between intrinsic (0) and sensory (1) thalamic activity
+]  # Developmental time parameter [0=early, 1=late]
 
 # ------------------------------------------------------------------------------
 # Visualization Settings

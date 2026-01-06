@@ -530,10 +530,10 @@ def create_strength_scaling_sliders() -> html.Div:
 
 
 def create_input_controls() -> dbc.Row:
-    """Create the input control sliders for intrinsic/sensory balance.
+    """Create the input control slider for developmental time (alpha).
 
     Returns:
-        Dash Row with alpha slider for thalamic input balance
+        Dash Row with alpha slider for thalamic developmental stage
     """
     return dbc.Row(
         [
@@ -541,8 +541,8 @@ def create_input_controls() -> dbc.Row:
                 [
                     dbc.Row(
                         [
-                            dbc.Col("Intrinsic", className="text-start", width=6),
-                            dbc.Col("Sensory", className="text-end", width=6),
+                            dbc.Col("Early", className="text-start", width=6),
+                            dbc.Col("Late", className="text-end", width=6),
                         ],
                         className="mb-2",
                     ),
