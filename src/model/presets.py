@@ -24,25 +24,27 @@ P0_PRESET = {
     "thalamic_alpha": 0.1,
     "connection_strengths": {
         # ---------- L2/3 (within L2/3) ----------
-        "L23_E_to_L23_E": 0.05,
-        "L23_E_to_L23_SST": 0.1,
+        "L23_E_to_L23_E": 0.0,
+        "L23_E_to_L23_SST": 0.0,
         "L23_E_to_L23_PV": 0.0,
         "L23_SST_to_L23_E": 0.0,
         "L23_SST_to_L23_PV": 0.0,
         "L23_PV_to_L23_E": 0.0,
         "L23_PV_to_L23_SST": 0.0,
         "L23_PV_to_L23_PV": 0.0,
+
         # ---------- L2/3 to L4 ----------
         "L23_E_to_L4_E": 0.0,
         "L23_E_to_L4_SST": 0.0,
-        "L23_E_to_L4_PV": 0.5,
+        "L23_E_to_L4_PV": 0.0,
         "L23_SST_to_L4_E": 0.0,
         "L23_SST_to_L4_PV": 0.0,
         "L23_PV_to_L4_E": 0.0,
         "L23_PV_to_L4_SST": 0.0,
         "L23_PV_to_L4_PV": 0.0,
+
         # ---------- L2/3 to L5 ----------
-        "L23_E_to_L5_E": 0.1,
+        "L23_E_to_L5_E": 0.0,
         "L23_E_to_L5_SST": 0.0,
         "L23_E_to_L5_PV": 0.0,
         "L23_SST_to_L5_E": 0.0,
@@ -50,17 +52,19 @@ P0_PRESET = {
         "L23_PV_to_L5_E": 0.0,
         "L23_PV_to_L5_SST": 0.0,
         "L23_PV_to_L5_PV": 0.0,
+
         # ---------- L4 (within L4) ----------
-        "L4_E_to_L4_E": 0.05,
-        "L4_E_to_L4_SST": 0.1,
+        "L4_E_to_L4_E": 0.1,
+        "L4_E_to_L4_SST": 0.0,
         "L4_E_to_L4_PV": 0.0,
-        "L4_SST_to_L4_E": 0.0,
+        "L4_SST_to_L4_E": 0.1,
         "L4_SST_to_L4_PV": 0.0,
         "L4_PV_to_L4_E": 0.0,
         "L4_PV_to_L4_SST": 0.0,
         "L4_PV_to_L4_PV": 0.0,
+
         # ---------- L4 to L2/3 ----------
-        "L4_E_to_L23_E": 0.1,
+        "L4_E_to_L23_E": 0.0,
         "L4_E_to_L23_SST": 0.0,
         "L4_E_to_L23_PV": 0.0,
         "L4_SST_to_L23_E": 0.0,
@@ -68,38 +72,42 @@ P0_PRESET = {
         "L4_PV_to_L23_E": 0.0,
         "L4_PV_to_L23_SST": 0.0,
         "L4_PV_to_L23_PV": 0.0,
+
         # ---------- L4 to L5 ----------
-        "L4_E_to_L5_E": 0.1,
-        "L4_E_to_L5_SST": 0.4,
+        "L4_E_to_L5_E": 0.0,
+        "L4_E_to_L5_SST": 0.0,
         "L4_E_to_L5_PV": 0.0,
         "L4_SST_to_L5_E": 0.0,
         "L4_SST_to_L5_PV": 0.0,
         "L4_PV_to_L5_E": 0.0,
         "L4_PV_to_L5_SST": 0.0,
         "L4_PV_to_L5_PV": 0.0,
+
         # ---------- L5 (within L5) ----------
-        "L5_E_to_L5_E": 0.05,
+        "L5_E_to_L5_E": 0.1,
         "L5_E_to_L5_SST": 0.1,
-        "L5_E_to_L5_PV": 0.1,
-        "L5_SST_to_L5_E": 0.0,
-        "L5_SST_to_L5_PV": 0.0,
+        "L5_E_to_L5_PV": 0.0,
+        "L5_SST_to_L5_E": -0.1,
+        "L5_SST_to_L5_PV": -0.1,
         "L5_PV_to_L5_E": 0.0,
         "L5_PV_to_L5_SST": 0.0,
         "L5_PV_to_L5_PV": 0.0,
+
         # ---------- L5 to L2/3 ----------
-        "L5_E_to_L23_E": 0.5,
-        "L5_E_to_L23_SST": 0.3,
-        "L5_E_to_L23_PV": 0.3,
+        "L5_E_to_L23_E": 0.0,
+        "L5_E_to_L23_SST": 0.0,
+        "L5_E_to_L23_PV": 0.0,
         "L5_SST_to_L23_E": 0.0,
         "L5_SST_to_L23_PV": 0.0,
         "L5_PV_to_L23_E": 0.0,
         "L5_PV_to_L23_SST": 0.0,
         "L5_PV_to_L23_PV": 0.0,
+
         # ---------- L5 to L4 ----------
-        "L5_E_to_L4_E": 0.1,
-        "L5_E_to_L4_SST": 0.1,
+        "L5_E_to_L4_E": 0.0,
+        "L5_E_to_L4_SST": 0.0,
         "L5_E_to_L4_PV": 0.0,
-        "L5_SST_to_L4_E": -0.4,
+        "L5_SST_to_L4_E": -0.2,   # transient early SST inhibition
         "L5_SST_to_L4_PV": 0.0,
         "L5_PV_to_L4_E": 0.0,
         "L5_PV_to_L4_SST": 0.0,
@@ -109,9 +117,9 @@ P0_PRESET = {
         "thalamus_to_L23_SST": 0.0,
         "thalamus_to_L23_PV":  0.0,
         "thalamus_to_L4_E":    0.1,
-        "thalamus_to_L4_SST":  0.0,
+        "thalamus_to_L4_SST":  0.1,
         "thalamus_to_L4_PV":   0.0,
-        "thalamus_to_L5_E":    0.1,
+        "thalamus_to_L5_E":    0.2,
         "thalamus_to_L5_SST":  0.3,
         "thalamus_to_L5_PV":   0.1
     },
@@ -129,84 +137,92 @@ P5_PRESET = {
     "thalamic_alpha": 0.3,
     "connection_strengths": {
         # ---------- L2/3 (within L2/3) ----------
-        "L23_E_to_L23_E": 0.3,
-        "L23_E_to_L23_SST": 0.3,
-        "L23_E_to_L23_PV": 0.2,
-        "L23_SST_to_L23_E": -0.2,
-        "L23_SST_to_L23_PV": -0.1,
+        "L23_E_to_L23_E": 0.05,
+        "L23_E_to_L23_SST": 0.1,
+        "L23_E_to_L23_PV": 0.0,
+        "L23_SST_to_L23_E": 0.0,
+        "L23_SST_to_L23_PV": 0.0,
         "L23_PV_to_L23_E": 0.0,
-        "L23_PV_to_L23_SST": -0.2,
-        "L23_PV_to_L23_PV": -0.2,
+        "L23_PV_to_L23_SST": 0.0,
+        "L23_PV_to_L23_PV": 0.0,
+
         # ---------- L2/3 to L4 ----------
         "L23_E_to_L4_E": 0.1,
         "L23_E_to_L4_SST": 0.1,
-        "L23_E_to_L4_PV": 0.4,
+        "L23_E_to_L4_PV": 0.1,
         "L23_SST_to_L4_E": 0.0,
         "L23_SST_to_L4_PV": 0.0,
-        "L23_PV_to_L4_E": -0.1,
+        "L23_PV_to_L4_E": 0.0,
         "L23_PV_to_L4_SST": 0.0,
         "L23_PV_to_L4_PV": 0.0,
+
         # ---------- L2/3 to L5 ----------
         "L23_E_to_L5_E": 0.2,
         "L23_E_to_L5_SST": 0.0,
-        "L23_E_to_L5_PV": 0.1,
-        "L23_SST_to_L5_E": -0.1,
+        "L23_E_to_L5_PV": 0.0,
+        "L23_SST_to_L5_E": 0.0,
         "L23_SST_to_L5_PV": 0.0,
-        "L23_PV_to_L5_E": -0.1,
+        "L23_PV_to_L5_E": 0.0,
         "L23_PV_to_L5_SST": 0.0,
         "L23_PV_to_L5_PV": 0.0,
+
         # ---------- L4 (within L4) ----------
-        "L4_E_to_L4_E": 0.4,
+        "L4_E_to_L4_E": 0.05,
         "L4_E_to_L4_SST": 0.4,
-        "L4_E_to_L4_PV": 0.2,
+        "L4_E_to_L4_PV": 0.1,
         "L4_SST_to_L4_E": -0.4,
         "L4_SST_to_L4_PV": -0.1,
         "L4_PV_to_L4_E": 0.0,
-        "L4_PV_to_L4_SST": -0.2,
-        "L4_PV_to_L4_PV": -0.3,
+        "L4_PV_to_L4_SST": 0.0,
+        "L4_PV_to_L4_PV": 0.0,
+
         # ---------- L4 to L2/3 ----------
         "L4_E_to_L23_E": 0.3,
         "L4_E_to_L23_SST": 0.1,
-        "L4_E_to_L23_PV": 0.2,
+        "L4_E_to_L23_PV": 0.1,
         "L4_SST_to_L23_E": 0.0,
         "L4_SST_to_L23_PV": 0.0,
-        "L4_PV_to_L23_E": -0.1,
+        "L4_PV_to_L23_E": 0.0,
         "L4_PV_to_L23_SST": 0.0,
-        "L4_PV_to_L23_PV": -0.1,
+        "L4_PV_to_L23_PV": 0.0,
+
         # ---------- L4 to L5 ----------
         "L4_E_to_L5_E": 0.1,
         "L4_E_to_L5_SST": 0.4,
         "L4_E_to_L5_PV": 0.1,
         "L4_SST_to_L5_E": 0.0,
         "L4_SST_to_L5_PV": 0.0,
-        "L4_PV_to_L5_E": -0.1,
+        "L4_PV_to_L5_E": 0.0,
         "L4_PV_to_L5_SST": 0.0,
-        "L4_PV_to_L5_PV": -0.1,
+        "L4_PV_to_L5_PV": 0.0,
+
         # ---------- L5 (within L5) ----------
-        "L5_E_to_L5_E": 0.4,
-        "L5_E_to_L5_SST": 0.3,
-        "L5_E_to_L5_PV": 0.4,
-        "L5_SST_to_L5_E": -0.3,
-        "L5_SST_to_L5_PV": -0.4,  # boosted early SST→PV
+        "L5_E_to_L5_E": 0.1,
+        "L5_E_to_L5_SST": 0.2,
+        "L5_E_to_L5_PV": 0.1,
+        "L5_SST_to_L5_E": -0.2,
+        "L5_SST_to_L5_PV": -0.4,
         "L5_PV_to_L5_E": 0.0,
-        "L5_PV_to_L5_SST": -0.2,
-        "L5_PV_to_L5_PV": -0.3,
+        "L5_PV_to_L5_SST": 0.0,
+        "L5_PV_to_L5_PV": 0.0,
+
         # ---------- L5 to L2/3 ----------
         "L5_E_to_L23_E": 0.5,
         "L5_E_to_L23_SST": 0.3,
-        "L5_E_to_L23_PV": 0.4,
+        "L5_E_to_L23_PV": 0.3,
         "L5_SST_to_L23_E": 0.0,
         "L5_SST_to_L23_PV": 0.0,
         "L5_PV_to_L23_E": 0.0,
         "L5_PV_to_L23_SST": 0.0,
         "L5_PV_to_L23_PV": 0.0,
+
         # ---------- L5 to L4 ----------
-        "L5_E_to_L4_E": 0.2,
-        "L5_E_to_L4_SST": 0.2,
-        "L5_E_to_L4_PV": 0.2,
-        "L5_SST_to_L4_E": -0.4,
-        "L5_SST_to_L4_PV": -0.5,
-        "L5_PV_to_L4_E": -0.1,
+        "L5_E_to_L4_E": 0.1,
+        "L5_E_to_L4_SST": 0.1,
+        "L5_E_to_L4_PV": 0.1,
+        "L5_SST_to_L4_E": -0.8,
+        "L5_SST_to_L4_PV": 0.0,
+        "L5_PV_to_L4_E": 0.0,
         "L5_PV_to_L4_SST": 0.0,
         "L5_PV_to_L4_PV": 0.0,
         # ---------- Thalamic connections ----------
@@ -217,7 +233,7 @@ P5_PRESET = {
         "thalamus_to_L4_SST":  0.1,
         "thalamus_to_L4_PV":   0.1,
         "thalamus_to_L5_E":    0.2,
-        "thalamus_to_L5_SST":  0.6,
+        "thalamus_to_L5_SST":  0.5,
         "thalamus_to_L5_PV":   0.3
     },
 }
@@ -228,8 +244,8 @@ P10_PRESET = {
     # Thalamic input widths (μm)
     "thalamic_widths": {"E": 120.0, "SST": 120.0, "PV": 100.0},
     # Outgoing widths (μm)
-    "outgoing_widths": {"E": 200.0, "SST": 220.0, "PV": 120.0},
-    "strength_scaling": {"E": 4.5, "SST": 4.0, "PV": 3.0, "thalamus": 2.0},
+    "outgoing_widths": {"E": 180.0, "SST": 300.0, "PV": 185.0},
+    "strength_scaling": {"E": 3.0, "SST": 4.0, "PV": 3.0, "thalamus": 2.0},
     "thalamic_alpha": 0.7,
     "background_input": {"E": 0.05, "SST": 0.0, "PV": 0.0},
     "connection_strengths": {
@@ -240,8 +256,9 @@ P10_PRESET = {
         "L23_SST_to_L23_E": -0.4,
         "L23_SST_to_L23_PV": -0.2,
         "L23_PV_to_L23_E": -0.2,
-        "L23_PV_to_L23_SST": -0.4,
+        "L23_PV_to_L23_SST": -0.2,
         "L23_PV_to_L23_PV": -0.4,
+
         # ---------- L2/3 to L4 ----------
         "L23_E_to_L4_E": 0.2,
         "L23_E_to_L4_SST": 0.2,
@@ -251,15 +268,17 @@ P10_PRESET = {
         "L23_PV_to_L4_E": -0.2,
         "L23_PV_to_L4_SST": 0.0,
         "L23_PV_to_L4_PV": 0.0,
+
         # ---------- L2/3 to L5 ----------
         "L23_E_to_L5_E": 0.8,
-        "L23_E_to_L5_SST": 0.1,
+        "L23_E_to_L5_SST": 0.2,
         "L23_E_to_L5_PV": 0.6,
-        "L23_SST_to_L5_E": -0.2,
+        "L23_SST_to_L5_E": 0.0,
         "L23_SST_to_L5_PV": 0.0,
         "L23_PV_to_L5_E": -0.1,
         "L23_PV_to_L5_SST": 0.0,
         "L23_PV_to_L5_PV": 0.0,
+
         # ---------- L4 (within L4) ----------
         "L4_E_to_L4_E": 0.5,
         "L4_E_to_L4_SST": 0.5,
@@ -267,8 +286,9 @@ P10_PRESET = {
         "L4_SST_to_L4_E": -0.4,
         "L4_SST_to_L4_PV": -0.2,
         "L4_PV_to_L4_E": -0.2,
-        "L4_PV_to_L4_SST": -0.2,
+        "L4_PV_to_L4_SST": -0.4,
         "L4_PV_to_L4_PV": -0.4,
+
         # ---------- L4 to L2/3 ----------
         "L4_E_to_L23_E": 0.6,
         "L4_E_to_L23_SST": 0.2,
@@ -276,17 +296,19 @@ P10_PRESET = {
         "L4_SST_to_L23_E": 0.0,
         "L4_SST_to_L23_PV": 0.0,
         "L4_PV_to_L23_E": -0.2,
-        "L4_PV_to_L23_SST": 0.0,
-        "L4_PV_to_L23_PV": -0.2,
+        "L4_PV_to_L23_SST": -0.2,
+        "L4_PV_to_L23_PV": 0.0,
+
         # ---------- L4 to L5 ----------
         "L4_E_to_L5_E": 0.1,
-        "L4_E_to_L5_SST": 0.4,
+        "L4_E_to_L5_SST": 0.1,
         "L4_E_to_L5_PV": 0.2,
         "L4_SST_to_L5_E": -0.1,
         "L4_SST_to_L5_PV": 0.0,
-        "L4_PV_to_L5_E": -0.2,
+        "L4_PV_to_L5_E": -0.1,
         "L4_PV_to_L5_SST": 0.0,
         "L4_PV_to_L5_PV": -0.2,
+
         # ---------- L5 (within L5) ----------
         "L5_E_to_L5_E": 0.6,
         "L5_E_to_L5_SST": 0.4,
@@ -294,8 +316,9 @@ P10_PRESET = {
         "L5_SST_to_L5_E": -0.5,
         "L5_SST_to_L5_PV": -0.3,
         "L5_PV_to_L5_E": -0.4,
-        "L5_PV_to_L5_SST": -0.3,
+        "L5_PV_to_L5_SST": -0.4,
         "L5_PV_to_L5_PV": -0.6,
+
         # ---------- L5 to L2/3 ----------
         "L5_E_to_L23_E": 0.5,
         "L5_E_to_L23_SST": 0.3,
@@ -303,13 +326,14 @@ P10_PRESET = {
         "L5_SST_to_L23_E": -0.3,
         "L5_SST_to_L23_PV": 0.0,
         "L5_PV_to_L23_E": 0.0,
-        "L5_PV_to_L23_SST": 0.0,
-        "L5_PV_to_L23_PV": -0.2,
+        "L5_PV_to_L23_SST": -0.2,
+        "L5_PV_to_L23_PV": 0.0,
+
         # ---------- L5 to L4 ----------
         "L5_E_to_L4_E": 0.2,
-        "L5_E_to_L4_SST": 0.1,
-        "L5_E_to_L4_PV": 0.3,
-        "L5_SST_to_L4_E": -0.2,
+        "L5_E_to_L4_SST": 0.2,
+        "L5_E_to_L4_PV": 0.1,
+        "L5_SST_to_L4_E": 0.2,
         "L5_SST_to_L4_PV": 0.0,
         "L5_PV_to_L4_E": -0.2,
         "L5_PV_to_L4_SST": 0.0,
@@ -319,10 +343,10 @@ P10_PRESET = {
         "thalamus_to_L23_SST": 0.1,
         "thalamus_to_L23_PV":  0.3,
         "thalamus_to_L4_E":    0.5,
-        "thalamus_to_L4_SST":  0.1,
+        "thalamus_to_L4_SST":  0.0,
         "thalamus_to_L4_PV":   0.8,
         "thalamus_to_L5_E":    0.4,
-        "thalamus_to_L5_SST":  0.1,
+        "thalamus_to_L5_SST":  0.0,
         "thalamus_to_L5_PV":   0.4
     },
 }
@@ -334,11 +358,11 @@ P15_PRESET = {
     "thalamic_widths": {"E": 100.0, "SST": 100.0, "PV": 100.0},
     # Outgoing widths (μm)
     "outgoing_widths": {
-        "E": 200.0,
-        "SST": 200.0,
+        "E": 100.0,
+        "SST": 100.0,
         "PV": 100.0,
     },
-    "strength_scaling": {"E": 6.0, "SST": 6.0, "PV": 5.0, "thalamus": 2.0},
+    "strength_scaling": {"E": 5.0, "SST": 4.0, "PV": 4.0, "thalamus": 2.0},
     "thalamic_alpha": 0.9,
     "background_input": {"E": 0.05, "SST": 0.0, "PV": 0.0},
     "connection_strengths": {
@@ -349,8 +373,9 @@ P15_PRESET = {
         "L23_SST_to_L23_E": -0.3,
         "L23_SST_to_L23_PV": -0.3,
         "L23_PV_to_L23_E": -0.8,
-        "L23_PV_to_L23_SST": -0.8,
+        "L23_PV_to_L23_SST": -0.3,
         "L23_PV_to_L23_PV": -0.8,
+
         # ---------- L2/3 to L4 ----------
         "L23_E_to_L4_E": 0.3,
         "L23_E_to_L4_SST": 0.3,
@@ -360,15 +385,17 @@ P15_PRESET = {
         "L23_PV_to_L4_E": -0.3,
         "L23_PV_to_L4_SST": 0.0,
         "L23_PV_to_L4_PV": 0.0,
+
         # ---------- L2/3 to L5 ----------
         "L23_E_to_L5_E": 1.0,
         "L23_E_to_L5_SST": 0.3,
         "L23_E_to_L5_PV": 0.6,
-        "L23_SST_to_L5_E": -0.3,
+        "L23_SST_to_L5_E": 0.0,
         "L23_SST_to_L5_PV": 0.0,
         "L23_PV_to_L5_E": -0.1,
-        "L23_PV_to_L5_SST": -0.1,
+        "L23_PV_to_L5_SST": 0.0,
         "L23_PV_to_L5_PV": 0.0,
+
         # ---------- L4 (within L4) ----------
         "L4_E_to_L4_E": 0.6,
         "L4_E_to_L4_SST": 0.7,
@@ -378,6 +405,7 @@ P15_PRESET = {
         "L4_PV_to_L4_E": -0.6,
         "L4_PV_to_L4_SST": -0.4,
         "L4_PV_to_L4_PV": -0.6,
+
         # ---------- L4 to L2/3 ----------
         "L4_E_to_L23_E": 1.0,
         "L4_E_to_L23_SST": 0.2,
@@ -385,26 +413,29 @@ P15_PRESET = {
         "L4_SST_to_L23_E": 0.0,
         "L4_SST_to_L23_PV": 0.0,
         "L4_PV_to_L23_E": -0.3,
-        "L4_PV_to_L23_SST": 0.0,
-        "L4_PV_to_L23_PV": -0.3,
+        "L4_PV_to_L23_SST": -0.3,
+        "L4_PV_to_L23_PV": 0.0,
+
         # ---------- L4 to L5 ----------
         "L4_E_to_L5_E": 0.1,
-        "L4_E_to_L5_SST": 0.4,
+        "L4_E_to_L5_SST": 0.3,
         "L4_E_to_L5_PV": 0.3,
         "L4_SST_to_L5_E": -0.3,
-        "L4_SST_to_L5_PV": 0.0,
+        "L4_SST_to_L5_PV": -0.2,
         "L4_PV_to_L5_E": -0.3,
-        "L4_PV_to_L5_SST": -0.2,
+        "L4_PV_to_L5_SST": -0.3,
         "L4_PV_to_L5_PV": -0.3,
+
         # ---------- L5 (within L5) ----------
         "L5_E_to_L5_E": 0.8,
-        "L5_E_to_L5_SST": 0.7,
+        "L5_E_to_L5_SST": 0.5,
         "L5_E_to_L5_PV": 1.0,
         "L5_SST_to_L5_E": -0.4,
         "L5_SST_to_L5_PV": -0.3,
-        "L5_PV_to_L5_E": -1.2,
+        "L5_PV_to_L5_E": -1.2,   # PV overshoot before pruning
         "L5_PV_to_L5_SST": -0.3,
         "L5_PV_to_L5_PV": -0.8,
+
         # ---------- L5 to L2/3 ----------
         "L5_E_to_L23_E": 0.4,
         "L5_E_to_L23_SST": 0.1,
@@ -412,14 +443,15 @@ P15_PRESET = {
         "L5_SST_to_L23_E": -0.5,
         "L5_SST_to_L23_PV": 0.0,
         "L5_PV_to_L23_E": 0.0,
-        "L5_PV_to_L23_SST": 0.0,
-        "L5_PV_to_L23_PV": -0.3,
+        "L5_PV_to_L23_SST": -0.3,
+        "L5_PV_to_L23_PV": 0.0,
+
         # ---------- L5 to L4 ----------
         "L5_E_to_L4_E": 0.1,
         "L5_E_to_L4_SST": 0.1,
-        "L5_E_to_L4_PV": 0.3,
-        "L5_SST_to_L4_E": -0.1,
-        "L5_SST_to_L4_PV": -0.1,
+        "L5_E_to_L4_PV": 0.1,
+        "L5_SST_to_L4_E": 0.0,
+        "L5_SST_to_L4_PV": 0.0,
         "L5_PV_to_L4_E": -0.3,
         "L5_PV_to_L4_SST": 0.0,
         "L5_PV_to_L4_PV": 0.0,
