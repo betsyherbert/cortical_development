@@ -9,7 +9,7 @@ P0_PRESET = {
     # Approximate time constants (ms).
     "time_constants": {
         "E": 50.0,  # immature pyramids, high τm
-        "SST": 60.0,  # very integrative early SST
+        "SST": 70.0,  # very integrative early SST
         "PV": 40.0,  # PV-lineage not yet fast-spiking
     },
     # Constant background input for each cell type.
@@ -19,12 +19,7 @@ P0_PRESET = {
     # Outgoing widths: how far each cell type's lateral connections spread (μm).
     "outgoing_widths": {"E": 300.0, "SST": 400.0, "PV": 250.0},
     # Strength scaling factors: overall scaling of connection strengths.
-    "strength_scaling": {
-        "E": 2.0,  # weak excitatory network
-        "SST": 3.0,  # slightly stronger SST modulation
-        "PV": 0.2,  # proto-PV inhibition
-        "thalamus": 2.0,  # baseline thalamic drive
-    },
+    "strength_scaling": {"E": 2.0, "SST": 3.0, "PV": 0.2, "thalamus": 2.0},
     # Thalamic alpha: developmental time parameter [0=early, 1=late]
     "thalamic_alpha": 0.1,
     "connection_strengths": {
@@ -110,21 +105,21 @@ P0_PRESET = {
         "L5_PV_to_L4_SST": 0.0,
         "L5_PV_to_L4_PV": 0.0,
         # ---------- Thalamic connections ----------
-        "thalamus_to_L23_E": 0.2,
-        "thalamus_to_L23_SST": 0.2,
-        "thalamus_to_L23_PV": 0.2,
-        "thalamus_to_L4_E": 0.3,
-        "thalamus_to_L4_SST": 0.3,
-        "thalamus_to_L4_PV": 0.1,  # reduced
-        "thalamus_to_L5_E": 0.3,
-        "thalamus_to_L5_SST": 0.6,  # boosted transient deep SST drive
-        "thalamus_to_L5_PV": 0.1,  # reduced
+        "thalamus_to_L23_E":   0.0,
+        "thalamus_to_L23_SST": 0.0,
+        "thalamus_to_L23_PV":  0.0,
+        "thalamus_to_L4_E":    0.1,
+        "thalamus_to_L4_SST":  0.0,
+        "thalamus_to_L4_PV":   0.0,
+        "thalamus_to_L5_E":    0.1,
+        "thalamus_to_L5_SST":  0.3,
+        "thalamus_to_L5_PV":   0.1
     },
 }
 
 # ----------------- P5 PRESET (Late 1st Week) -----------------
 P5_PRESET = {
-    "time_constants": {"E": 45.0, "SST": 55.0, "PV": 35.0},
+    "time_constants": {"E": 40.0, "SST": 60.0, "PV": 35.0},
     "background_input": {"E": 0.0, "SST": 0.0, "PV": 0.0},
     # Thalamic input widths (μm)
     "thalamic_widths": {"E": 150.0, "SST": 150.0, "PV": 120.0},
@@ -215,15 +210,15 @@ P5_PRESET = {
         "L5_PV_to_L4_SST": 0.0,
         "L5_PV_to_L4_PV": 0.0,
         # ---------- Thalamic connections ----------
-        "thalamus_to_L23_E": 0.1,
-        "thalamus_to_L23_SST": 0.1,
-        "thalamus_to_L23_PV": 0.1,
-        "thalamus_to_L4_E": 0.6,
-        "thalamus_to_L4_SST": 0.2,
-        "thalamus_to_L4_PV": 0.2,  # reduced
-        "thalamus_to_L5_E": 0.3,
-        "thalamus_to_L5_SST": 0.4,
-        "thalamus_to_L5_PV": 0.1,  # reduced
+        "thalamus_to_L23_E":   0.0,
+        "thalamus_to_L23_SST": 0.0,
+        "thalamus_to_L23_PV":  0.0,
+        "thalamus_to_L4_E":    0.5,
+        "thalamus_to_L4_SST":  0.1,
+        "thalamus_to_L4_PV":   0.1,
+        "thalamus_to_L5_E":    0.2,
+        "thalamus_to_L5_SST":  0.6,
+        "thalamus_to_L5_PV":   0.3
     },
 }
 
@@ -320,21 +315,21 @@ P10_PRESET = {
         "L5_PV_to_L4_SST": 0.0,
         "L5_PV_to_L4_PV": 0.0,
         # ---------- Thalamic connections ----------
-        "thalamus_to_L23_E": 0.1,
-        "thalamus_to_L23_SST": 0.0,
-        "thalamus_to_L23_PV": 0.1,
-        "thalamus_to_L4_E": 0.8,
-        "thalamus_to_L4_SST": 0.1,
-        "thalamus_to_L4_PV": 0.5,  # reduced
-        "thalamus_to_L5_E": 0.2,
-        "thalamus_to_L5_SST": 0.2,
-        "thalamus_to_L5_PV": 0.2,
+        "thalamus_to_L23_E":   0.1,
+        "thalamus_to_L23_SST": 0.1,
+        "thalamus_to_L23_PV":  0.3,
+        "thalamus_to_L4_E":    0.5,
+        "thalamus_to_L4_SST":  0.1,
+        "thalamus_to_L4_PV":   0.8,
+        "thalamus_to_L5_E":    0.4,
+        "thalamus_to_L5_SST":  0.1,
+        "thalamus_to_L5_PV":   0.4
     },
 }
 
 # ----------------- P15 PRESET (Late 2nd Week) -----------------
 P15_PRESET = {
-    "time_constants": {"E": 25.0, "SST": 30.0, "PV": 12.0},
+    "time_constants": {"E": 20.0, "SST": 30.0, "PV": 10.0},
     # Thalamic input widths (μm)
     "thalamic_widths": {"E": 100.0, "SST": 100.0, "PV": 100.0},
     # Outgoing widths (μm)
@@ -429,14 +424,14 @@ P15_PRESET = {
         "L5_PV_to_L4_SST": 0.0,
         "L5_PV_to_L4_PV": 0.0,
         # ---------- Thalamic connections ----------
-        "thalamus_to_L23_E": 0.1,
-        "thalamus_to_L23_SST": 0.0,
-        "thalamus_to_L23_PV": 0.1,
-        "thalamus_to_L4_E": 1.0,
-        "thalamus_to_L4_SST": 0.0,
-        "thalamus_to_L4_PV": 0.6,  # slightly reduced vs original
-        "thalamus_to_L5_E": 0.2,
-        "thalamus_to_L5_SST": 0.0,
-        "thalamus_to_L5_PV": 0.1,  # reduced
+        "thalamus_to_L23_E":   0.2,
+        "thalamus_to_L23_SST": 0.1,
+        "thalamus_to_L23_PV":  0.5,
+        "thalamus_to_L4_E":    0.6,
+        "thalamus_to_L4_SST":  0.1,
+        "thalamus_to_L4_PV":   1.0,
+        "thalamus_to_L5_E":    0.5,
+        "thalamus_to_L5_SST":  0.1,
+        "thalamus_to_L5_PV":   0.5
     },
 }
