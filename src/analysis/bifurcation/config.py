@@ -163,11 +163,13 @@ SCANNABLE_PARAMETERS = {
     ),
 }
 
-
 # Default parameter pair configurations for 2D maps
 DEFAULT_STABILITY_PAIRS = [
     ("tau_SST", "sigma_SST"),
     ("tau_PV", "sigma_PV"),
+    ("sigma_E", "sigma_SST"),
+    ("sigma_SST", "sigma_PV"),
+    ("sigma_E", "sigma_PV"),
 ]
 
 DEFAULT_GAIN_PAIRS = [
@@ -193,11 +195,11 @@ DEFAULT_SPECTRUM_SWEEPS = [
 TAU_MIN = 5.0  # Minimum time constant (ms)
 TAU_MAX = 70.0  # Maximum time constant (ms)
 SIGMA_MIN = 50.0  # Minimum spatial width (μm)
-SIGMA_MAX = 450.0  # Maximum spatial width (μm), must be >= max preset σ value
+SIGMA_MAX = 500.0  # Maximum spatial width (μm), must be >= max preset σ value
 
 # Fixed ratio mode limits (applied to τ_inh/τ_E and σ_inh/σ_E ratios)
 FIXED_RATIO_TAU_MIN = 0.1  # Minimum tau ratio
-FIXED_RATIO_TAU_MAX = 2.0  # Maximum tau ratio
+FIXED_RATIO_TAU_MAX = 1.5  # Maximum tau ratio
 FIXED_RATIO_SIGMA_MIN = 0.1  # Minimum sigma ratio
 FIXED_RATIO_SIGMA_MAX = 4.0  # Maximum sigma ratio
 
@@ -205,7 +207,7 @@ FIXED_RATIO_SIGMA_MAX = 4.0  # Maximum sigma ratio
 #   - fixed_absolute mode: computed dynamically per stage from TAU_MIN/MAX and SIGMA_MIN/MAX
 #     tau_ratio ∈ [TAU_MIN/τ_E, TAU_MAX/τ_E], sigma_ratio ∈ [SIGMA_MIN/σ_E, SIGMA_MAX/σ_E]
 #   - fixed_ratio mode: uses FIXED_RATIO_* constants directly
-GRID_RESOLUTION = 20  # Number of points per axis
+GRID_RESOLUTION = 50  # Number of points per axis
 MEAN_STATE_SEED = RANDOM_SEED  # Random seed for SteadyStateFinder reproducibility
 
 # Visualization parameters
@@ -240,3 +242,49 @@ SPECTRUM_LOG_SCALE = True  # Use log10(gain) for colormap
 
 # Visualization parameters
 SPECTRUM_Y_MARGIN = (0.5, 2.0)  # Y-axis range per stage (relative to preset: 0.5x to 2x)
+
+# ============================================================================
+# Compressed Stability Maps Configuration (SST-PV Ratio Analysis)
+# ============================================================================
+
+# Parameter ranges for compressed maps showing SST→PV maturation handoff
+# These maps plot σ_PV/σ_SST vs τ_PV/τ_SST to capture developmental trajectory
+COMPRESSED_MAP_TAU_RATIO_RANGE = (0.1, 1.0)  # τ_PV/τ_SST ratio (PV faster → smaller values)
+COMPRESSED_MAP_SIGMA_RATIO_RANGE = (0.5, 1.8)  # σ_PV/σ_SST ratio
+
+# ============================================================================
+# Maturity Index Stability Maps Configuration
+# ============================================================================
+
+# Maturity index reference values (immature=0, mature=1)
+# These define the normalization bounds for each parameter component.
+# Values are chosen to span the full range observed across all presets (P0-P15),
+# accounting for non-monotonic trajectories (e.g., σ_SST/σ_E peaks at P5).
+#
+# Actual preset values:
+#   P0:  τ_SST/τ_E=1.2, σ_SST/σ_E=1.5, s_SST=3.0 | τ_PV/τ_E=0.8, σ_PV/σ_E=0.83, s_PV=0.2
+#   P5:  τ_SST/τ_E=1.25, σ_SST/σ_E=3.0, s_SST=4.5 | τ_PV/τ_E=0.875, σ_PV/σ_E=1.67, s_PV=0.7
+#   P10: τ_SST/τ_E=1.33, σ_SST/σ_E=1.0, s_SST=4.0 | τ_PV/τ_E=0.67, σ_PV/σ_E=1.0, s_PV=3.8
+#   P15: τ_SST/τ_E=1.5, σ_SST/σ_E=1.0, s_SST=4.0 | τ_PV/τ_E=0.5, σ_PV/σ_E=1.0, s_PV=4.0
+MATURITY_REFERENCE_VALUES = {
+    "SST": {
+        # τ_SST/τ_E increases slightly: 1.2 (P0) → 1.5 (P15)
+        "tau_ratio": {"immature": 1.2, "mature": 1.5},
+        # σ_SST/σ_E: non-monotonic! peaks at P5 (3.0), converges to 1.0 at P10/P15
+        # Use P5 as immature (furthest from mature state) and P15 as mature
+        "sigma_ratio": {"immature": 3.0, "mature": 1.0},
+        # s_SST: peaks at P5 (4.5), settles at 4.0; use range 3.0→4.0
+        "strength": {"immature": 3.0, "mature": 4.0},
+    },
+    "PV": {
+        # τ_PV/τ_E decreases: 0.875 (P5, slowest) → 0.5 (P15, fastest)
+        "tau_ratio": {"immature": 0.875, "mature": 0.5},
+        # σ_PV/σ_E: peaks at P5 (1.67), converges to 1.0 at P10/P15
+        "sigma_ratio": {"immature": 1.67, "mature": 1.0},
+        # s_PV: dramatic increase 0.2 (P0) → 4.0 (P15)
+        "strength": {"immature": 0.2, "mature": 4.0},
+    },
+}
+
+# Maturity scan configuration
+MATURITY_SCAN_MARGIN = 0.5  # +/- around stage's natural maturity value

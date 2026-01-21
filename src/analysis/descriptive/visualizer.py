@@ -547,6 +547,112 @@ class ActivityVisualizer:
         # Filter out NaN values
         return [v for v in all_values if not np.isnan(v)]
 
+    def create_dimensionality_trends(self, results: dict[str, Any]) -> None:
+        """Create developmental trends in network dimensionality (participation ratio)."""
+        fig, axes = plt.subplots(1, 3, figsize=FIGSIZE_TRENDS)
+        fig.suptitle("Network Dimensionality (Participation Ratio)", fontsize=FONT_SIZES["title"], fontweight="bold")
+
+        x_pos = list(range(len(DEVELOPMENTAL_STAGES)))
+
+        # Collect all dimensionality values for consistent y-axis
+        all_dim_values = self._collect_dimensionality_values(results)
+
+        # Calculate consistent y-axis limits
+        if all_dim_values:
+            min_val = min(all_dim_values)
+            max_val = max(all_dim_values)
+            y_buffer = (max_val - min_val) * 0.1 if max_val > min_val else 0.1
+            dim_ylim = [max(0, min_val - y_buffer), min(1, max_val + y_buffer)]
+            dim_tick_values = [dim_ylim[0], dim_ylim[1]]
+            dim_tick_labels = [f"{v:.2f}" for v in dim_tick_values]
+        else:
+            # Fallback if all values are NaN
+            dim_ylim = [0, 1]
+            dim_tick_values = [0, 1]
+            dim_tick_labels = ["0", "1"]
+
+        # Plot 1: By cell type
+        for cell_type in POSTER_CELL_TYPES:
+            means = [
+                results[stage]["dimensionality"]["by_celltype"].get(cell_type, np.nan)
+                for stage in DEVELOPMENTAL_STAGES
+            ]
+            self._plot_trend_with_errorbars(
+                axes[0], x_pos, means, CELL_COLORS[cell_type], cell_type
+            )
+
+        self._setup_trend_plot_axes(
+            axes[0],
+            "By Cell Type",
+            "Normalized PR",
+            x_pos,
+            dim_ylim,
+            dim_tick_values,
+            dim_tick_labels,
+        )
+
+        # Plot 2: By layer
+        for layer in LAYERS:
+            means = [
+                results[stage]["dimensionality"]["by_layer"].get(layer, np.nan)
+                for stage in DEVELOPMENTAL_STAGES
+            ]
+            self._plot_trend_with_errorbars(axes[1], x_pos, means, LAYER_COLORS[layer], layer)
+
+        self._setup_trend_plot_axes(
+            axes[1],
+            "By Layer",
+            "",
+            x_pos,
+            dim_ylim,
+            dim_tick_values,
+            dim_tick_labels,
+            show_ylabel=False,
+        )
+
+        # Plot 3: Total network
+        total_values = [results[stage]["dimensionality"]["total"] for stage in DEVELOPMENTAL_STAGES]
+        self._plot_trend_with_errorbars(axes[2], x_pos, total_values, "black")
+
+        self._setup_trend_plot_axes(
+            axes[2],
+            "Total Network",
+            "",
+            x_pos,
+            dim_ylim,
+            dim_tick_values,
+            dim_tick_labels,
+            show_ylabel=False,
+        )
+
+        plt.tight_layout()
+        self._add_trend_legends(fig, axes)
+        self._save_plot("dimensionality_trends.pdf")
+
+    def _collect_dimensionality_values(self, results: dict[str, Any]) -> list[float]:
+        """Collect all dimensionality values for consistent scaling (excluding NaN)."""
+        all_values = []
+
+        for cell_type in POSTER_CELL_TYPES:
+            values = [
+                results[stage]["dimensionality"]["by_celltype"].get(cell_type, 0)
+                for stage in DEVELOPMENTAL_STAGES
+            ]
+            all_values.extend(values)
+
+        for layer in LAYERS:
+            values = [
+                results[stage]["dimensionality"]["by_layer"].get(layer, 0)
+                for stage in DEVELOPMENTAL_STAGES
+            ]
+            all_values.extend(values)
+
+        total_values = [results[stage]["dimensionality"]["total"] for stage in DEVELOPMENTAL_STAGES]
+        all_values.extend(total_values)
+
+        # Filter out NaN values
+        return [v for v in all_values if not np.isnan(v)]
+
     def create_synchronous_event_trends(self, results: dict[str, Any]) -> None:
         """Create developmental trends in synchronous events."""
         fig, axes = plt.subplots(1, 3, figsize=FIGSIZE_TRENDS)
@@ -651,6 +757,539 @@ class ActivityVisualizer:
 
         return all_values
 
+    def create_structural_ei_balance_trends(self, results: dict[str, Any]) -> None:
+        """Create developmental trends in structural E-I balance.
+
+        Shows how inhibition to E cells changes across developmental stages,
+        based on connection strengths (not activity).
+
+        Panel 1: Inhibition by cell type (SST vs PV magnitude)
+        Panel 2: Total inhibition (sum of SST + PV)
+        """
+        fig, axes = plt.subplots(1, 2, figsize=FIGSIZE_TRENDS)
+        fig.suptitle("Inhibition to E Cells", fontsize=FONT_SIZES["title"], fontweight="bold")
+
+        x_pos = list(range(len(DEVELOPMENTAL_STAGES)))
+
+        # --- Collect all inhibition values for consistent y-axis ---
+        inhibitory_types = ["SST", "PV"]
+        inhib_values = self._collect_inhibition_values(results)
+        
+        # Also include total inhibition values
+        total_inhib_values = [
+            results[stage]["structural_ei_balance"]["inhibition_total"]
+            for stage in DEVELOPMENTAL_STAGES
+        ]
+        all_inhib_values = inhib_values + total_inhib_values
+
+        # Calculate y-axis limits for both panels
+        if all_inhib_values:
+            max_inhib = max(all_inhib_values)
+            y_buffer = max_inhib * 0.1
+            inhib_ylim = [-y_buffer * 0.5, max_inhib + y_buffer]
+            inhib_tick_values, inhib_tick_labels = self._format_zero_max_ticks(all_inhib_values)
+        else:
+            inhib_ylim = [0, 1]
+            inhib_tick_values = [0, 1]
+            inhib_tick_labels = ["0", "1"]
+
+        # --- Panel 1: Inhibition by cell type (SST and PV) ---
+        for cell_type in inhibitory_types:
+            means = [
+                results[stage]["structural_ei_balance"]["by_inhibitory_celltype"][cell_type]
+                for stage in DEVELOPMENTAL_STAGES
+            ]
+            self._plot_trend_with_errorbars(
+                axes[0], x_pos, means, CELL_COLORS[cell_type], cell_type
+            )
+
+        self._setup_trend_plot_axes(
+            axes[0],
+            "By Cell Type",
+            "Scaled Strength",
+            x_pos,
+            inhib_ylim,
+            inhib_tick_values,
+            inhib_tick_labels,
+        )
+
+        # --- Panel 2: Total inhibition ---
+        self._plot_trend_with_errorbars(axes[1], x_pos, total_inhib_values, "black")
+
+        self._setup_trend_plot_axes(
+            axes[1],
+            "Total",
+            "",
+            x_pos,
+            inhib_ylim,
+            inhib_tick_values,
+            inhib_tick_labels,
+            show_ylabel=False,
+        )
+
+        plt.tight_layout()
+        
+        # Add legend only for first panel (cell types)
+        plt.subplots_adjust(right=0.85)
+        fig.legend(
+            axes[0].get_lines(),
+            [line.get_label() for line in axes[0].get_lines()],
+            loc="center left",
+            bbox_to_anchor=(0.87, 0.5),
+            title="Cell Types",
+        )
+        
+        self._save_plot("structural_ei_balance_trends.pdf")
+
+    def _collect_inhibition_values(self, results: dict[str, Any]) -> list[float]:
+        """Collect all inhibition magnitude values for consistent scaling."""
+        all_values = []
+        for cell_type in ["SST", "PV"]:
+            values = [
+                results[stage]["structural_ei_balance"]["by_inhibitory_celltype"][cell_type]
+                for stage in DEVELOPMENTAL_STAGES
+            ]
+            all_values.extend(values)
+        return [v for v in all_values if not np.isnan(v) and v != float("inf")]
+
+    def create_functional_ei_balance_trends(self, results: dict[str, Any]) -> None:
+        """Create developmental trends in functional E-I balance.
+
+        Shows how activity-weighted inhibition to E cells changes across
+        developmental stages (activity × connection strength).
+
+        Panel 1: Inhibition by cell type (SST vs PV magnitude)
+        Panel 2: Total inhibition (sum of SST + PV)
+        """
+        fig, axes = plt.subplots(1, 2, figsize=FIGSIZE_TRENDS)
+        fig.suptitle(
+            "Functional Inhibition to E Cells", fontsize=FONT_SIZES["title"], fontweight="bold"
+        )
+
+        x_pos = list(range(len(DEVELOPMENTAL_STAGES)))
+
+        # --- Collect all functional inhibition values for consistent y-axis ---
+        inhibitory_types = ["SST", "PV"]
+        functional_inhib_values = []
+
+        for cell_type in inhibitory_types:
+            values = [
+                results[stage]["functional_ei_balance"]["by_inhibitory_celltype"][cell_type][
+                    "mean"
+                ]
+                for stage in DEVELOPMENTAL_STAGES
+            ]
+            functional_inhib_values.extend(values)
+
+        # Also include total inhibition values
+        total_functional_inhib_values = [
+            results[stage]["functional_ei_balance"]["total"]["mean"]
+            for stage in DEVELOPMENTAL_STAGES
+        ]
+        all_functional_inhib_values = functional_inhib_values + total_functional_inhib_values
+
+        # Calculate y-axis limits for both panels
+        if all_functional_inhib_values:
+            max_inhib = max(all_functional_inhib_values)
+            y_buffer = max_inhib * 0.1
+            inhib_ylim = [-y_buffer * 0.5, max_inhib + y_buffer]
+            inhib_tick_values, inhib_tick_labels = self._format_zero_max_ticks(
+                all_functional_inhib_values
+            )
+        else:
+            inhib_ylim = [0, 1]
+            inhib_tick_values = [0, 1]
+            inhib_tick_labels = ["0", "1"]
+
+        # --- Panel 1: Inhibition by cell type (SST and PV) ---
+        for cell_type in inhibitory_types:
+            means = [
+                results[stage]["functional_ei_balance"]["by_inhibitory_celltype"][cell_type][
+                    "mean"
+                ]
+                for stage in DEVELOPMENTAL_STAGES
+            ]
+            # Note: We have std available but using SEM_FACTOR for consistency with other plots
+            self._plot_trend_with_errorbars(
+                axes[0], x_pos, means, CELL_COLORS[cell_type], cell_type
+            )
+
+        self._setup_trend_plot_axes(
+            axes[0],
+            "By Cell Type",
+            "Activity × Strength",
+            x_pos,
+            inhib_ylim,
+            inhib_tick_values,
+            inhib_tick_labels,
+        )
+
+        # --- Panel 2: Total inhibition ---
+        self._plot_trend_with_errorbars(axes[1], x_pos, total_functional_inhib_values, "black")
+
+        self._setup_trend_plot_axes(
+            axes[1],
+            "Total",
+            "",
+            x_pos,
+            inhib_ylim,
+            inhib_tick_values,
+            inhib_tick_labels,
+            show_ylabel=False,
+        )
+
+        plt.tight_layout()
+
+        # Add legend only for first panel (cell types)
+        plt.subplots_adjust(right=0.85)
+        fig.legend(
+            axes[0].get_lines(),
+            [line.get_label() for line in axes[0].get_lines()],
+            loc="center left",
+            bbox_to_anchor=(0.87, 0.5),
+            title="Cell Types",
+        )
+
+        self._save_plot("functional_ei_balance_trends.pdf")
+
+    def create_spatial_correlation_curves(self, results: dict[str, Any]) -> None:
+        """Create C(r) spatial correlation curves for all developmental stages.
+
+        Shows how correlation between spatial locations decays with distance,
+        organized as a 4x4 grid (cell types + total × layers + total) with all 4 stages overlaid.
+        Uses cell type colors with stage-specific opacity. Distance limited to 1000 μm.
+        """
+        # 4x4 grid: 3 cell types + total row, 3 layers + total column
+        # Make wider than tall for better aspect ratio
+        fig, axes = plt.subplots(4, 4, figsize=(12, 7))
+        fig.suptitle(
+            "Spatial Correlation C(r)", fontsize=FONT_SIZES["title"], fontweight="bold"
+        )
+
+        # Define stage opacity (alpha) for distinguishing curves
+        # Increasing opacity with developmental stage
+        stage_alphas = {
+            "P0": 0.3,
+            "P5": 0.5,
+            "P10": 0.7,
+            "P15": 1.0,
+        }
+
+        # Distance limit
+        max_dist_um = 1000.0
+
+        # Collect all correlation values for consistent y-axis (within distance limit)
+        all_corr_values = []
+        for stage in DEVELOPMENTAL_STAGES:
+            for layer in LAYERS:
+                for cell_type in POSTER_CELL_TYPES:
+                    corr_data = results[stage]["spatial_correlations"][layer][cell_type]
+                    # Use all correlations for y-axis scaling (xlim will handle display clipping)
+                    valid_corr = corr_data["correlations"][~np.isnan(corr_data["correlations"])]
+                    all_corr_values.extend(valid_corr)
+
+        # Calculate y-axis limits
+        if all_corr_values:
+            min_corr = min(all_corr_values)
+            max_corr = max(all_corr_values)
+            y_buffer = (max_corr - min_corr) * 0.1 if max_corr > min_corr else 0.1
+            corr_ylim = [min(0, min_corr - y_buffer), max_corr + y_buffer]
+        else:
+            corr_ylim = [-0.1, 1.0]
+
+        dist_xlim = [0, max_dist_um]
+
+        # Plot individual cell type × layer combinations
+        for row, cell_type in enumerate(POSTER_CELL_TYPES):
+            cell_color = CELL_COLORS[cell_type]
+            
+            for col, layer in enumerate(LAYERS):
+                ax = axes[row, col]
+
+                # Plot each stage with cell type color and stage-specific opacity
+                # Plot full data - xlim will clip the display to max_dist_um
+                for stage in DEVELOPMENTAL_STAGES:
+                    corr_data = results[stage]["spatial_correlations"][layer][cell_type]
+                    ax.plot(
+                        corr_data["distances_um"],
+                        corr_data["correlations"],
+                        color=cell_color,
+                        alpha=stage_alphas[stage],
+                        linestyle="-",
+                        linewidth=LINE_WIDTH,
+                        label=stage if row == 0 and col == 0 else "",
+                    )
+
+                ax.set_xlim(dist_xlim)
+                ax.set_ylim(corr_ylim)
+
+                # Row labels (cell types) on left column
+                if col == 0:
+                    ax.set_ylabel(
+                        f"{cell_type}",
+                        fontweight="bold",
+                        rotation=0,
+                        ha="right",
+                        va="center",
+                        color=cell_color,
+                    )
+
+                # Column headers (layers) on top row
+                if row == 0:
+                    ax.set_title(layer, fontweight="bold")
+
+                # X-axis labels only on bottom row
+                if row == 3:
+                    ax.set_xlabel("Distance (μm)")
+                else:
+                    ax.set_xticks([])
+
+                # Y-axis ticks only on left column
+                if col != 0:
+                    ax.set_yticklabels([])
+                    ax.tick_params(left=False)
+
+        # Fourth column: Average across layers for each cell type
+        for row, cell_type in enumerate(POSTER_CELL_TYPES):
+            cell_color = CELL_COLORS[cell_type]
+            ax = axes[row, 3]
+
+            for stage in DEVELOPMENTAL_STAGES:
+                # Average across layers - plot full data, xlim clips display
+                distances = None
+                corr_list = []
+                for layer in LAYERS:
+                    corr_data = results[stage]["spatial_correlations"][layer][cell_type]
+                    if distances is None:
+                        distances = corr_data["distances_um"]
+                    corr_list.append(corr_data["correlations"])
+                
+                avg_corr = np.nanmean(corr_list, axis=0)
+                ax.plot(
+                    distances,
+                    avg_corr,
+                    color=cell_color,
+                    alpha=stage_alphas[stage],
+                    linestyle="-",
+                    linewidth=LINE_WIDTH,
+                )
+
+            ax.set_xlim(dist_xlim)
+            ax.set_ylim(corr_ylim)
+            ax.set_yticklabels([])
+            ax.tick_params(left=False)
+            
+            if row == 0:
+                ax.set_title("Total", fontweight="bold")
+            if row == 3:
+                ax.set_xlabel("Distance (μm)")
+            else:
+                ax.set_xticks([])
+
+        # Fourth row: Average across cell types for each layer
+        for col, layer in enumerate(LAYERS):
+            ax = axes[3, col]
+
+            for stage in DEVELOPMENTAL_STAGES:
+                # Average across cell types - plot full data, xlim clips display
+                distances = None
+                corr_list = []
+                for cell_type in POSTER_CELL_TYPES:
+                    corr_data = results[stage]["spatial_correlations"][layer][cell_type]
+                    if distances is None:
+                        distances = corr_data["distances_um"]
+                    corr_list.append(corr_data["correlations"])
+                
+                avg_corr = np.nanmean(corr_list, axis=0)
+                ax.plot(
+                    distances,
+                    avg_corr,
+                    color="black",
+                    alpha=stage_alphas[stage],
+                    linestyle="-",
+                    linewidth=LINE_WIDTH,
+                )
+
+            ax.set_xlim(dist_xlim)
+            ax.set_ylim(corr_ylim)
+            ax.set_xlabel("Distance (μm)")
+            
+            if col == 0:
+                ax.set_ylabel(
+                    "Total",
+                    fontweight="bold",
+                    rotation=0,
+                    ha="right",
+                    va="center",
+                    color="black",
+                )
+            else:
+                ax.set_yticklabels([])
+                ax.tick_params(left=False)
+
+        # Bottom-right: Average across all cell types and layers
+        ax = axes[3, 3]
+        for stage in DEVELOPMENTAL_STAGES:
+            # Plot full data, xlim clips display
+            distances = None
+            corr_list = []
+            for layer in LAYERS:
+                for cell_type in POSTER_CELL_TYPES:
+                    corr_data = results[stage]["spatial_correlations"][layer][cell_type]
+                    if distances is None:
+                        distances = corr_data["distances_um"]
+                    corr_list.append(corr_data["correlations"])
+            
+            avg_corr = np.nanmean(corr_list, axis=0)
+            ax.plot(
+                distances,
+                avg_corr,
+                color="black",
+                alpha=stage_alphas[stage],
+                linestyle="-",
+                linewidth=LINE_WIDTH,
+            )
+
+        ax.set_xlim(dist_xlim)
+        ax.set_ylim(corr_ylim)
+        ax.set_xlabel("Distance (μm)")
+        ax.set_yticklabels([])
+        ax.tick_params(left=False)
+
+        # Add legend
+        plt.tight_layout()
+        plt.subplots_adjust(right=0.88)
+        # Get handles from first subplot
+        handles, labels = axes[0, 0].get_legend_handles_labels()
+        fig.legend(
+            handles,
+            labels,
+            loc="center left",
+            bbox_to_anchor=(0.90, 0.5),
+            title="Stage",
+        )
+
+        self._save_plot("spatial_correlation_curves.pdf")
+
+    def create_correlation_length_trends(self, results: dict[str, Any]) -> None:
+        """Create developmental trends in spatial correlation length ξ.
+
+        Shows how the characteristic spatial scale of correlations changes
+        across developmental stages, in the same format as other trend plots.
+        """
+        fig, axes = plt.subplots(1, 3, figsize=FIGSIZE_TRENDS)
+        fig.suptitle(
+            "Spatial Correlation Length ξ", fontsize=FONT_SIZES["title"], fontweight="bold"
+        )
+
+        x_pos = list(range(len(DEVELOPMENTAL_STAGES)))
+
+        # Collect all xi values for consistent y-axis
+        all_xi_values = self._collect_correlation_length_values(results)
+
+        # Calculate consistent y-axis limits
+        if all_xi_values:
+            max_val = max(all_xi_values)
+            y_buffer = max_val * 0.1
+            xi_ylim = [0, max_val + y_buffer]
+            xi_tick_values, xi_tick_labels = self._format_zero_max_ticks(all_xi_values)
+        else:
+            xi_ylim = [0, 1000]
+            xi_tick_values = [0, 1000]
+            xi_tick_labels = ["0", "1000"]
+
+        # Plot 1: By cell type (average across layers)
+        for cell_type in POSTER_CELL_TYPES:
+            means = []
+            for stage in DEVELOPMENTAL_STAGES:
+                # Average xi across layers for this cell type
+                xi_values = [
+                    results[stage]["spatial_correlations"][layer][cell_type]["xi_um"]
+                    for layer in LAYERS
+                ]
+                xi_values = [v for v in xi_values if not np.isnan(v)]
+                means.append(np.mean(xi_values) if xi_values else np.nan)
+
+            self._plot_trend_with_errorbars(
+                axes[0], x_pos, means, CELL_COLORS[cell_type], cell_type
+            )
+
+        self._setup_trend_plot_axes(
+            axes[0],
+            "By Cell Type",
+            "ξ (μm)",
+            x_pos,
+            xi_ylim,
+            xi_tick_values,
+            xi_tick_labels,
+        )
+
+        # Plot 2: By layer (average across cell types)
+        for layer in LAYERS:
+            means = []
+            for stage in DEVELOPMENTAL_STAGES:
+                # Average xi across cell types for this layer
+                xi_values = [
+                    results[stage]["spatial_correlations"][layer][cell_type]["xi_um"]
+                    for cell_type in POSTER_CELL_TYPES
+                ]
+                xi_values = [v for v in xi_values if not np.isnan(v)]
+                means.append(np.mean(xi_values) if xi_values else np.nan)
+
+            self._plot_trend_with_errorbars(axes[1], x_pos, means, LAYER_COLORS[layer], layer)
+
+        self._setup_trend_plot_axes(
+            axes[1],
+            "By Layer",
+            "",
+            x_pos,
+            xi_ylim,
+            xi_tick_values,
+            xi_tick_labels,
+            show_ylabel=False,
+        )
+
+        # Plot 3: Total network (average across all)
+        total_values = []
+        for stage in DEVELOPMENTAL_STAGES:
+            xi_values = [
+                results[stage]["spatial_correlations"][layer][cell_type]["xi_um"]
+                for layer in LAYERS
+                for cell_type in POSTER_CELL_TYPES
+            ]
+            xi_values = [v for v in xi_values if not np.isnan(v)]
+            total_values.append(np.mean(xi_values) if xi_values else np.nan)
+
+        self._plot_trend_with_errorbars(axes[2], x_pos, total_values, "black")
+
+        self._setup_trend_plot_axes(
+            axes[2],
+            "Total Network",
+            "",
+            x_pos,
+            xi_ylim,
+            xi_tick_values,
+            xi_tick_labels,
+            show_ylabel=False,
+        )
+
+        plt.tight_layout()
+        self._add_trend_legends(fig, axes)
+        self._save_plot("correlation_length_trends.pdf")
+
+    def _collect_correlation_length_values(self, results: dict[str, Any]) -> list[float]:
+        """Collect all correlation length values for consistent scaling (excluding NaN)."""
+        all_values = []
+
+        for stage in DEVELOPMENTAL_STAGES:
+            for layer in LAYERS:
+                for cell_type in POSTER_CELL_TYPES:
+                    xi = results[stage]["spatial_correlations"][layer][cell_type]["xi_um"]
+                    if not np.isnan(xi):
+                        all_values.append(xi)
+
+        return all_values
+
     def _save_plot(self, filename: str) -> None:
         """Save plot with consistent settings."""
         # Ensure .pdf extension
@@ -670,7 +1309,12 @@ class ActivityVisualizer:
             ("Average firing rates", self.create_average_firing_rate_plots),
             ("Active cell fractions", self.create_active_cell_fraction_plots),
             ("Correlation trends", self.create_pairwise_correlation_trends),
+            ("Dimensionality trends", self.create_dimensionality_trends),
             ("Synchronous events", self.create_synchronous_event_trends),
+            ("Structural E-I balance", self.create_structural_ei_balance_trends),
+            ("Functional E-I balance", self.create_functional_ei_balance_trends),
+            ("Spatial correlation curves", self.create_spatial_correlation_curves),
+            ("Correlation length trends", self.create_correlation_length_trends),
         ]
 
         for plot_name, plot_func in tqdm(plot_functions, desc="Generating plots", unit="plot"):

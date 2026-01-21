@@ -18,11 +18,15 @@ from src.analysis.common import DEVELOPMENTAL_STAGES, PRESETS
 from .config import (
     ALL_LAYERS,
     ANALYSIS_PARAMS,
+    COMPRESSED_MAP_SIGMA_RATIO_RANGE,
+    COMPRESSED_MAP_TAU_RATIO_RANGE,
     FIXED_RATIO_SIGMA_MAX,
     FIXED_RATIO_SIGMA_MIN,
     FIXED_RATIO_TAU_MAX,
     FIXED_RATIO_TAU_MIN,
     GRID_RESOLUTION,
+    MATURITY_REFERENCE_VALUES,
+    MATURITY_SCAN_MARGIN,
     SCANNABLE_PARAMETERS,
     THALAMIC_MAGNITUDE,
     ParameterSpec,
@@ -371,5 +375,429 @@ def compute_stability_maps_all_stages(
         # Distribute results into the organized structure
         for pair, result in stage_results.items():
             all_results[pair][stage_name] = result
+
+    return all_results
+
+
+def _compressed_stability_worker(args: tuple) -> tuple[float, float, tuple[float, float, bool]]:
+    """Worker function for compressed stability map computation.
+
+    Args:
+        args: Tuple of (preset, tau_ratio, sigma_ratio)
+
+    Returns:
+        Tuple of (tau_ratio, sigma_ratio, result) where result is from compute_stability_for_point
+    """
+    preset, tau_ratio, sigma_ratio = args
+
+    # Modify preset with computed absolute values
+    modified_preset = copy.deepcopy(preset)
+    
+    # Get base SST values
+    tau_SST_base = preset["time_constants"]["SST"]
+    sigma_SST_base = preset["outgoing_widths"]["SST"]
+    
+    # Compute absolute PV values from ratios
+    tau_PV = tau_ratio * tau_SST_base
+    sigma_PV = sigma_ratio * sigma_SST_base
+    
+    # Set PV parameters
+    modified_preset["time_constants"]["PV"] = tau_PV
+    modified_preset["outgoing_widths"]["PV"] = sigma_PV
+
+    # Compute stability
+    result = compute_stability_for_point(modified_preset)
+
+    return (tau_ratio, sigma_ratio, result)
+
+
+def compute_compressed_stability_maps_all_stages(
+    stages: list[str] = None,
+    n_processes: int = None,
+) -> dict:
+    """Compute compressed stability maps for SST-PV ratio analysis.
+
+    This function creates a single map per stage showing how stability depends on
+    the ratios τ_PV/τ_SST (x-axis) and σ_PV/σ_SST (y-axis), which capture the
+    SST→PV maturation handoff during development.
+
+    Args:
+        stages: List of developmental stages (default: ['P0', 'P5', 'P10', 'P15'])
+        n_processes: Number of processes for parallelization
+
+    Returns:
+        Dict mapping stage names to results dicts with:
+        - k_matrix: Critical wavenumbers (n_y × n_x)
+        - stability_matrix: Max Re(λ) values (n_y × n_x)
+        - flatness_matrix: Flat spectrum flags (n_y × n_x)
+        - tau_ratio_values: τ_PV/τ_SST ratio values (x-axis)
+        - sigma_ratio_values: σ_PV/σ_SST ratio values (y-axis)
+        - preset: Original preset dict
+        - preset_tau_ratio: Preset τ_PV/τ_SST value
+        - preset_sigma_ratio: Preset σ_PV/σ_SST value
+    """
+    if stages is None:
+        stages = DEVELOPMENTAL_STAGES
+
+    print("\n" + "=" * 70)
+    print("  COMPRESSED STABILITY MAPS - SST-PV Ratio Analysis")
+    print("=" * 70 + "\n")
+
+    # Determine number of processes
+    if n_processes is None:
+        n_processes = max(1, os.cpu_count() - 1)
+
+    # Generate ratio grids
+    tau_ratio_values = np.linspace(
+        COMPRESSED_MAP_TAU_RATIO_RANGE[0],
+        COMPRESSED_MAP_TAU_RATIO_RANGE[1],
+        GRID_RESOLUTION
+    )
+    sigma_ratio_values = np.linspace(
+        COMPRESSED_MAP_SIGMA_RATIO_RANGE[0],
+        COMPRESSED_MAP_SIGMA_RATIO_RANGE[1],
+        GRID_RESOLUTION
+    )
+
+    n_x = len(tau_ratio_values)
+    n_y = len(sigma_ratio_values)
+
+    all_results = {}
+
+    for stage_name in stages:
+        preset = PRESETS[stage_name.upper()]
+        
+        print(f"\n{'='*70}")
+        print(f"Computing compressed stability map for {stage_name}")
+        print(f"{'='*70}")
+        
+        # Get base SST values
+        tau_SST_base = preset["time_constants"]["SST"]
+        sigma_SST_base = preset["outgoing_widths"]["SST"]
+        
+        # Get preset PV values for reference
+        tau_PV_preset = preset["time_constants"]["PV"]
+        sigma_PV_preset = preset["outgoing_widths"]["PV"]
+        
+        # Compute preset ratios
+        preset_tau_ratio = tau_PV_preset / tau_SST_base
+        preset_sigma_ratio = sigma_PV_preset / sigma_SST_base
+        
+        print(f"  Base SST values: τ_SST={tau_SST_base} ms, σ_SST={sigma_SST_base} μm")
+        print(f"  Preset PV values: τ_PV={tau_PV_preset} ms, σ_PV={sigma_PV_preset} μm")
+        print(f"  Preset ratios: τ_PV/τ_SST={preset_tau_ratio:.3f}, σ_PV/σ_SST={preset_sigma_ratio:.3f}")
+        print(f"  Scanning τ_PV/τ_SST ∈ [{COMPRESSED_MAP_TAU_RATIO_RANGE[0]:.2f}, {COMPRESSED_MAP_TAU_RATIO_RANGE[1]:.2f}]")
+        print(f"  Scanning σ_PV/σ_SST ∈ [{COMPRESSED_MAP_SIGMA_RATIO_RANGE[0]:.2f}, {COMPRESSED_MAP_SIGMA_RATIO_RANGE[1]:.2f}]")
+        print(f"  Grid: {GRID_RESOLUTION}×{GRID_RESOLUTION} = {GRID_RESOLUTION**2} points")
+
+        # Prepare tasks for parallel execution
+        tasks = []
+        for sigma_ratio in sigma_ratio_values:
+            for tau_ratio in tau_ratio_values:
+                tasks.append((preset, tau_ratio, sigma_ratio))
+
+        print(f"  Running {len(tasks)} stability computations using {n_processes} processes...")
+
+        # Execute in parallel
+        with mp.Pool(n_processes) as pool:
+            results = pool.map(_compressed_stability_worker, tasks)
+
+        # Unpack results into matrices
+        k_matrix = np.zeros((n_y, n_x))
+        stability_matrix = np.zeros((n_y, n_x))
+        flatness_matrix = np.zeros((n_y, n_x), dtype=bool)
+
+        for tau_ratio, sigma_ratio, (k_crit, max_real, is_flat) in results:
+            # Find indices
+            i = np.argmin(np.abs(sigma_ratio_values - sigma_ratio))
+            j = np.argmin(np.abs(tau_ratio_values - tau_ratio))
+
+            k_matrix[i, j] = k_crit
+            stability_matrix[i, j] = max_real
+            flatness_matrix[i, j] = is_flat
+
+        # Compute stability at exact preset parameters
+        k_preset, stability_preset, flat_preset = compute_stability_for_point(preset)
+        
+        print(f"  Preset stability: k={k_preset:.3f}, Re(λ)_max={stability_preset:.6f}, flat={flat_preset}")
+
+        # Store results
+        all_results[stage_name] = {
+            "k_matrix": k_matrix,
+            "stability_matrix": stability_matrix,
+            "flatness_matrix": flatness_matrix,
+            "tau_ratio_values": tau_ratio_values,
+            "sigma_ratio_values": sigma_ratio_values,
+            "preset": preset,
+            "preset_tau_ratio": preset_tau_ratio,
+            "preset_sigma_ratio": preset_sigma_ratio,
+            "preset_k": k_preset,
+            "preset_stability": stability_preset,
+            "preset_flat": flat_preset,
+        }
+
+    return all_results
+
+
+# ============================================================================
+# Maturity Index Stability Maps
+# ============================================================================
+
+
+def _lerp(a: float, b: float, t: float) -> float:
+    """Linear interpolation from a to b with parameter t in [0, 1]."""
+    return a + t * (b - a)
+
+
+def compute_maturity_from_preset(preset: dict, cell_type: str) -> float:
+    """Compute maturity index for SST or PV from a preset.
+
+    Maturity is the average of three normalized components:
+    - tau_ratio: normalized τ_X/τ_E
+    - sigma_ratio: normalized σ_X/σ_E
+    - strength: normalized strength_scaling
+
+    Each component is 0 at P0 reference and 1 at P15 reference.
+
+    Args:
+        preset: Developmental preset dictionary
+        cell_type: 'SST' or 'PV'
+
+    Returns:
+        Maturity index in [0, 1] (approximately, can exceed bounds for non-preset values)
+    """
+    ref = MATURITY_REFERENCE_VALUES[cell_type]
+
+    # Get current values from preset
+    tau_E = preset["time_constants"]["E"]
+    tau_X = preset["time_constants"][cell_type]
+    sigma_E = preset["outgoing_widths"]["E"]
+    sigma_X = preset["outgoing_widths"][cell_type]
+    strength_X = preset["strength_scaling"][cell_type]
+
+    # Compute current ratios
+    tau_ratio = tau_X / tau_E
+    sigma_ratio = sigma_X / sigma_E
+
+    # Normalize each component to [0, 1] based on immature→mature progression
+    tau_imm, tau_mat = ref["tau_ratio"]["immature"], ref["tau_ratio"]["mature"]
+    sigma_imm, sigma_mat = ref["sigma_ratio"]["immature"], ref["sigma_ratio"]["mature"]
+    strength_imm, strength_mat = ref["strength"]["immature"], ref["strength"]["mature"]
+
+    # Handle direction of change (some increase, some decrease with maturity)
+    if tau_mat != tau_imm:
+        norm_tau = (tau_ratio - tau_imm) / (tau_mat - tau_imm)
+    else:
+        norm_tau = 0.5
+
+    if sigma_mat != sigma_imm:
+        norm_sigma = (sigma_ratio - sigma_imm) / (sigma_mat - sigma_imm)
+    else:
+        norm_sigma = 0.5
+
+    if strength_mat != strength_imm:
+        norm_strength = (strength_X - strength_imm) / (strength_mat - strength_imm)
+    else:
+        norm_strength = 0.5
+
+    # Average the three components with equal weights
+    maturity = (norm_tau + norm_sigma + norm_strength) / 3.0
+
+    return maturity
+
+
+def compute_parameters_from_maturity(
+    maturity: float, cell_type: str, tau_E: float, sigma_E: float
+) -> tuple[float, float, float]:
+    """Compute absolute parameters from a maturity index.
+
+    This is the inverse of compute_maturity_from_preset: given a maturity value,
+    compute the corresponding τ, σ, and strength values.
+
+    All three parameters are interpolated in lockstep (same maturity → same
+    normalized position for all three).
+
+    Args:
+        maturity: Maturity index (typically in [0, 1])
+        cell_type: 'SST' or 'PV'
+        tau_E: Stage-specific τ_E value (ms)
+        sigma_E: Stage-specific σ_E value (μm)
+
+    Returns:
+        Tuple of (tau_X, sigma_X, strength_X)
+    """
+    ref = MATURITY_REFERENCE_VALUES[cell_type]
+
+    # Interpolate ratios and strength based on maturity (immature=0, mature=1)
+    tau_ratio = _lerp(ref["tau_ratio"]["immature"], ref["tau_ratio"]["mature"], maturity)
+    sigma_ratio = _lerp(ref["sigma_ratio"]["immature"], ref["sigma_ratio"]["mature"], maturity)
+    strength = _lerp(ref["strength"]["immature"], ref["strength"]["mature"], maturity)
+
+    # Convert ratios to absolute values using stage-specific E parameters
+    tau_X = tau_E * tau_ratio
+    sigma_X = sigma_E * sigma_ratio
+
+    return tau_X, sigma_X, strength
+
+
+def _maturity_stability_worker(args: tuple) -> tuple[float, float, tuple[float, float, bool]]:
+    """Worker function for maturity stability map computation.
+
+    Args:
+        args: Tuple of (preset, sst_maturity, pv_maturity, tau_E, sigma_E)
+
+    Returns:
+        Tuple of (sst_maturity, pv_maturity, result) where result is from compute_stability_for_point
+    """
+    preset, sst_maturity, pv_maturity, tau_E, sigma_E = args
+
+    # Compute absolute parameters from maturity indices
+    tau_SST, sigma_SST, strength_SST = compute_parameters_from_maturity(
+        sst_maturity, "SST", tau_E, sigma_E
+    )
+    tau_PV, sigma_PV, strength_PV = compute_parameters_from_maturity(
+        pv_maturity, "PV", tau_E, sigma_E
+    )
+
+    # Modify preset with computed parameters
+    modified_preset = copy.deepcopy(preset)
+    modified_preset["time_constants"]["SST"] = tau_SST
+    modified_preset["time_constants"]["PV"] = tau_PV
+    modified_preset["outgoing_widths"]["SST"] = sigma_SST
+    modified_preset["outgoing_widths"]["PV"] = sigma_PV
+    modified_preset["strength_scaling"]["SST"] = strength_SST
+    modified_preset["strength_scaling"]["PV"] = strength_PV
+
+    # Compute stability
+    result = compute_stability_for_point(modified_preset)
+
+    return (sst_maturity, pv_maturity, result)
+
+
+def compute_maturity_stability_maps_all_stages(
+    stages: list[str] = None,
+    n_processes: int = None,
+) -> dict:
+    """Compute stability maps as a function of SST and PV maturity indices.
+
+    For each developmental stage, uses that stage's E parameters as baseline
+    and scans a grid of (SST_maturity, PV_maturity) values centered on the
+    stage's natural maturity.
+
+    Args:
+        stages: List of developmental stages (default: ['P0', 'P5', 'P10', 'P15'])
+        n_processes: Number of processes for parallelization
+
+    Returns:
+        Dict mapping stage names to results dicts with:
+        - k_matrix: Critical wavenumbers (n_y × n_x)
+        - stability_matrix: Max Re(λ) values (n_y × n_x)
+        - flatness_matrix: Flat spectrum flags (n_y × n_x)
+        - sst_maturity_values: SST maturity values (x-axis)
+        - pv_maturity_values: PV maturity values (y-axis)
+        - preset: Original preset dict
+        - preset_sst_maturity: Preset SST maturity value
+        - preset_pv_maturity: Preset PV maturity value
+        - sst_maturity_range: (min, max) range scanned for SST
+        - pv_maturity_range: (min, max) range scanned for PV
+    """
+    if stages is None:
+        stages = DEVELOPMENTAL_STAGES
+
+    print("\n" + "=" * 70)
+    print("  MATURITY INDEX STABILITY MAPS")
+    print("=" * 70 + "\n")
+
+    # Determine number of processes
+    if n_processes is None:
+        n_processes = max(1, os.cpu_count() - 1)
+
+    all_results = {}
+
+    for stage_name in stages:
+        preset = PRESETS[stage_name.upper()]
+
+        print(f"\n{'='*70}")
+        print(f"Computing maturity stability map for {stage_name}")
+        print(f"{'='*70}")
+
+        # Get stage-specific E parameters
+        tau_E = preset["time_constants"]["E"]
+        sigma_E = preset["outgoing_widths"]["E"]
+
+        # Compute natural maturity for this stage
+        preset_sst_maturity = compute_maturity_from_preset(preset, "SST")
+        preset_pv_maturity = compute_maturity_from_preset(preset, "PV")
+
+        print(f"  Stage E parameters: τ_E={tau_E} ms, σ_E={sigma_E} μm")
+        print(f"  Natural SST maturity: {preset_sst_maturity:.3f}")
+        print(f"  Natural PV maturity: {preset_pv_maturity:.3f}")
+
+        # Determine scan range centered on natural maturity, clamped to [0, 1]
+        sst_min = max(0.0, preset_sst_maturity - MATURITY_SCAN_MARGIN)
+        sst_max = min(1.0, preset_sst_maturity + MATURITY_SCAN_MARGIN)
+        pv_min = max(0.0, preset_pv_maturity - MATURITY_SCAN_MARGIN)
+        pv_max = min(1.0, preset_pv_maturity + MATURITY_SCAN_MARGIN)
+
+        print(f"  Scanning SST maturity ∈ [{sst_min:.2f}, {sst_max:.2f}]")
+        print(f"  Scanning PV maturity ∈ [{pv_min:.2f}, {pv_max:.2f}]")
+        print(f"  Grid: {GRID_RESOLUTION}×{GRID_RESOLUTION} = {GRID_RESOLUTION**2} points")
+
+        # Generate maturity grids
+        sst_maturity_values = np.linspace(sst_min, sst_max, GRID_RESOLUTION)
+        pv_maturity_values = np.linspace(pv_min, pv_max, GRID_RESOLUTION)
+
+        n_x = len(sst_maturity_values)
+        n_y = len(pv_maturity_values)
+
+        # Prepare tasks for parallel execution
+        tasks = []
+        for pv_mat in pv_maturity_values:
+            for sst_mat in sst_maturity_values:
+                tasks.append((preset, sst_mat, pv_mat, tau_E, sigma_E))
+
+        print(f"  Running {len(tasks)} stability computations using {n_processes} processes...")
+
+        # Execute in parallel
+        with mp.Pool(n_processes) as pool:
+            results = pool.map(_maturity_stability_worker, tasks)
+
+        # Unpack results into matrices
+        k_matrix = np.zeros((n_y, n_x))
+        stability_matrix = np.zeros((n_y, n_x))
+        flatness_matrix = np.zeros((n_y, n_x), dtype=bool)
+
+        for sst_mat, pv_mat, (k_crit, max_real, is_flat) in results:
+            # Find indices
+            i = np.argmin(np.abs(pv_maturity_values - pv_mat))
+            j = np.argmin(np.abs(sst_maturity_values - sst_mat))
+
+            k_matrix[i, j] = k_crit
+            stability_matrix[i, j] = max_real
+            flatness_matrix[i, j] = is_flat
+
+        # Compute stability at exact preset parameters
+        k_preset, stability_preset, flat_preset = compute_stability_for_point(preset)
+
+        print(
+            f"  Preset stability: k={k_preset:.3f}, Re(λ)_max={stability_preset:.6f}, flat={flat_preset}"
+        )
+
+        # Store results
+        all_results[stage_name] = {
+            "k_matrix": k_matrix,
+            "stability_matrix": stability_matrix,
+            "flatness_matrix": flatness_matrix,
+            "sst_maturity_values": sst_maturity_values,
+            "pv_maturity_values": pv_maturity_values,
+            "preset": preset,
+            "preset_sst_maturity": preset_sst_maturity,
+            "preset_pv_maturity": preset_pv_maturity,
+            "sst_maturity_range": (sst_min, sst_max),
+            "pv_maturity_range": (pv_min, pv_max),
+            "preset_k": k_preset,
+            "preset_stability": stability_preset,
+            "preset_flat": flat_preset,
+        }
 
     return all_results

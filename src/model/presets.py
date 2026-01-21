@@ -9,7 +9,7 @@ P0_PRESET = {
     # Approximate time constants (ms).
     "time_constants": {
         "E": 50.0,  # immature pyramids, high τm
-        "SST": 70.0,  # very integrative early SST
+        "SST": 60.0,  # very integrative early SST
         "PV": 40.0,  # PV-lineage not yet fast-spiking
     },
     # Constant background input for each cell type.
@@ -17,7 +17,7 @@ P0_PRESET = {
     # Thalamic input widths: how broadly thalamic input is spatially spread (μm).
     "thalamic_widths": {"E": 200.0, "SST": 200.0, "PV": 150.0},
     # Outgoing widths: how far each cell type's lateral connections spread (μm).
-    "outgoing_widths": {"E": 300.0, "SST": 400.0, "PV": 250.0},
+    "outgoing_widths": {"E": 300.0, "SST": 450.0, "PV": 250.0},
     # Strength scaling factors: overall scaling of connection strengths.
     "strength_scaling": {"E": 2.0, "SST": 3.0, "PV": 0.2, "thalamus": 2.0},
     # Thalamic alpha: developmental time parameter [0=early, 1=late]
@@ -94,7 +94,7 @@ P0_PRESET = {
         "L5_PV_to_L5_PV": 0.0,
 
         # ---------- L5 to L2/3 ----------
-        "L5_E_to_L23_E": 0.0,
+        "L5_E_to_L23_E": 0.001,
         "L5_E_to_L23_SST": 0.0,
         "L5_E_to_L23_PV": 0.0,
         "L5_SST_to_L23_E": 0.0,
@@ -120,20 +120,20 @@ P0_PRESET = {
         "thalamus_to_L4_SST":  0.1,
         "thalamus_to_L4_PV":   0.0,
         "thalamus_to_L5_E":    0.2,
-        "thalamus_to_L5_SST":  0.3,
+        "thalamus_to_L5_SST":  0.2,
         "thalamus_to_L5_PV":   0.1
     },
 }
 
 # ----------------- P5 PRESET (Late 1st Week) -----------------
 P5_PRESET = {
-    "time_constants": {"E": 40.0, "SST": 60.0, "PV": 35.0},
+    "time_constants": {"E": 40.0, "SST": 50.0, "PV": 35.0},
     "background_input": {"E": 0.0, "SST": 0.0, "PV": 0.0},
     # Thalamic input widths (μm)
     "thalamic_widths": {"E": 150.0, "SST": 150.0, "PV": 120.0},
     # Outgoing widths (μm)
-    "outgoing_widths": {"E": 200.0, "SST": 400.0, "PV": 250.0},
-    "strength_scaling": {"E": 3.2, "SST": 4.0, "PV": 0.7, "thalamus": 2.0},
+    "outgoing_widths": {"E": 150.0, "SST": 450.0, "PV": 250.0},
+    "strength_scaling": {"E": 3.2, "SST": 4.5, "PV": 0.7, "thalamus": 2.0},
     "thalamic_alpha": 0.3,
     "connection_strengths": {
         # ---------- L2/3 (within L2/3) ----------
@@ -220,7 +220,7 @@ P5_PRESET = {
         "L5_E_to_L4_E": 0.1,
         "L5_E_to_L4_SST": 0.1,
         "L5_E_to_L4_PV": 0.1,
-        "L5_SST_to_L4_E": -0.8,
+        "L5_SST_to_L4_E": -0.6,
         "L5_SST_to_L4_PV": 0.0,
         "L5_PV_to_L4_E": 0.0,
         "L5_PV_to_L4_SST": 0.0,
@@ -233,26 +233,26 @@ P5_PRESET = {
         "thalamus_to_L4_SST":  0.1,
         "thalamus_to_L4_PV":   0.1,
         "thalamus_to_L5_E":    0.2,
-        "thalamus_to_L5_SST":  0.5,
+        "thalamus_to_L5_SST":  0.4,
         "thalamus_to_L5_PV":   0.3
     },
 }
 
 # ----------------- P10 PRESET (Mid 2nd Week) -----------------
 P10_PRESET = {
-    "time_constants": {"E": 30.0, "SST": 50.0, "PV": 20.0},
+    "time_constants": {"E": 30.0, "SST": 40.0, "PV": 20.0},
     # Thalamic input widths (μm)
     "thalamic_widths": {"E": 120.0, "SST": 120.0, "PV": 100.0},
     # Outgoing widths (μm)
-    "outgoing_widths": {"E": 180.0, "SST": 300.0, "PV": 185.0},
-    "strength_scaling": {"E": 3.0, "SST": 4.0, "PV": 3.0, "thalamus": 2.0},
+    "outgoing_widths": {"E": 150.0, "SST": 150.0, "PV": 150.0},
+    "strength_scaling": {"E": 3.1, "SST": 4.0, "PV": 3.8, "thalamus": 2.0},
     "thalamic_alpha": 0.7,
     "background_input": {"E": 0.05, "SST": 0.0, "PV": 0.0},
     "connection_strengths": {
         # ---------- L2/3 (within L2/3) ----------
         "L23_E_to_L23_E": 0.4,
         "L23_E_to_L23_SST": 0.6,
-        "L23_E_to_L23_PV": 0.5,
+        "L23_E_to_L23_PV": 0.2,
         "L23_SST_to_L23_E": -0.4,
         "L23_SST_to_L23_PV": -0.2,
         "L23_PV_to_L23_E": -0.2,
@@ -270,7 +270,7 @@ P10_PRESET = {
         "L23_PV_to_L4_PV": 0.0,
 
         # ---------- L2/3 to L5 ----------
-        "L23_E_to_L5_E": 0.8,
+        "L23_E_to_L5_E": 0.6,
         "L23_E_to_L5_SST": 0.2,
         "L23_E_to_L5_PV": 0.6,
         "L23_SST_to_L5_E": 0.0,
@@ -286,7 +286,7 @@ P10_PRESET = {
         "L4_SST_to_L4_E": -0.4,
         "L4_SST_to_L4_PV": -0.2,
         "L4_PV_to_L4_E": -0.2,
-        "L4_PV_to_L4_SST": -0.4,
+        "L4_PV_to_L4_SST": -0.1,
         "L4_PV_to_L4_PV": -0.4,
 
         # ---------- L4 to L2/3 ----------
@@ -310,19 +310,19 @@ P10_PRESET = {
         "L4_PV_to_L5_PV": -0.2,
 
         # ---------- L5 (within L5) ----------
-        "L5_E_to_L5_E": 0.6,
+        "L5_E_to_L5_E": 0.5,
         "L5_E_to_L5_SST": 0.4,
-        "L5_E_to_L5_PV": 0.8,
+        "L5_E_to_L5_PV": 0.5,
         "L5_SST_to_L5_E": -0.5,
         "L5_SST_to_L5_PV": -0.3,
         "L5_PV_to_L5_E": -0.4,
-        "L5_PV_to_L5_SST": -0.4,
+        "L5_PV_to_L5_SST": -0.0,
         "L5_PV_to_L5_PV": -0.6,
 
         # ---------- L5 to L2/3 ----------
         "L5_E_to_L23_E": 0.5,
         "L5_E_to_L23_SST": 0.3,
-        "L5_E_to_L23_PV": 0.5,
+        "L5_E_to_L23_PV": 0.3,
         "L5_SST_to_L23_E": -0.3,
         "L5_SST_to_L23_PV": 0.0,
         "L5_PV_to_L23_E": 0.0,
@@ -333,7 +333,7 @@ P10_PRESET = {
         "L5_E_to_L4_E": 0.2,
         "L5_E_to_L4_SST": 0.2,
         "L5_E_to_L4_PV": 0.1,
-        "L5_SST_to_L4_E": 0.2,
+        "L5_SST_to_L4_E": -0.1,
         "L5_SST_to_L4_PV": 0.0,
         "L5_PV_to_L4_E": -0.2,
         "L5_PV_to_L4_SST": 0.0,

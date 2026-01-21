@@ -119,13 +119,15 @@ class BifurcationVisualizer:
             secondary_width = self.bold_spine_width
 
         # Create figure with n_rows×n_stages grid
-        fig_height = self.fig_height_per_row * n_rows
+        # Slightly taller per row than gain maps because we now show one x-label per row
+        fig_height = self.fig_height_per_row * n_rows * 1.18
         fig = plt.figure(figsize=(self.fig_width, fig_height))
         gs = GridSpec(
             n_rows,
             n_stages,
             figure=fig,
-            hspace=self.hspace,
+            # Extra vertical spacing so row-level x-labels don't collide with the next row
+            hspace=self.hspace + 0.18,
             wspace=self.wspace,
             left=self.left_margin,
             right=0.83,
@@ -295,6 +297,7 @@ class BifurcationVisualizer:
                 # Axis labels (primary axes)
                 # Make labels grey if not dominant, black if dominant
                 primary_label_color = "black" if primary_width == self.bold_spine_width else "0.5"
+                # Show y-labels on all leftmost axes
                 if stage_idx == 0:
                     ax.set_ylabel(
                         param_y_spec.get_axis_label(absolute=primary_absolute),
@@ -305,8 +308,8 @@ class BifurcationVisualizer:
                 else:
                     ax.set_ylabel("")
 
-                # Show x-labels on bottom row and top row (tau_SST)
-                if row_idx == n_rows - 1 or row_idx == 0:
+                # Show x-label once per row (leftmost panel) since each row can use a different x-param
+                if stage_idx == 0:
                     ax.set_xlabel(
                         param_x_spec.get_axis_label(absolute=primary_absolute),
                         fontsize=self.label_fontsize,
@@ -351,6 +354,7 @@ class BifurcationVisualizer:
                 ax2.yaxis.set_major_locator(MaxNLocator(nbins=4))
                 # Make labels grey if not dominant, black if dominant
                 secondary_label_color = "black" if secondary_width == self.bold_spine_width else "0.5"
+                # Show y-labels on all rightmost axes
                 if stage_idx == n_stages - 1:
                     ax2.set_ylabel(
                         param_y_spec.get_axis_label(absolute=secondary_absolute),
@@ -370,13 +374,18 @@ class BifurcationVisualizer:
                     else:
                         ax2.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
                 else:
+                    # Keep secondary axis minimal on interior panels: no tick labels without an axis label
                     ax2.set_ylabel("")
-                    ax2.tick_params(labelright=False, length=0)
+                    ax2.tick_params(
+                        labelright=False,
+                        right=False,
+                        length=0,
+                    )
                 ax2.spines["right"].set_linewidth(secondary_width)
                 for spine_name in ["left", "top", "bottom"]:
                     ax2.spines[spine_name].set_visible(False)
 
-                # Top axis - only show on top row
+                # Top axis - show on all top row axes
                 if param_x_spec.use_ratio and param_x_spec.reference_param:
                     ref_spec_x = SCANNABLE_PARAMETERS[param_x_spec.reference_param]
                     ref_value_x = get_nested_value(preset, ref_spec_x.path)
@@ -1088,6 +1097,553 @@ class BifurcationVisualizer:
 
         return fig
 
+    def create_compressed_stability_map_figure(
+        self,
+        results: dict,
+        stages: list[str],
+    ) -> plt.Figure:
+        """Create compressed stability map figure showing SST-PV ratio analysis.
+
+        Args:
+            results: Results dict organized as {stage: stage_results}
+            stages: List of stage names
+
+        Returns:
+            matplotlib Figure object
+        """
+        n_stages = len(stages)
+
+        # Create figure with single row of n_stages panels
+        fig_height = self.fig_height_per_row * 1.18  # Slightly taller for x-labels
+        fig = plt.figure(figsize=(self.fig_width, fig_height))
+        gs = GridSpec(
+            1,
+            n_stages,
+            figure=fig,
+            hspace=0.45,
+            wspace=self.wspace,
+            left=self.left_margin,
+            right=0.83,
+            top=0.80,
+            bottom=0.08,
+        )
+
+        # Determine global wavelength range for consistent colormap across all stages
+        all_wavelength_values = []
+        for stage in stages:
+            if stage in results:
+                k_matrix = results[stage]["k_matrix"]
+                # Convert k to wavelength, avoiding division by zero
+                wavelength_matrix = np.where(k_matrix > 0, 1.0 / k_matrix, np.inf)
+                all_wavelength_values.append(wavelength_matrix)
+
+        if all_wavelength_values:
+            # Use finite values only
+            finite_wavelengths = [w[np.isfinite(w)] for w in all_wavelength_values]
+            if any(len(w) > 0 for w in finite_wavelengths):
+                wavelength_min = max(
+                    np.min([np.min(w) for w in finite_wavelengths if len(w) > 0]), 50.0
+                )
+                wavelength_max = min(
+                    np.max([np.max(w) for w in finite_wavelengths if len(w) > 0]), 2000.0
+                )
+            else:
+                wavelength_min, wavelength_max = 50.0, 2000.0
+        else:
+            wavelength_min, wavelength_max = 50.0, 2000.0
+
+        norm = colors.Normalize(vmin=wavelength_min, vmax=wavelength_max)
+        cmap = plt.colormaps[BIFURCATION_COLORMAP]
+
+        # Plot each stage
+        for stage_idx, stage_name in enumerate(stages):
+            if stage_name not in results:
+                continue
+
+            stage_result = results[stage_name]
+            tau_ratio_values = stage_result["tau_ratio_values"]
+            sigma_ratio_values = stage_result["sigma_ratio_values"]
+            k_matrix = stage_result["k_matrix"]
+            stability_matrix = stage_result["stability_matrix"]
+            flatness_matrix = stage_result.get("flatness_matrix", None)
+
+            ax = fig.add_subplot(gs[0, stage_idx])
+
+            # Convert k to wavelength: λ = 1/k (μm)
+            wavelength_matrix = np.where(k_matrix > 0, 1.0 / k_matrix, np.inf)
+
+            # Identify NaN values (failed steady-state convergence)
+            nan_mask = np.isnan(k_matrix) | np.isnan(stability_matrix)
+
+            # Compute alpha values based on stability
+            alpha_matrix = np.zeros_like(stability_matrix)
+            alpha_matrix[stability_matrix < STABILITY_THRESHOLD] = OPACITY_STABLE_FAR
+            alpha_matrix[
+                (stability_matrix >= STABILITY_THRESHOLD) & (stability_matrix < 0)
+            ] = OPACITY_STABLE_NEAR
+            alpha_matrix[stability_matrix >= 0] = OPACITY_UNSTABLE
+
+            # Create RGBA image (grey for flat spectra, colormap otherwise, white for NaN)
+            rgba_image = np.zeros((*wavelength_matrix.shape, 4))
+            grey_color = (0.5, 0.5, 0.5)
+            white_color = (1.0, 1.0, 1.0)
+            for i in range(wavelength_matrix.shape[0]):
+                for j in range(wavelength_matrix.shape[1]):
+                    if nan_mask[i, j]:
+                        # NaN values render as white (failed convergence)
+                        rgba_image[i, j] = (*white_color, 1.0)
+                    elif flatness_matrix is not None and flatness_matrix[i, j]:
+                        color_rgb = grey_color
+                        rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
+                    else:
+                        color_rgb = cmap(norm(wavelength_matrix[i, j]))[:3]
+                        rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
+
+            # Display image
+            extent = [
+                tau_ratio_values[0],
+                tau_ratio_values[-1],
+                sigma_ratio_values[0],
+                sigma_ratio_values[-1],
+            ]
+            ax.imshow(rgba_image, origin="lower", extent=extent, interpolation="nearest")
+
+            # Add stability boundary contour
+            with contextlib.suppress(ValueError, RuntimeError):
+                ax.contour(
+                    tau_ratio_values,
+                    sigma_ratio_values,
+                    stability_matrix,
+                    levels=[0],
+                    colors="white",
+                    linewidths=1.0,
+                    linestyles="--",
+                    alpha=0.8,
+                )
+
+            # Mark preset point
+            preset_tau_ratio = stage_result["preset_tau_ratio"]
+            preset_sigma_ratio = stage_result["preset_sigma_ratio"]
+            ax.scatter(
+                preset_tau_ratio,
+                preset_sigma_ratio,
+                marker="o",
+                s=30,
+                edgecolor="black",
+                linewidth=1.2,
+                facecolor="white",
+                zorder=10,
+            )
+
+            # Set axis limits
+            ax.set_xlim(tau_ratio_values[0], tau_ratio_values[-1])
+            ax.set_ylim(sigma_ratio_values[0], sigma_ratio_values[-1])
+            
+            # Calculate aspect ratio to make plots visually square
+            # Aspect ratio = (x_range) / (y_range) to maintain square appearance
+            x_range = tau_ratio_values[-1] - tau_ratio_values[0]
+            y_range = sigma_ratio_values[-1] - sigma_ratio_values[0]
+            aspect_ratio = x_range / y_range if y_range > 0 else 1.0
+            ax.set_aspect(aspect_ratio, adjustable="box")
+            
+            ax.locator_params(axis="x", nbins=4)
+            ax.locator_params(axis="y", nbins=5)
+
+            # Axis styling - make all spines visible
+            ax.spines["bottom"].set_linewidth(self.default_spine_width)
+            ax.spines["left"].set_linewidth(self.default_spine_width)
+            ax.spines["top"].set_linewidth(self.default_spine_width)
+            ax.spines["right"].set_linewidth(self.default_spine_width)
+            ax.spines["top"].set_visible(True)
+            ax.spines["right"].set_visible(True)
+
+            # Labels
+            if stage_idx == 0:
+                ax.set_ylabel(
+                    r"$\sigma_{\mathrm{PV}} / \sigma_{\mathrm{SST}}$",
+                    fontsize=self.label_fontsize,
+                    labelpad=6,
+                )
+            else:
+                ax.set_ylabel("")
+
+            ax.set_xlabel(
+                r"$\tau_{\mathrm{PV}} / \tau_{\mathrm{SST}}$",
+                fontsize=self.label_fontsize,
+                labelpad=6,
+            )
+
+            ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.5)
+
+            # Stage label
+            ax.set_title(
+                stage_name, fontsize=self.subtitle_fontsize, fontweight="bold", pad=10
+            )
+
+        # Add 2D opacity legend (same as standard stability maps)
+        cbar_bottom = 0.14
+        cbar_top = 0.80
+        cbar_height = cbar_top - cbar_bottom
+        cbar_width = 0.05
+        cbar_ax = fig.add_axes([0.95, cbar_bottom, cbar_width, cbar_height])
+
+        # Create 2D opacity legend
+        n_ticks = 100
+        opacity_legend = np.zeros((n_ticks, 3, 4))  # RGBA array
+
+        wavelength_values_for_legend = np.linspace(wavelength_min, wavelength_max, n_ticks)
+        for i, wavelength_val in enumerate(wavelength_values_for_legend):
+            color_rgb = cmap(norm(wavelength_val))[:3]
+            opacity_legend[i, 0, :3] = color_rgb
+            opacity_legend[i, 0, 3] = OPACITY_STABLE_FAR
+            opacity_legend[i, 1, :3] = color_rgb
+            opacity_legend[i, 1, 3] = OPACITY_STABLE_NEAR
+            opacity_legend[i, 2, :3] = color_rgb
+            opacity_legend[i, 2, 3] = OPACITY_UNSTABLE
+
+        # Display the 2D legend
+        cbar_ax.imshow(opacity_legend, origin="lower", aspect="auto", interpolation="nearest")
+
+        # Set up axes
+        cbar_ax.set_xlim(-0.5, 2.5)
+        cbar_ax.set_ylim(0, n_ticks - 1)
+
+        # X-axis labels for the three stability ranges
+        cbar_ax.set_xticks([0, 1, 2])
+        cbar_ax.set_xticklabels(
+            ["Stable (far)", "Stable (near)", "Unstable"],
+            fontsize=self.secondary_tick_fontsize,
+            rotation=45,
+            ha="left",
+        )
+        cbar_ax.xaxis.set_label_position("top")
+        cbar_ax.xaxis.tick_top()
+        cbar_ax.tick_params(
+            axis="x", bottom=False, top=True, labelsize=self.secondary_tick_fontsize
+        )
+
+        # Y-axis: wavelength values
+        wavelength_tick_positions = np.linspace(0, n_ticks - 1, 6)
+        wavelength_tick_values = np.linspace(wavelength_min, wavelength_max, 6)
+        cbar_ax.set_yticks(wavelength_tick_positions)
+        cbar_ax.set_yticklabels(
+            [f"{w:.0f}" for w in wavelength_tick_values], fontsize=self.tick_fontsize
+        )
+        cbar_ax.set_ylabel(
+            r"Wavelength w/ max Re($\lambda$) ($\mu$m)", fontsize=self.label_fontsize, labelpad=15
+        )
+        cbar_ax.yaxis.set_label_position("right")
+        cbar_ax.yaxis.tick_right()
+        cbar_ax.tick_params(axis="y", left=False, right=True, labelsize=self.tick_fontsize)
+
+        # Style the axes
+        cbar_ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.6)
+        for spine in cbar_ax.spines.values():
+            spine.set_visible(True)
+            spine.set_edgecolor("black")
+            spine.set_linewidth(1.0)
+
+        # Add grey legend at bottom of colorbar
+        grey_legend_bottom = 0.08 + 0.01
+        stable_ax = fig.add_axes([0.95, grey_legend_bottom, cbar_width, 0.03])
+        stable_ax.imshow(
+            np.full((10, 1), 0.5), cmap="Greys", vmin=0, vmax=1, origin="lower", aspect="auto"
+        )
+        stable_ax.set_xticks([])
+        stable_ax.set_yticks([])
+        for spine in stable_ax.spines.values():
+            spine.set_visible(True)
+            spine.set_edgecolor("black")
+        stable_ax.text(
+            0.5,
+            -0.25,
+            "No dominant\nspatial mode",
+            transform=stable_ax.transAxes,
+            fontsize=self.secondary_label_fontsize,
+            rotation=0,
+            va="top",
+            ha="center",
+        )
+
+        # Overall title
+        title = "Stability Landscape: SST-PV Maturation Ratios"
+        fig.suptitle(title, fontsize=self.title_fontsize, fontweight="bold", y=1.03)
+
+        return fig
+
+    def create_maturity_stability_map_figure(
+        self,
+        results: dict,
+        stages: list[str],
+    ) -> plt.Figure:
+        """Create maturity stability map figure showing SST/PV maturation indices.
+
+        Args:
+            results: Results dict organized as {stage: stage_results}
+            stages: List of stage names
+
+        Returns:
+            matplotlib Figure object
+        """
+        n_stages = len(stages)
+
+        # Create figure with single row of n_stages panels
+        fig_height = self.fig_height_per_row * 1.18  # Slightly taller for x-labels
+        fig = plt.figure(figsize=(self.fig_width, fig_height))
+        gs = GridSpec(
+            1,
+            n_stages,
+            figure=fig,
+            hspace=0.45,
+            wspace=self.wspace,
+            left=self.left_margin,
+            right=0.83,
+            top=0.80,
+            bottom=0.08,
+        )
+
+        # Determine global wavelength range for consistent colormap across all stages
+        all_wavelength_values = []
+        for stage in stages:
+            if stage in results:
+                k_matrix = results[stage]["k_matrix"]
+                # Convert k to wavelength, avoiding division by zero
+                wavelength_matrix = np.where(k_matrix > 0, 1.0 / k_matrix, np.inf)
+                all_wavelength_values.append(wavelength_matrix)
+
+        if all_wavelength_values:
+            # Use finite values only
+            finite_wavelengths = [w[np.isfinite(w)] for w in all_wavelength_values]
+            if any(len(w) > 0 for w in finite_wavelengths):
+                wavelength_min = max(
+                    np.min([np.min(w) for w in finite_wavelengths if len(w) > 0]), 50.0
+                )
+                wavelength_max = min(
+                    np.max([np.max(w) for w in finite_wavelengths if len(w) > 0]), 2000.0
+                )
+            else:
+                wavelength_min, wavelength_max = 50.0, 2000.0
+        else:
+            wavelength_min, wavelength_max = 50.0, 2000.0
+
+        norm = colors.Normalize(vmin=wavelength_min, vmax=wavelength_max)
+        cmap = plt.colormaps[BIFURCATION_COLORMAP]
+
+        # Plot each stage
+        for stage_idx, stage_name in enumerate(stages):
+            if stage_name not in results:
+                continue
+
+            stage_result = results[stage_name]
+            sst_maturity_values = stage_result["sst_maturity_values"]
+            pv_maturity_values = stage_result["pv_maturity_values"]
+            k_matrix = stage_result["k_matrix"]
+            stability_matrix = stage_result["stability_matrix"]
+            flatness_matrix = stage_result.get("flatness_matrix", None)
+
+            ax = fig.add_subplot(gs[0, stage_idx])
+
+            # Convert k to wavelength: λ = 1/k (μm)
+            wavelength_matrix = np.where(k_matrix > 0, 1.0 / k_matrix, np.inf)
+
+            # Identify NaN values (failed steady-state convergence)
+            nan_mask = np.isnan(k_matrix) | np.isnan(stability_matrix)
+
+            # Compute alpha values based on stability
+            alpha_matrix = np.zeros_like(stability_matrix)
+            alpha_matrix[stability_matrix < STABILITY_THRESHOLD] = OPACITY_STABLE_FAR
+            alpha_matrix[
+                (stability_matrix >= STABILITY_THRESHOLD) & (stability_matrix < 0)
+            ] = OPACITY_STABLE_NEAR
+            alpha_matrix[stability_matrix >= 0] = OPACITY_UNSTABLE
+
+            # Create RGBA image (grey for flat spectra, colormap otherwise, white for NaN)
+            rgba_image = np.zeros((*wavelength_matrix.shape, 4))
+            grey_color = (0.5, 0.5, 0.5)
+            white_color = (1.0, 1.0, 1.0)
+            for i in range(wavelength_matrix.shape[0]):
+                for j in range(wavelength_matrix.shape[1]):
+                    if nan_mask[i, j]:
+                        # NaN values render as white (failed convergence)
+                        rgba_image[i, j] = (*white_color, 1.0)
+                    elif flatness_matrix is not None and flatness_matrix[i, j]:
+                        color_rgb = grey_color
+                        rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
+                    else:
+                        color_rgb = cmap(norm(wavelength_matrix[i, j]))[:3]
+                        rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
+
+            # Display image
+            extent = [
+                sst_maturity_values[0],
+                sst_maturity_values[-1],
+                pv_maturity_values[0],
+                pv_maturity_values[-1],
+            ]
+            ax.imshow(rgba_image, origin="lower", extent=extent, interpolation="nearest")
+
+            # Add stability boundary contour
+            with contextlib.suppress(ValueError, RuntimeError):
+                ax.contour(
+                    sst_maturity_values,
+                    pv_maturity_values,
+                    stability_matrix,
+                    levels=[0],
+                    colors="white",
+                    linewidths=1.0,
+                    linestyles="--",
+                    alpha=0.8,
+                )
+
+            # Mark preset point
+            preset_sst_maturity = stage_result["preset_sst_maturity"]
+            preset_pv_maturity = stage_result["preset_pv_maturity"]
+            ax.scatter(
+                preset_sst_maturity,
+                preset_pv_maturity,
+                marker="o",
+                s=30,
+                edgecolor="black",
+                linewidth=1.2,
+                facecolor="white",
+                zorder=10,
+            )
+
+            # Set axis limits
+            ax.set_xlim(sst_maturity_values[0], sst_maturity_values[-1])
+            ax.set_ylim(pv_maturity_values[0], pv_maturity_values[-1])
+
+            # Calculate aspect ratio to make plots visually square
+            x_range = sst_maturity_values[-1] - sst_maturity_values[0]
+            y_range = pv_maturity_values[-1] - pv_maturity_values[0]
+            aspect_ratio = x_range / y_range if y_range > 0 else 1.0
+            ax.set_aspect(aspect_ratio, adjustable="box")
+
+            ax.locator_params(axis="x", nbins=4)
+            ax.locator_params(axis="y", nbins=5)
+
+            # Axis styling - make all spines visible
+            ax.spines["bottom"].set_linewidth(self.default_spine_width)
+            ax.spines["left"].set_linewidth(self.default_spine_width)
+            ax.spines["top"].set_linewidth(self.default_spine_width)
+            ax.spines["right"].set_linewidth(self.default_spine_width)
+            ax.spines["top"].set_visible(True)
+            ax.spines["right"].set_visible(True)
+
+            # Labels
+            if stage_idx == 0:
+                ax.set_ylabel(
+                    "PV Maturity",
+                    fontsize=self.label_fontsize,
+                    labelpad=6,
+                )
+            else:
+                ax.set_ylabel("")
+
+            ax.set_xlabel(
+                "SST Maturity",
+                fontsize=self.label_fontsize,
+                labelpad=6,
+            )
+
+            ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.5)
+
+            # Stage label
+            ax.set_title(
+                stage_name, fontsize=self.subtitle_fontsize, fontweight="bold", pad=10
+            )
+
+        # Add 2D opacity legend (same as standard stability maps)
+        cbar_bottom = 0.14
+        cbar_top = 0.80
+        cbar_height = cbar_top - cbar_bottom
+        cbar_width = 0.05
+        cbar_ax = fig.add_axes([0.95, cbar_bottom, cbar_width, cbar_height])
+
+        # Create 2D opacity legend
+        n_ticks = 100
+        opacity_legend = np.zeros((n_ticks, 3, 4))  # RGBA array
+
+        wavelength_values_for_legend = np.linspace(wavelength_min, wavelength_max, n_ticks)
+        for i, wavelength_val in enumerate(wavelength_values_for_legend):
+            color_rgb = cmap(norm(wavelength_val))[:3]
+            opacity_legend[i, 0, :3] = color_rgb
+            opacity_legend[i, 0, 3] = OPACITY_STABLE_FAR
+            opacity_legend[i, 1, :3] = color_rgb
+            opacity_legend[i, 1, 3] = OPACITY_STABLE_NEAR
+            opacity_legend[i, 2, :3] = color_rgb
+            opacity_legend[i, 2, 3] = OPACITY_UNSTABLE
+
+        # Display the 2D legend
+        cbar_ax.imshow(opacity_legend, origin="lower", aspect="auto", interpolation="nearest")
+
+        # Set up axes
+        cbar_ax.set_xlim(-0.5, 2.5)
+        cbar_ax.set_ylim(0, n_ticks - 1)
+
+        # X-axis labels for the three stability ranges
+        cbar_ax.set_xticks([0, 1, 2])
+        cbar_ax.set_xticklabels(
+            ["Stable (far)", "Stable (near)", "Unstable"],
+            fontsize=self.secondary_tick_fontsize,
+            rotation=45,
+            ha="left",
+        )
+        cbar_ax.xaxis.set_label_position("top")
+        cbar_ax.xaxis.tick_top()
+        cbar_ax.tick_params(
+            axis="x", bottom=False, top=True, labelsize=self.secondary_tick_fontsize
+        )
+
+        # Y-axis: wavelength values
+        wavelength_tick_positions = np.linspace(0, n_ticks - 1, 6)
+        wavelength_tick_values = np.linspace(wavelength_min, wavelength_max, 6)
+        cbar_ax.set_yticks(wavelength_tick_positions)
+        cbar_ax.set_yticklabels(
+            [f"{w:.0f}" for w in wavelength_tick_values], fontsize=self.tick_fontsize
+        )
+        cbar_ax.set_ylabel(
+            r"Wavelength w/ max Re($\lambda$) ($\mu$m)", fontsize=self.label_fontsize, labelpad=15
+        )
+        cbar_ax.yaxis.set_label_position("right")
+        cbar_ax.yaxis.tick_right()
+        cbar_ax.tick_params(axis="y", left=False, right=True, labelsize=self.tick_fontsize)
+
+        # Style the axes
+        cbar_ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.6)
+        for spine in cbar_ax.spines.values():
+            spine.set_visible(True)
+            spine.set_edgecolor("black")
+            spine.set_linewidth(1.0)
+
+        # Add grey legend at bottom of colorbar
+        grey_legend_bottom = 0.08 + 0.01
+        stable_ax = fig.add_axes([0.95, grey_legend_bottom, cbar_width, 0.03])
+        stable_ax.imshow(
+            np.full((10, 1), 0.5), cmap="Greys", vmin=0, vmax=1, origin="lower", aspect="auto"
+        )
+        stable_ax.set_xticks([])
+        stable_ax.set_yticks([])
+        for spine in stable_ax.spines.values():
+            spine.set_visible(True)
+            spine.set_edgecolor("black")
+        stable_ax.text(
+            0.5,
+            -0.25,
+            "No dominant\nspatial mode",
+            transform=stable_ax.transAxes,
+            fontsize=self.secondary_label_fontsize,
+            rotation=0,
+            va="top",
+            ha="center",
+        )
+
+        # Overall title
+        title = "Stability Landscape: Interneuron Maturation Indices"
+        fig.suptitle(title, fontsize=self.title_fontsize, fontweight="bold", y=1.03)
+
+        return fig
+
     def generate_all_figures(self, results: dict, mode: str = "fixed_absolute") -> None:
         """Generate all figures from results.
 
@@ -1138,6 +1694,34 @@ class BifurcationVisualizer:
                 fig = self.create_gain_spectrum_figure(spectrum_results, param_keys, stages)
 
                 filename = "gain_spectra.pdf"
+                filepath = output_dir / filename
+                save_figure(fig, filepath)
+                print(f"  Saved: {filepath}")
+
+        # Generate compressed stability map figure (SST-PV ratio analysis)
+        if "compressed_stability" in results:
+            print("\nGenerating compressed stability map figure...")
+            compressed_results = results["compressed_stability"]
+            stage_names = list(compressed_results.keys())
+
+            if stage_names:
+                fig = self.create_compressed_stability_map_figure(compressed_results, stage_names)
+
+                filename = "compressed_stability_maps.pdf"
+                filepath = output_dir / filename
+                save_figure(fig, filepath)
+                print(f"  Saved: {filepath}")
+
+        # Generate maturity stability map figure (SST/PV maturation indices)
+        if "maturity_stability" in results:
+            print("\nGenerating maturity stability map figure...")
+            maturity_results = results["maturity_stability"]
+            stage_names = list(maturity_results.keys())
+
+            if stage_names:
+                fig = self.create_maturity_stability_map_figure(maturity_results, stage_names)
+
+                filename = "maturity_stability_maps.pdf"
                 filepath = output_dir / filename
                 save_figure(fig, filepath)
                 print(f"  Saved: {filepath}")

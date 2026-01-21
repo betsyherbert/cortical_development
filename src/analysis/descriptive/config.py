@@ -51,9 +51,11 @@ ANALYSIS_PARAMS = {
     "warmup_duration": 2.0,  # Warmup time before data collection (seconds)
     "simulation_duration": 10.0,  # Simulation duration (seconds)
     "activity_threshold": 0.1,  # Firing rate threshold for "active" cells
-    "synchronous_event_threshold": 0.1,  # Fraction of cells for "large synchronous events"
+    "synchronous_event_threshold": 0.05,  # Fraction of cells for "large synchronous events"
     "correlation_activity_threshold": 0.00,  # Min network activity for correlation calculation
     "sampling_interval": 20.0,  # Sampling interval (ms)
+    "dimensionality_min_variance": 0.001,  # Min eigenvalue to include in dimensionality calculation
+    "spatial_correlation_bins": 20,  # Number of distance bins for C(r) spatial correlation
 }
 
 # Visualization constants (mm-based, Nature double-column standard)
@@ -76,7 +78,7 @@ POSTER_CELL_TYPES = ["SST", "E", "PV"]  # Reordered for poster layout
 
 # Heatmap visualization settings
 HEATMAP_VMIN = 0
-HEATMAP_VMAX = 1.0
+HEATMAP_VMAX = 0.5
 
 # Plot layout constants
 SUBPLOT_PADDING = {

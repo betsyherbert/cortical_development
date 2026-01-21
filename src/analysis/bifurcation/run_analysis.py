@@ -18,7 +18,11 @@ from .config import (
     OUTPUT_DIR,
 )
 from .gain_maps import compute_gain_maps_all_stages, compute_gain_spectra_all_stages
-from .stability_maps import compute_stability_maps_all_stages
+from .stability_maps import (
+    compute_compressed_stability_maps_all_stages,
+    compute_maturity_stability_maps_all_stages,
+    compute_stability_maps_all_stages,
+)
 
 
 class BifurcationPipeline:
@@ -159,6 +163,88 @@ class BifurcationPipeline:
 
         return {"maps": map_results, "spectra": spectrum_results}
 
+    def run_compressed_stability_analysis(self) -> dict:
+        """Run compressed stability map analysis (SST-PV ratios).
+
+        Returns:
+            Dictionary with compressed stability results organized by stage
+        """
+        # Seed RNG if not already seeded
+        if self._seed_used is None:
+            self._seed_used = seed_random()
+
+        print("\n" + "=" * 70)
+        print("COMPRESSED STABILITY ANALYSIS (SST-PV Ratios)")
+        print("=" * 70)
+        print(f"Random seed: {self._seed_used}")
+
+        start_time = time.time()
+
+        # Run compressed stability maps
+        results = compute_compressed_stability_maps_all_stages(
+            stages=self.config["stages"],
+            n_processes=self.config["n_processes"],
+        )
+
+        elapsed = time.time() - start_time
+        print(f"\nCompressed stability analysis completed in {elapsed:.1f} seconds")
+
+        # Save results
+        output_dir = Path(self.config["output_dir"])
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        results_file = output_dir / "compressed_stability_maps.pkl"
+        metadata = make_run_metadata(
+            seed=self._seed_used,
+            stages=self.config["stages"],
+            params={"analysis_type": "compressed_sst_pv_ratios"},
+        )
+        save_with_version(results, str(results_file), metadata=metadata)
+        print(f"Results saved to: {results_file}")
+
+        return results
+
+    def run_maturity_stability_analysis(self) -> dict:
+        """Run maturity index stability map analysis.
+
+        Returns:
+            Dictionary with maturity stability results organized by stage
+        """
+        # Seed RNG if not already seeded
+        if self._seed_used is None:
+            self._seed_used = seed_random()
+
+        print("\n" + "=" * 70)
+        print("MATURITY INDEX STABILITY ANALYSIS")
+        print("=" * 70)
+        print(f"Random seed: {self._seed_used}")
+
+        start_time = time.time()
+
+        # Run maturity stability maps
+        results = compute_maturity_stability_maps_all_stages(
+            stages=self.config["stages"],
+            n_processes=self.config["n_processes"],
+        )
+
+        elapsed = time.time() - start_time
+        print(f"\nMaturity stability analysis completed in {elapsed:.1f} seconds")
+
+        # Save results
+        output_dir = Path(self.config["output_dir"])
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        results_file = output_dir / "maturity_stability_maps.pkl"
+        metadata = make_run_metadata(
+            seed=self._seed_used,
+            stages=self.config["stages"],
+            params={"analysis_type": "maturity_indices"},
+        )
+        save_with_version(results, str(results_file), metadata=metadata)
+        print(f"Results saved to: {results_file}")
+
+        return results
+
     def run_all(self) -> dict:
         """Run complete bifurcation analysis pipeline.
 
@@ -211,6 +297,12 @@ Examples:
   # Run only stability analysis
   python -m src.analysis.bifurcation --analysis stability
 
+  # Run compressed stability maps (SST-PV ratio analysis)
+  python -m src.analysis.bifurcation --analysis compressed
+
+  # Run maturity index stability maps
+  python -m src.analysis.bifurcation --analysis maturity
+
   # Run with fixed ratio mode only
   python -m src.analysis.bifurcation --mode fixed_ratio
 
@@ -224,7 +316,7 @@ Examples:
 
     parser.add_argument(
         "--analysis",
-        choices=["all", "stability", "gain", "gain_maps", "gain_spectra"],
+        choices=["all", "stability", "gain", "gain_maps", "gain_spectra", "compressed", "maturity"],
         default="all",
         help="Type of analysis to run (default: all)",
     )
@@ -339,6 +431,12 @@ Examples:
                 save_with_version(spectrum_results, str(spectra_file), metadata=spectra_metadata)
                 print(f"Gain spectra saved to: {spectra_file}")
                 results = {"gain_spectra": spectrum_results}
+            elif args.analysis == "compressed":
+                # Run compressed stability maps (SST-PV ratio analysis)
+                results = {"compressed_stability": analyzer.run_compressed_stability_analysis()}
+            elif args.analysis == "maturity":
+                # Run maturity index stability maps
+                results = {"maturity_stability": analyzer.run_maturity_stability_analysis()}
 
             # Generate visualizations if requested
             if not args.no_viz:

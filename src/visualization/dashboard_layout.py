@@ -170,9 +170,9 @@ GAIN_PARAMS = {
 
 WIDTH_PARAMS = {
     "min_val": 5.0,
-    "max_val": 400.0,
+    "max_val": 500.0,
     "step": 5.0,
-    "marks": {i: f"{i}" for i in range(0, 401, 100)},
+    "marks": {i: f"{i}" for i in range(0, 501, 100)},
 }
 
 STRENGTH_SCALING_PARAMS = {
