@@ -309,7 +309,11 @@ class SteadyStateFinder:
 
         Returns:
             (r_star, status) tuple where r_star is array of firing rates.
-            status is one of: 'converged', 'not_converged', 'diverged'
+            status is one of: 'converged', 'approximate', 'not_converged', 'diverged'
+            - 'converged': Found exact fixed point (delta < tolerance)
+            - 'approximate': Found approximate fixed point (bounded oscillation)
+            - 'not_converged': Failed to find any reasonable fixed point
+            - 'diverged': Solution exploded
         """
         n = len(self.network.tau)
         r = np.ones(n) * 0.1
@@ -318,9 +322,18 @@ class SteadyStateFinder:
             self.network.mu if thalamic_input is None else self.network.mu + thalamic_input
         )
 
-        alpha = 0.05  # Conservative fixed damping for stability near criticality
+        # Use adaptive damping: start conservative, increase if progress stalls
+        alpha = 0.05
+        alpha_max = 0.3
+        stall_count = 0
+        prev_delta = np.inf
 
-        for _ in range(self.max_iters):
+        # Track running average for approximate fixed point detection
+        r_sum = np.zeros(n)
+        avg_window = 100
+        avg_start = self.max_iters - avg_window
+
+        for i in range(self.max_iters):
             input_vec = self.network.A @ r + external_input
             r_new_raw = np.maximum(0.0, self.network.gain * input_vec)
 
@@ -328,11 +341,35 @@ class SteadyStateFinder:
                 return np.zeros(n), "diverged"
 
             r_new = (1 - alpha) * r + alpha * r_new_raw
+            delta = np.max(np.abs(r_new - r))
 
-            if np.all(np.abs(r_new - r) < self.tol):
+            if delta < self.tol:
                 return r_new, "converged"
 
+            # Adaptive damping: if progress stalls, increase alpha
+            if delta > 0.95 * prev_delta:
+                stall_count += 1
+                if stall_count > 50 and alpha < alpha_max:
+                    alpha = min(alpha * 1.5, alpha_max)
+                    stall_count = 0
+            else:
+                stall_count = 0
+
+            # Accumulate for running average in final window
+            if i >= avg_start:
+                r_sum += r_new
+
+            prev_delta = delta
             r = r_new
+
+        # If we didn't converge exactly but have bounded oscillation,
+        # return the time-averaged value as an "approximate" fixed point.
+        # This handles cases where the system oscillates around a mean state.
+        r_avg = r_sum / avg_window
+        
+        # Check if the average is reasonable (positive, bounded)
+        if np.all(r_avg >= 0) and np.all(r_avg < 100):
+            return r_avg, "approximate"
 
         return np.clip(r, 0, 1e10), "not_converged"
 

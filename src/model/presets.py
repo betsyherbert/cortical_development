@@ -245,9 +245,9 @@ P10_PRESET = {
     "thalamic_widths": {"E": 120.0, "SST": 120.0, "PV": 100.0},
     # Outgoing widths (μm)
     "outgoing_widths": {"E": 150.0, "SST": 150.0, "PV": 150.0},
-    "strength_scaling": {"E": 3.1, "SST": 4.0, "PV": 3.8, "thalamus": 2.0},
+    "strength_scaling": {"E": 6.0, "SST": 4.0, "PV": 4.0, "thalamus": 2.0},
     "thalamic_alpha": 0.7,
-    "background_input": {"E": 0.05, "SST": 0.0, "PV": 0.0},
+    "background_input": {"E": 0.00, "SST": 0.0, "PV": 0.0},
     "connection_strengths": {
         # ---------- L2/3 (within L2/3) ----------
         "L23_E_to_L23_E": 0.4,
@@ -362,7 +362,7 @@ P15_PRESET = {
         "SST": 100.0,
         "PV": 100.0,
     },
-    "strength_scaling": {"E": 5.0, "SST": 4.0, "PV": 4.0, "thalamus": 2.0},
+    "strength_scaling": {"E": 6.0, "SST": 5.0, "PV": 5.0, "thalamus": 2.0},
     "thalamic_alpha": 0.9,
     "background_input": {"E": 0.05, "SST": 0.0, "PV": 0.0},
     "connection_strengths": {

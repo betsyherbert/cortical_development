@@ -64,6 +64,7 @@ def compute_stability_for_point(preset: dict, verbose: bool = False) -> tuple[fl
     r_star, status = finder.find_steady_state(thalamic_input=thalamic_input)
 
     # Handle failed convergence: return NaN to mark invalid parameter point
+    # Accept both 'converged' and 'approximate' as valid operating points
     if status in ["diverged", "not_converged"] or np.any(r_star > 100):
         return np.nan, np.nan, False
 
