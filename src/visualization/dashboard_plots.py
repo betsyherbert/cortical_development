@@ -16,8 +16,11 @@ from .dashboard_layout import AXIS_FONT_SIZE, GRAPH_LAYOUT, SUBTITLE_FONT_SIZE
 # =============================================================================
 # Heatmap Scaling Constants
 # =============================================================================
+# Import vmax from descriptive analysis for consistency across dashboard and analysis
+from src.analysis.descriptive.config import HEATMAP_VMAX
+
 HEATMAP_ZMIN = 0.0
-HEATMAP_ZMAX = 1.0
+HEATMAP_ZMAX = HEATMAP_VMAX  # Use same scale as descriptive analysis (0.5)
 
 
 # =============================================================================

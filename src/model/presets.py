@@ -133,7 +133,7 @@ P5_PRESET = {
     "thalamic_widths": {"E": 150.0, "SST": 150.0, "PV": 120.0},
     # Outgoing widths (μm)
     "outgoing_widths": {"E": 150.0, "SST": 450.0, "PV": 250.0},
-    "strength_scaling": {"E": 3.2, "SST": 4.5, "PV": 0.7, "thalamus": 2.0},
+    "strength_scaling": {"E": 2.4, "SST": 3.3, "PV": 0.7, "thalamus": 2.0},
     "thalamic_alpha": 0.3,
     "connection_strengths": {
         # ---------- L2/3 (within L2/3) ----------
@@ -142,7 +142,7 @@ P5_PRESET = {
         "L23_E_to_L23_PV": 0.0,
         "L23_SST_to_L23_E": 0.0,
         "L23_SST_to_L23_PV": 0.0,
-        "L23_PV_to_L23_E": 0.0,
+        "L23_PV_to_L23_E": -0.1,
         "L23_PV_to_L23_SST": 0.0,
         "L23_PV_to_L23_PV": 0.0,
 
@@ -172,7 +172,7 @@ P5_PRESET = {
         "L4_E_to_L4_PV": 0.1,
         "L4_SST_to_L4_E": -0.4,
         "L4_SST_to_L4_PV": -0.1,
-        "L4_PV_to_L4_E": 0.0,
+        "L4_PV_to_L4_E": -0.1,
         "L4_PV_to_L4_SST": 0.0,
         "L4_PV_to_L4_PV": 0.0,
 
@@ -202,7 +202,7 @@ P5_PRESET = {
         "L5_E_to_L5_PV": 0.1,
         "L5_SST_to_L5_E": -0.2,
         "L5_SST_to_L5_PV": -0.4,
-        "L5_PV_to_L5_E": 0.0,
+        "L5_PV_to_L5_E": 0.1,
         "L5_PV_to_L5_SST": 0.0,
         "L5_PV_to_L5_PV": 0.0,
 
@@ -245,7 +245,7 @@ P10_PRESET = {
     "thalamic_widths": {"E": 120.0, "SST": 120.0, "PV": 100.0},
     # Outgoing widths (μm)
     "outgoing_widths": {"E": 150.0, "SST": 150.0, "PV": 150.0},
-    "strength_scaling": {"E": 6.0, "SST": 4.0, "PV": 4.0, "thalamus": 2.0},
+    "strength_scaling": {"E": 6.0, "SST": 3.3, "PV": 4.0, "thalamus": 2.0},
     "thalamic_alpha": 0.7,
     "background_input": {"E": 0.00, "SST": 0.0, "PV": 0.0},
     "connection_strengths": {
@@ -358,11 +358,11 @@ P15_PRESET = {
     "thalamic_widths": {"E": 100.0, "SST": 100.0, "PV": 100.0},
     # Outgoing widths (μm)
     "outgoing_widths": {
-        "E": 100.0,
+        "E": 75.0,
         "SST": 100.0,
         "PV": 100.0,
     },
-    "strength_scaling": {"E": 6.0, "SST": 5.0, "PV": 5.0, "thalamus": 2.0},
+    "strength_scaling": {"E": 6.0, "SST": 4.0, "PV": 5.0, "thalamus": 2.0},
     "thalamic_alpha": 0.9,
     "background_input": {"E": 0.05, "SST": 0.0, "PV": 0.0},
     "connection_strengths": {

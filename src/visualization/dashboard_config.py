@@ -4,6 +4,7 @@ This module contains all dashboard-specific configuration values.
 Import these constants instead of duplicating them across modules.
 """
 
+from src.analysis.descriptive.config import ANALYSIS_PARAMS
 from src.model.config import UPDATE_INTERVAL
 
 # =============================================================================
@@ -36,9 +37,9 @@ CORRELATION_HISTORY_LENGTH = int(CORRELATION_WINDOW_MS / UPDATE_INTERVAL)
 # Synchronous Event Detection
 # =============================================================================
 
-# Minimum activity level to count a cell as active
-ACTIVITY_THRESHOLD = 0.1
-
-# Fraction of cells that must be active for a synchronous event
-SYNCHRONOUS_EVENT_THRESHOLD = 0.1
+# Import thresholds from descriptive analysis for consistency
+# Changes to these values in descriptive/config.py will apply to dashboard
+ACTIVITY_THRESHOLD = ANALYSIS_PARAMS["activity_threshold"]
+SYNCHRONOUS_EVENT_THRESHOLD = ANALYSIS_PARAMS["synchronous_event_threshold"]
+min_mean_rate = ANALYSIS_PARAMS["min_mean_rate"]
 

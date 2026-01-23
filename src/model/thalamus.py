@@ -26,13 +26,13 @@ from .config import (
 # Developmental endpoint parameters (early = alpha=0, late = alpha=1)
 # These are derived from the original P0 intrinsic and P15 sensory parameters
 SIGMA_RANGE_EARLY = (100.0, 300.0)  # μm - broad bursts at early development
-SIGMA_RANGE_LATE = (30.0, 150.0)  # μm - narrow bursts at late development
+SIGMA_RANGE_LATE = (10.0, 80.0)  # μm - narrow bursts at late development
 DURATION_RANGE_EARLY = (200.0, 300.0)  # ms - long bursts at early development
-DURATION_RANGE_LATE = (100.0, 200.0)  # ms - short bursts at late development
+DURATION_RANGE_LATE = (50.0, 150.0)  # ms - short bursts at late development
 INTERVAL_RANGE_EARLY = (200.0, 400.0)  # ms - sparse bursts at early development
 INTERVAL_RANGE_LATE = (50.0, 200.0)  # ms - frequent bursts at late development
 JITTER_FACTOR_EARLY = 0.2  # low spatial variability
-JITTER_FACTOR_LATE = 0.4  # high spatial variability
+JITTER_FACTOR_LATE = 0.8  # high spatial variability
 
 
 def _lerp(a: float, b: float, alpha: float) -> float:

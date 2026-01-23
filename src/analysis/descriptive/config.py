@@ -50,9 +50,9 @@ OUTPUT_DIR = str(get_output_dir("descriptive", create=False))
 ANALYSIS_PARAMS = {
     "warmup_duration": 2.0,  # Warmup time before data collection (seconds)
     "simulation_duration": 10.0,  # Simulation duration (seconds)
-    "activity_threshold": 0.1,  # Firing rate threshold for "active" cells
-    "synchronous_event_threshold": 0.05,  # Fraction of cells for "large synchronous events"
-    "correlation_activity_threshold": 0.00,  # Min network activity for correlation calculation
+    "activity_threshold": 0.25,  # Firing rate threshold for "active" cells
+    "synchronous_event_threshold": 0.02,  # Fraction of cells for "large synchronous events"
+    "min_mean_rate": 10e-5,  # Min mean firing rate to include in analysis (correlation and dimensionality calculations)
     "sampling_interval": 20.0,  # Sampling interval (ms)
     "dimensionality_min_variance": 0.001,  # Min eigenvalue to include in dimensionality calculation
     "spatial_correlation_bins": 20,  # Number of distance bins for C(r) spatial correlation

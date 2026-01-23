@@ -10,6 +10,7 @@ from dash import dcc, html
 from dash.dependencies import Input, Output, State
 
 from src.analysis.bifurcation.config import ANALYSIS_PARAMS
+from src.analysis.descriptive.config import HEATMAP_VMAX
 from src.model.config import (
     CELL_ACTIVITY_COLORS,
     CELL_COLORS,
@@ -71,6 +72,7 @@ from src.visualization.dashboard_config import (
     CORRELATION_CELL_SAMPLE_RATE,
     CORRELATION_DISPLAY_SECONDS,
     CORRELATION_HISTORY_LENGTH,
+    min_mean_rate,
     CORRELATION_WINDOW_MS,
     SYNCHRONOUS_EVENT_THRESHOLD,
 )
@@ -209,6 +211,7 @@ class DashboardApp:
         self.event_time_series = {
             "by_layer": {layer: [] for layer in LAYERS},
             "by_celltype": {cell_type: [] for cell_type in CELL_TYPES},
+            "total": [],
         }
 
         # Define common outputs for preset callbacks
@@ -354,6 +357,12 @@ class DashboardApp:
                 time_series_dict[group_key][item] = [
                     (t, v) for t, v in time_series_dict[group_key][item] if t >= cutoff_time
                 ]
+        # Handle "total" if present
+        if "total" in results and "total" in time_series_dict:
+            time_series_dict["total"].append((self.simulation_time, results["total"]))
+            time_series_dict["total"] = [
+                (t, v) for t, v in time_series_dict["total"] if t >= cutoff_time
+            ]
 
     def _update_time_series_figure(self, fig, items, group_key, time_series_dict):
         """Update a time series figure with current data."""
@@ -429,26 +438,27 @@ class DashboardApp:
 
         # Compute correlations within each group (much more efficient than all cells at once)
         def compute_group_corr(data_list):
-            """Compute average pairwise correlation for a group."""
+            """Compute average pairwise correlation for a group.
+
+            Best practice: return NaN when correlation is undefined (too few
+            points, constant data). Do not replace NaN with 0, since 0 denotes
+            no linear relationship; NaN denotes cannot compute.
+            """
             if not data_list or len(data_list) < 2:
-                return 0.0
+                return np.nan
             data_array = np.array(data_list)  # Shape: (num_timepoints, num_cells_in_group)
-            # Return zeros if group inactive
-            if np.max(data_array) < 1e-6:
-                return 0.0
-            # Skip if too few cells (can't compute meaningful correlation)
             if data_array.shape[1] < 2:
-                return 0.0
-            # Compute correlation matrix: (num_cells, num_timepoints)
+                return np.nan
+            if np.mean(data_array) < min_mean_rate:
+                return np.nan
             with np.errstate(divide="ignore", invalid="ignore"):
                 corr_matrix = np.corrcoef(data_array.T)
-            corr_matrix = np.nan_to_num(corr_matrix, nan=0.0, posinf=0.0, neginf=0.0)
-            # Extract upper triangle (excluding diagonal) and compute mean
             if corr_matrix.shape[0] <= 1:
-                return 0.0
+                return np.nan
             mask = np.triu(np.ones_like(corr_matrix, dtype=bool), k=1)
-            mean_corr = np.mean(corr_matrix[mask])
-            return 0.0 if not np.isfinite(mean_corr) else float(mean_corr)
+            # nanmean: average only defined pairs; if all NaN (e.g. constant data) -> NaN
+            mean_corr = np.nanmean(corr_matrix[mask])
+            return np.nan if not np.isfinite(mean_corr) else float(mean_corr)
 
         return {
             "by_layer": {layer: compute_group_corr(layer_data[layer]) for layer in LAYERS},
@@ -462,12 +472,11 @@ class DashboardApp:
         if len(self.correlation_activity_buffer) < CORRELATION_HISTORY_LENGTH:
             return None
 
-        # Build labels once (same for all snapshots)
-        layer_labels, celltype_labels = [], []
-        for layer in LAYERS:
-            for cell_type in CELL_TYPES:
-                layer_labels.append(layer)
-                celltype_labels.append(cell_type)
+        # all_cells columns are ordered: for layer in LAYERS, for cell_type in CELL_TYPES,
+        # with each population flattened (grid_size^2 cells). We need per-cell column
+        # indices for each layer and each cell type, not population indices.
+        grid_size = self.simulation.grid_size
+        n = grid_size * grid_size  # cells per population
 
         # Collect cell data from buffer
         all_cells = []
@@ -491,21 +500,29 @@ class DashboardApp:
                 / window_seconds
             )
 
+        def col_indices_layer(layer):
+            """Column indices in all_cells for all cells in this layer."""
+            layer_idx = LAYERS.index(layer)
+            start = layer_idx * 3 * n
+            end = (layer_idx + 1) * 3 * n
+            return np.arange(start, end)
+
+        def col_indices_celltype(cell_type):
+            """Column indices in all_cells for all cells of this type across layers."""
+            ct_idx = CELL_TYPES.index(cell_type)
+            return np.concatenate(
+                [np.arange((p * 3 + ct_idx) * n, (p * 3 + ct_idx) * n + n) for p in range(3)]
+            )
+
         return {
             "by_layer": {
-                layer: count_events(
-                    all_cells[:, np.array([i for i, l in enumerate(layer_labels) if l == layer])]
-                )
-                for layer in LAYERS
+                layer: count_events(all_cells[:, col_indices_layer(layer)]) for layer in LAYERS
             },
             "by_celltype": {
-                cell_type: count_events(
-                    all_cells[
-                        :, np.array([i for i, ct in enumerate(celltype_labels) if ct == cell_type])
-                    ]
-                )
+                cell_type: count_events(all_cells[:, col_indices_celltype(cell_type)])
                 for cell_type in CELL_TYPES
             },
+            "total": count_events(all_cells),
         }
 
     def compute_stability_spectrum(self, preset: dict, selected_pops: list | None = None) -> tuple:
@@ -673,6 +690,89 @@ class DashboardApp:
         result.className = "mb-4"
         return result
 
+    def _create_activity_colorbar(self):
+        """Create a combined vertical colorbar for SST, E, PV cell types.
+
+        Returns:
+            html.Div containing three vertical gradient bars (SST|E|PV) with
+            scale labels 0 to HEATMAP_VMAX and a vertical "Firing rate (Hz)" label.
+        """
+        ordered_cell_types = ["SST", "E", "PV"]
+        colors = {ct: CELL_COLORS[ct] for ct in ordered_cell_types}
+
+        # Height to span all three layer rows: 3 × 155px + 2 × 24px (mb-4 between)
+        COLORBAR_HEIGHT = 513
+
+        # Create three vertical gradient bars side by side
+        gradient_bars = [
+            html.Div(
+                style={
+                    "width": "12px",
+                    "flex": "1",
+                    "background": f"linear-gradient(to top, white, {colors[ct]})",
+                    "borderLeft": "1px solid #aaa" if i > 0 else "none",
+                }
+            )
+            for i, ct in enumerate(ordered_cell_types)
+        ]
+
+        # Format vmax label (show as decimal if < 1, otherwise integer)
+        vmax_label = f"{HEATMAP_VMAX:.1f}" if HEATMAP_VMAX < 1 else f"{int(HEATMAP_VMAX)}"
+
+        # Scale labels to the right of the bar: 0.5 at top, 0 at bottom
+        scale_labels = html.Div(
+            [
+                html.Div(vmax_label, style={"fontSize": "11px", "color": "#555"}),
+                html.Div("0", style={"fontSize": "11px", "color": "#555"}),
+            ],
+            style={
+                "display": "flex",
+                "flexDirection": "column",
+                "justifyContent": "space-between",
+                "height": f"{COLORBAR_HEIGHT}px",
+                "paddingLeft": "4px",
+            },
+        )
+
+        gradient_block = html.Div(
+            gradient_bars,
+            style={
+                "display": "flex",
+                "height": f"{COLORBAR_HEIGHT}px",
+                "border": "1px solid #aaa",
+            },
+        )
+
+        colorbar_block = html.Div(
+            [gradient_block, scale_labels],
+            style={"display": "flex", "alignItems": "stretch"},
+        )
+
+        # Vertical label to the right of the colorbar
+        vertical_label = html.Div(
+            "Firing rate (Hz)",
+            style={
+                "writingMode": "vertical-rl",
+                "height": f"{COLORBAR_HEIGHT}px",
+                "fontSize": "12px",
+                "color": "#555",
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "marginLeft": "10px",
+                "whiteSpace": "nowrap",
+            },
+        )
+
+        return html.Div(
+            [colorbar_block, vertical_label],
+            style={
+                "display": "flex",
+                "alignItems": "center",
+                "marginLeft": "0px",
+            },
+        )
+
     def _create_thalamus_visualization(self):
         """Create the thalamus visualization row."""
         return html.Div(
@@ -746,8 +846,22 @@ class DashboardApp:
                 self._create_grid_info_boxes(),
                 # Preset Buttons
                 self._create_preset_buttons(),
-                # Layer visualizations
-                *[self.create_layer_row(layer) for layer in LAYERS],
+                # Layer visualizations with colorbar on the right
+                html.Div(
+                    [
+                        # Layer rows container
+                        html.Div(
+                            [self.create_layer_row(layer) for layer in LAYERS],
+                            style={"flex": "1"},
+                        ),
+                        # Combined colorbar for SST/E/PV
+                        self._create_activity_colorbar(),
+                    ],
+                    style={
+                        "display": "flex",
+                        "alignItems": "flex-start",
+                    },
+                ),
                 # Thalamus visualization
                 self._create_thalamus_visualization(),
                 # Selected populations display

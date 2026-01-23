@@ -683,7 +683,7 @@ class ActivityVisualizer:
         self._setup_trend_plot_axes(
             axes[0],
             "By Cell Type",
-            "LSE / min",
+            "LSE / s",
             x_pos,
             event_ylim,
             event_tick_values,
