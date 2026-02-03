@@ -2,31 +2,51 @@
 
 All constants for both analysis and visualization live here.
 Import from here, not from visualizer.py or other modules.
+
+Note:
+    Styling constants (DPI, font sizes, line widths) are centralized in
+    `src.analysis.common`. This module keeps only stability-analysis-specific
+    constants and re-exports shared ones for convenience.
 """
 
 from src.analysis.common import (
-    DOUBLE_COLUMN_WIDTH_MM,
+    DPI,
+    ERROR_BAR_ALPHA,
     FIGURE_FONT_SIZES_PT,
-    compute_figsize_inches,
+    LINE_WIDTH,
+    MARKER_SIZE,
+    SUBPLOT_WIDTH_MM,
+    compute_subplot_figsize,
     get_output_dir,
 )
-from src.model.config import CELL_TYPES, DT, LAYERS
+from src.model.config import CELL_COLORS, CELL_TYPES, DT, LAYER_COLORS, LAYERS
 
 # Re-export for convenience (single import point)
 __all__ = [
     "ANALYSIS_PARAMS",
+    "CELL_COLORS",
     "CELL_TYPES",
     "COLORBAR_PARAMS",
+    "COLORBAR_WIDTH",
     "COLORMAP",
+    "COLORMAPS",
+    "compute_subplot_figsize",
     "CONDITIONS",
+    "DPI",
     "DT",
-    "FONT_CONFIG",
+    "ERROR_BAR_ALPHA",
+    "FONT_SIZES",
+    "LAYER_COLORS",
     "LAYERS",
+    "LINE_WIDTH",
+    "MARKER_SIZE",
     "OUTPUT_DIR",
+    "REFERENCE_LINE_WIDTH",
     "REGIMES",
     "REGIME_COLORS",
     "REGIME_LABELS",
-    "STANDARD_COLORS",
+    "SUBPLOT_ASPECTS",
+    "SUBPLOT_WIDTH_MM",
 ]
 
 # =============================================================================
@@ -36,9 +56,9 @@ __all__ = [
 ANALYSIS_PARAMS = {
     "duration": 10.0,  # Simulation duration for snapshot selection (seconds)
     "percentiles": [10, 90],  # [Idle, Driven] thresholds
-    "n_snapshots": 30,  # Number of snapshots per regime
-    "layer_patch_size": 5,  # Patch size for layer-wise analysis
-    "column_patch_size": 5,  # Patch size for column-wise analysis
+    "n_snapshots": 10,  # Number of snapshots per regime
+    "layer_patch_size": 3,  # Patch size for layer-wise analysis
+    "column_patch_size": 3,  # Patch size for column-wise analysis
     "boundary_exclude": 2,  # Pixels to exclude from edges
 }
 
@@ -75,42 +95,35 @@ REGIME_LABELS = [
     "inhibition \n stabilised",
 ]
 
-# Publication-quality font and figure settings
-# Figure sizes are defined in mm (Nature double-column standard) and converted to inches
-FONT_CONFIG = {
-    "font_family": "DejaVu Sans",  # Matches centralized style
-    "font_sizes": {
-        "title": FIGURE_FONT_SIZES_PT["figure_title"],
-        "ylabel": FIGURE_FONT_SIZES_PT["axis_label"],
-        "colorbar": FIGURE_FONT_SIZES_PT["colorbar_label"],
-        "colorbar_ticks": FIGURE_FONT_SIZES_PT["colorbar_tick"],
-        "tick_labels": FIGURE_FONT_SIZES_PT["tick_label"],
-        "condition_labels": FIGURE_FONT_SIZES_PT["axes_title"],
-    },
-    "figure_sizes": {
-        # All sizes in inches (converted from mm for Matplotlib)
-        # Widths use double-column (183 mm) or appropriate fraction
-        "layer_wise": compute_figsize_inches(DOUBLE_COLUMN_WIDTH_MM, 40.0),  # Wide, short
-        "column_wise": compute_figsize_inches(90.0, 120.0),  # Narrow, tall
-        "effectiveness": compute_figsize_inches(90.0, 90.0),  # Square
-        "effectiveness_2x2": compute_figsize_inches(DOUBLE_COLUMN_WIDTH_MM, DOUBLE_COLUMN_WIDTH_MM),  # Square, full width
-        "phase_diagram": compute_figsize_inches(DOUBLE_COLUMN_WIDTH_MM, 40.0),  # Wide, short
-        "regime_percentages": compute_figsize_inches(120.0, 120.0),  # Square, medium
-        "heatmap_single": compute_figsize_inches(90.0, 70.0),  # Medium rectangle
-        "heatmap_dual": compute_figsize_inches(120.0, 60.0),  # Wide rectangle
-    },
-    "dpi": 300,
-    "colorbar_width": 0.008,
+# Font sizes - maps local names to centralized FIGURE_FONT_SIZES_PT
+# (matches pattern in descriptive/config.py for consistency)
+FONT_SIZES = {
+    "title": FIGURE_FONT_SIZES_PT["figure_title"],
+    "ylabel": FIGURE_FONT_SIZES_PT["axis_label"],
+    "colorbar": FIGURE_FONT_SIZES_PT["colorbar_label"],
+    "colorbar_ticks": FIGURE_FONT_SIZES_PT["colorbar_tick"],
+    "tick_labels": FIGURE_FONT_SIZES_PT["tick_label"],
+    "condition_labels": FIGURE_FONT_SIZES_PT["axes_title"],
 }
 
-# Standardized color schemes
-STANDARD_COLORS = {
-    "cell_types": {"SST": "#FF630C", "PV": "#D91B12"},
-    "layers": {
-        "L5": "#999999",
-        "L4": "#555555",
-        "L23": "#222222",
-        "L2/3": "#222222",
-    },
-    "colormaps": {"heatmap": "Reds", "diverging": "RdBu_r", "sequential": "viridis"},
+# Colorbar width for manual positioning (fraction of figure width)
+COLORBAR_WIDTH = 0.008
+
+# Subplot aspect ratios for different plot types
+# (used with compute_subplot_figsize to derive figure dimensions)
+SUBPLOT_ASPECTS = {
+    "square": 1.0,  # Trend plots, phase diagrams
+    "wide": 2.5,  # Timeseries, layer-wise snapshots
+    "tall": 0.75,  # Column-wise snapshots (5 rows, 4 cols)
+    "heatmap": 0.5,  # Heatmaps (wider than tall)
+}
+
+# Line and marker styling (single place for all stability plots)
+REFERENCE_LINE_WIDTH = 1.0  # For axhline/axvline reference lines
+
+# Colormaps for specific plot types
+COLORMAPS = {
+    "heatmap": "Reds",
+    "diverging": "RdBu_r",
+    "sequential": "viridis",
 }

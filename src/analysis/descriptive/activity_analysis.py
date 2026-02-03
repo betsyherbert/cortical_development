@@ -13,7 +13,7 @@ from src.model.config import DT, GRID_SIZE, INTEGRATION_STEPS, grid_to_um
 from .config import ANALYSIS_PARAMS, CELL_TYPES, LAYERS
 
 
-def compute_structural_ei_balance(preset: dict[str, Any]) -> dict[str, Any]:
+def compute_ei_balance_structural(preset: dict[str, Any]) -> dict[str, Any]:
     """Compute structural E-I balance from preset connection strengths.
 
     Calculates the balance of excitatory vs inhibitory input to E cells,
@@ -253,7 +253,7 @@ class DescriptiveAnalysis:
 
         # Compute functional E-I balance (activity-weighted)
         preset = PRESETS[stage]
-        processed["functional_ei_balance"] = self._compute_functional_ei_balance(
+        processed["ei_balance_functional"] = self._compute_ei_balance_functional(
             processed, preset
         )
 
@@ -302,7 +302,7 @@ class DescriptiveAnalysis:
                     processed["spatial_activities"][layer][cell_type]
                 )
 
-    def _compute_functional_ei_balance(
+    def _compute_ei_balance_functional(
         self, processed: dict[str, Any], preset: dict[str, Any]
     ) -> dict[str, Any]:
         """Compute functional E-I balance from activity data and connection strengths.
@@ -343,30 +343,32 @@ class DescriptiveAnalysis:
 
         # Calculate activity-weighted inhibition at each timepoint
         for t in range(n_timepoints):
-            for layer in LAYERS:
+            for target_layer in LAYERS:
                 layer_inhibition = 0.0
 
-                # SST contribution to E cells in this layer
-                sst_activity = processed["average_rates"][layer]["SST"][t]
+                # SST contribution to E cells in this target layer
                 for source_layer in LAYERS:
-                    conn_key = f"{source_layer}_SST_to_{layer}_E"
+                    conn_key = f"{source_layer}_SST_to_{target_layer}_E"
                     if conn_key in conn_strengths:
+                        # Use SOURCE layer's SST activity (presynaptic population)
+                        sst_activity = processed["average_rates"][source_layer]["SST"][t]
                         strength = abs(conn_strengths[conn_key]) * scaling.get("SST", 1.0)
                         contribution = sst_activity * strength
                         inhibition_timeseries["SST"][t] += contribution
                         layer_inhibition += contribution
 
-                # PV contribution to E cells in this layer
-                pv_activity = processed["average_rates"][layer]["PV"][t]
+                # PV contribution to E cells in this target layer
                 for source_layer in LAYERS:
-                    conn_key = f"{source_layer}_PV_to_{layer}_E"
+                    conn_key = f"{source_layer}_PV_to_{target_layer}_E"
                     if conn_key in conn_strengths:
+                        # Use SOURCE layer's PV activity (presynaptic population)
+                        pv_activity = processed["average_rates"][source_layer]["PV"][t]
                         strength = abs(conn_strengths[conn_key]) * scaling.get("PV", 1.0)
                         contribution = pv_activity * strength
                         inhibition_timeseries["PV"][t] += contribution
                         layer_inhibition += contribution
 
-                inhibition_timeseries["by_layer"][layer][t] = layer_inhibition
+                inhibition_timeseries["by_layer"][target_layer][t] = layer_inhibition
 
         # Compute summary statistics
         return {
@@ -873,7 +875,7 @@ class DescriptiveAnalysis:
 
         return events_by_layer
 
-    def compute_structural_ei_balance_all_stages(self) -> dict[str, dict[str, Any]]:
+    def compute_ei_balance_structural_all_stages(self) -> dict[str, dict[str, Any]]:
         """Compute structural E-I balance for all developmental stages.
 
         This is a static analysis of preset parameters - no simulation needed.
@@ -884,7 +886,7 @@ class DescriptiveAnalysis:
         ei_balance_results = {}
         for stage in DEVELOPMENTAL_STAGES:
             preset = PRESETS[stage]
-            ei_balance_results[stage] = compute_structural_ei_balance(preset)
+            ei_balance_results[stage] = compute_ei_balance_structural(preset)
         return ei_balance_results
 
     def run_analysis(self) -> dict[str, Any]:
@@ -896,7 +898,7 @@ class DescriptiveAnalysis:
 
         # Compute structural E-I balance (no simulation needed)
         print("\nComputing structural E-I balance...")
-        ei_balance = self.compute_structural_ei_balance_all_stages()
+        ei_balance = self.compute_ei_balance_structural_all_stages()
 
         # Progress bar for developmental stages
         for stage in tqdm(DEVELOPMENTAL_STAGES, desc="Processing stages", unit="stage"):
@@ -923,7 +925,7 @@ class DescriptiveAnalysis:
                 **correlations_events,
                 **spatial_corr,
                 "dimensionality": dimensionality,
-                "structural_ei_balance": ei_balance[stage],
+                "ei_balance_structural": ei_balance[stage],
             }
 
         total_time = time.time() - start_time

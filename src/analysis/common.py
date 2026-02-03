@@ -16,12 +16,11 @@ PRESETS = {"P0": P0_PRESET, "P5": P5_PRESET, "P10": P10_PRESET, "P15": P15_PRESE
 
 # Statistical visualization constants
 ERROR_BAR_ALPHA = 0.2
-LINE_WIDTH = 2
-MARKER_SIZE = 6
+LINE_WIDTH = 0.8
+MARKER_SIZE = 2
 SEM_FACTOR = 0.1
 
 # Figure settings
-FIGSIZE_TRENDS = (7, 2.5)  # Deprecated: use mm-based sizing instead
 DPI = 300
 
 # =============================================================================
@@ -101,6 +100,44 @@ def compute_figsize_inches(width_mm: float, height_mm: float | None = None, aspe
     else:
         raise ValueError("Must provide either height_mm or aspect_ratio")
     return (width_inches, height_inches)
+
+
+# Default subplot width (mm) - tuned for publication figures
+SUBPLOT_WIDTH_MM = 50.0
+
+
+def compute_subplot_figsize(
+    nrows: int,
+    ncols: int,
+    subplot_width_mm: float = SUBPLOT_WIDTH_MM,
+    subplot_aspect: float = 1.0,
+) -> tuple[float, float]:
+    """Compute figure size based on subplot grid and aspect ratio.
+
+    Derives figure size from the number of subplots and desired aspect
+    ratio per subplot. This handles different content types naturally:
+    - Timeseries → use subplot_aspect > 1 for landscape subplots
+    - Trends/scatter → use subplot_aspect = 1 for square subplots
+
+    Args:
+        nrows: Number of subplot rows
+        ncols: Number of subplot columns
+        subplot_width_mm: Width per subplot in millimeters
+        subplot_aspect: Width/height ratio per subplot (>1 = landscape, 1 = square)
+
+    Returns:
+        Tuple of (width_inches, height_inches) for plt.subplots()
+
+    Example:
+        >>> # Square subplots for trend plots
+        >>> fig, axes = plt.subplots(1, 3, figsize=compute_subplot_figsize(1, 3))
+        >>> # Landscape subplots for timeseries
+        >>> fig, axes = plt.subplots(3, 4, figsize=compute_subplot_figsize(3, 4, subplot_aspect=2.0))
+    """
+    width_mm = ncols * subplot_width_mm
+    subplot_height_mm = subplot_width_mm / subplot_aspect
+    height_mm = nrows * subplot_height_mm
+    return (mm_to_inches(width_mm), mm_to_inches(height_mm))
 
 
 # Font sizes in points (appropriate for final print size at 183 mm width)

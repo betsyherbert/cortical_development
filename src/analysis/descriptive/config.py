@@ -7,14 +7,12 @@ Note:
 """
 
 from src.analysis.common import (
-    DOUBLE_COLUMN_WIDTH_MM,
     DPI,
     ERROR_BAR_ALPHA,
     FIGURE_FONT_SIZES_PT,
     LINE_WIDTH,
     MARKER_SIZE,
     SEM_FACTOR,
-    compute_figsize_inches,
     get_output_dir,
 )
 from src.model.config import CELL_COLORS, CELL_TYPES, LAYER_COLORS, LAYERS
@@ -27,8 +25,6 @@ __all__ = [
     "CELL_TYPES",
     "DPI",
     "ERROR_BAR_ALPHA",
-    "FIGSIZE_TIMESERIES",
-    "FIGSIZE_TRENDS",
     "FONT_SIZES",
     "HEATMAP_VMAX",
     "HEATMAP_VMIN",
@@ -58,13 +54,7 @@ ANALYSIS_PARAMS = {
     "spatial_correlation_bins": 20,  # Number of distance bins for C(r) spatial correlation
 }
 
-# Visualization constants (mm-based, Nature double-column standard)
-# Timeseries: wide figure for 3x4 subplot layout
-FIGSIZE_TIMESERIES = compute_figsize_inches(DOUBLE_COLUMN_WIDTH_MM, 60.0)
-# Trends: narrower figure for 1x3 subplot layout
-FIGSIZE_TRENDS = compute_figsize_inches(DOUBLE_COLUMN_WIDTH_MM, 50.0)
-
-# Font sizes for poster format - optimized for readability
+# Font sizes - optimized for readability
 FONT_SIZES = {
     "title": FIGURE_FONT_SIZES_PT["figure_title"],
     "subtitle": FIGURE_FONT_SIZES_PT["axes_title"],
@@ -93,4 +83,4 @@ SUBPLOT_PADDING = {
 Y_MARGIN_FACTOR = 0.05  # Margin factor for y-axis limits
 
 # Plot-specific y-axis limits (set to None for auto-scaling)
-AVERAGE_FIRING_RATE_YLIM = [0, 1.0]  # [min, max] for average firing rate plots
+AVERAGE_FIRING_RATE_YLIM = [0, 0.2]  # [min, max] for average firing rate plots

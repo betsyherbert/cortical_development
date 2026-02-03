@@ -19,34 +19,36 @@ from src.model.config import GRID_SIZE
 
 from .config import (
     ANALYSIS_PARAMS,
+    CELL_COLORS,
     COLORBAR_PARAMS,
+    COLORBAR_WIDTH,
     COLORMAP,
-    FONT_CONFIG,
+    COLORMAPS,
+    compute_subplot_figsize,
+    DPI,
+    FONT_SIZES,
+    LAYER_COLORS,
     LAYERS,
+    LINE_WIDTH,
+    MARKER_SIZE,
     OUTPUT_DIR,
+    REFERENCE_LINE_WIDTH,
     REGIME_COLORS,
     REGIME_LABELS,
     REGIMES,
-    STANDARD_COLORS,
+    SUBPLOT_ASPECTS,
+    SUBPLOT_WIDTH_MM,
 )
 
-# Derived constants (computed from config, not duplicated)
-FONT_SIZES = FONT_CONFIG["font_sizes"]
-DPI = FONT_CONFIG["dpi"]
-COLORBAR_WIDTH = FONT_CONFIG["colorbar_width"]
-
-# Simple plotting constants (local to visualizer, not worth putting in config)
+# Plotting constants (layout/decoration only; line/marker sizes in config)
 LINE_COLOR = "black"
-LINE_WIDTH = 3
 LINE_STYLES = {"driven": "-", "idle": "--"}
 SHADE_COLOR = "lightgrey"
 SHADE_ALPHA = 0.7
 REFERENCE_LINE_ALPHA = 0.5
 REFERENCE_LINE_ALPHA_THICK = 0.8
-REFERENCE_LINE_WIDTH = 2.0
 QUADRANT_ALPHA = 0.2
 PHASE_DIAGRAM_ALPHA = 0.4
-PHASE_DIAGRAM_MARKER_SIZE = 10
 
 
 class StabilityVisualizer:
@@ -56,12 +58,6 @@ class StabilityVisualizer:
         """Initialize visualizer with publication-quality parameters and color schemes."""
         apply_matplotlib_style()
         os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-        # Font and figure configuration
-        self.font_sizes = FONT_CONFIG["font_sizes"]
-        self.figure_sizes = FONT_CONFIG["figure_sizes"]
-        self.dpi = FONT_CONFIG["dpi"]
-        self.colorbar_width = FONT_CONFIG["colorbar_width"]
 
         # Create output directories
         self.summary_dir = os.path.join(OUTPUT_DIR, "summary")
@@ -206,14 +202,14 @@ class StabilityVisualizer:
         """Add colorbar with poster-optimized styling."""
         cbar_ax = fig.add_axes(position)
         cbar = fig.colorbar(im, cax=cbar_ax)
-        cbar.set_label(label, rotation=270, labelpad=12, fontsize=self.font_sizes["colorbar"])
+        cbar.set_label(label, rotation=270, labelpad=12, fontsize=FONT_SIZES["colorbar"])
 
         if ticks:
             cbar.set_ticks(ticks)
         if tick_labels:
-            cbar.set_ticklabels(tick_labels, fontsize=self.font_sizes["colorbar_ticks"])
+            cbar.set_ticklabels(tick_labels, fontsize=FONT_SIZES["colorbar_ticks"])
         else:
-            cbar.ax.tick_params(labelsize=self.font_sizes["tick_labels"])
+            cbar.ax.tick_params(labelsize=FONT_SIZES["tick_labels"])
 
         return cbar
 
@@ -225,7 +221,7 @@ class StabilityVisualizer:
         # Main title only (no grey parameter subtitle for poster style)
         fig.suptitle(
             f"{title_prefix} - {regime.capitalize()}",
-            fontsize=self.font_sizes["title"],
+            fontsize=FONT_SIZES["title"],
             fontweight="bold",
             y=0.95,
         )
@@ -236,7 +232,7 @@ class StabilityVisualizer:
         """Save figure to appropriate directory."""
         filename = f"{plot_type}_{regime}_snapshot{snapshot_idx}.pdf"
         filepath = os.path.join(self.snapshots_dir, filename)
-        save_figure(fig, filepath, dpi=self.dpi)
+        save_figure(fig, filepath, dpi=DPI)
         print(f"Saved figure: {filepath}")
 
     def _add_layer_wise_colorbars(self, fig, axes, ims):
@@ -251,7 +247,7 @@ class StabilityVisualizer:
             self._add_colorbar(
                 fig,
                 ims["lambda"],
-                [0.88, cbar_bottom, self.colorbar_width, cbar_height],
+                [0.88, cbar_bottom, COLORBAR_WIDTH, cbar_height],
                 r"$\lambda_{\mathrm{max}}$",
                 [vmin, 0, vmax],
             )
@@ -260,7 +256,7 @@ class StabilityVisualizer:
             self._add_colorbar(
                 fig,
                 ims["regime"],
-                [0.93, cbar_bottom, self.colorbar_width, cbar_height],
+                [0.93, cbar_bottom, COLORBAR_WIDTH, cbar_height],
                 "Stability Regime",
                 list(range(len(REGIME_LABELS))),
                 REGIME_LABELS,
@@ -334,9 +330,9 @@ class StabilityVisualizer:
         """Create layer-wise figure."""
         print(f"Creating layer-wise figure for {regime} snapshot {snapshot_idx}")
 
-        fig = self._setup_figure(
-            regime, snapshot_idx, self.figure_sizes["layer_wise"], "Layer-wise stability"
-        )
+        # 3 layers × 16 columns (4 stages × 4 conditions), use smaller subplot width for dense grid
+        figsize = compute_subplot_figsize(3, 16, subplot_width_mm=12.0, subplot_aspect=1.0)
+        fig = self._setup_figure(regime, snapshot_idx, figsize, "Layer-wise stability")
 
         # Manual subplot positioning to eliminate gaps between layers
         axes = np.empty((3, 16), dtype=object)
@@ -405,7 +401,7 @@ class StabilityVisualizer:
         for i, label in enumerate(layer_labels):
             axes[i, 0].set_ylabel(
                 label,
-                fontsize=self.font_sizes["ylabel"],
+                fontsize=FONT_SIZES["ylabel"],
                 rotation=0,
                 labelpad=12,
                 ha="right",
@@ -421,7 +417,7 @@ class StabilityVisualizer:
                 f"$\\mathbf{{{stage}}}$",
                 ha="center",
                 va="center",
-                fontsize=self.font_sizes["ylabel"],
+                fontsize=FONT_SIZES["ylabel"],
                 fontweight="bold",
                 transform=fig.transFigure,
             )
@@ -436,7 +432,7 @@ class StabilityVisualizer:
                 transform=axes[0, cond_idx].transAxes,
                 ha="center",
                 va="center",
-                fontsize=self.font_sizes["condition_labels"],
+                fontsize=FONT_SIZES["condition_labels"],
                 color="black",
             )
 
@@ -455,9 +451,9 @@ class StabilityVisualizer:
         """Create column-wise figure."""
         print(f"Creating column-wise figure for {regime} snapshot {snapshot_idx}")
 
-        fig = self._setup_figure(
-            regime, snapshot_idx, self.figure_sizes["column_wise"], "Column-wise stability"
-        )
+        # 5 rows × 4 columns (developmental stages)
+        figsize = compute_subplot_figsize(5, 4, subplot_aspect=SUBPLOT_ASPECTS["tall"])
+        fig = self._setup_figure(regime, snapshot_idx, figsize, "Column-wise stability")
 
         # Create 5×4 grid with equal row and column spacing
         gs = fig.add_gridspec(
@@ -493,7 +489,7 @@ class StabilityVisualizer:
         for i, label in enumerate(row_labels):
             axes[i, 0].set_ylabel(
                 f"{label}",
-                fontsize=self.font_sizes["ylabel"],
+                fontsize=FONT_SIZES["ylabel"],
                 rotation=0,
                 labelpad=20,
                 ha="right",
@@ -510,7 +506,7 @@ class StabilityVisualizer:
                     transform=axes[0, j].transAxes,
                     ha="center",
                     va="center",
-                    fontsize=self.font_sizes["ylabel"],
+                    fontsize=FONT_SIZES["ylabel"],
                     fontweight="bold",
                 )
 
@@ -602,7 +598,7 @@ class StabilityVisualizer:
             bottom += values
 
         # Configure axis
-        ax.set_title(title, fontsize=self.font_sizes["ylabel"], fontweight="bold")
+        ax.set_title(title, fontsize=FONT_SIZES["ylabel"], fontweight="bold")
         ax.set_ylim(0, 100)
         ax.set_xticks(x_positions)
         ax.set_xticklabels(DEVELOPMENTAL_STAGES)
@@ -613,9 +609,10 @@ class StabilityVisualizer:
 
         percentages = self._calculate_regime_percentages(results)
 
-        fig, axes = plt.subplots(2, 2, figsize=self.figure_sizes["regime_percentages"])
+        # 2×2 grid of square bar charts
+        fig, axes = plt.subplots(2, 2, figsize=compute_subplot_figsize(2, 2))
         fig.suptitle(
-            "Stability Regime Ratios", fontsize=self.font_sizes["title"], fontweight="bold"
+            "Stability Regime Ratios", fontsize=FONT_SIZES["title"], fontweight="bold"
         )
 
         plot_configs = [
@@ -628,16 +625,16 @@ class StabilityVisualizer:
         for row, col, condition, analysis_type, title in plot_configs:
             ax = axes[row, col]
             self._plot_regime_percentages(ax, percentages, condition, analysis_type, title)
-            ax.set_title(title, fontsize=self.font_sizes["ylabel"], fontweight="bold")
+            ax.set_title(title, fontsize=FONT_SIZES["ylabel"], fontweight="bold")
 
             if col == 0:
-                ax.set_ylabel("Cortical area (%)", fontsize=self.font_sizes["ylabel"])
+                ax.set_ylabel("Cortical area (%)", fontsize=FONT_SIZES["ylabel"])
 
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.3, wspace=0.3)
 
         filepath = os.path.join(self.summary_dir, "regime_percentages.pdf")
-        save_figure(fig, filepath, dpi=self.dpi)
+        save_figure(fig, filepath, dpi=DPI)
         print(f"Saved figure: {filepath}")
 
     def _calculate_inhibition_effectiveness(self, results: dict) -> dict:
@@ -728,13 +725,13 @@ class StabilityVisualizer:
                 )
 
         # Configure axis
-        ax.set_title(title, fontsize=self.font_sizes["title"], fontweight="bold")
-        ax.set_xlabel("Developmental Age", fontsize=self.font_sizes["ylabel"])
-        ax.set_ylabel(ylabel, fontsize=self.font_sizes["ylabel"])
+        ax.set_title(title, fontsize=FONT_SIZES["title"], fontweight="bold")
+        ax.set_xlabel("Developmental Age", fontsize=FONT_SIZES["ylabel"])
+        ax.set_ylabel(ylabel, fontsize=FONT_SIZES["ylabel"])
         ax.set_xticks(x_positions)
         ax.set_xticklabels(DEVELOPMENTAL_STAGES)
-        ax.legend(fontsize=self.font_sizes["colorbar"], frameon=True)
-        ax.axhline(y=0, color=LINE_COLOR, linestyle=":", alpha=REFERENCE_LINE_ALPHA, linewidth=1)
+        ax.legend(fontsize=FONT_SIZES["colorbar"], frameon=True)
+        ax.axhline(y=0, color=LINE_COLOR, linestyle=":", alpha=REFERENCE_LINE_ALPHA, linewidth=REFERENCE_LINE_WIDTH)
 
     def create_inhibition_effectiveness_plot(self, results: dict):
         """Create inhibition effectiveness plot."""
@@ -742,7 +739,8 @@ class StabilityVisualizer:
 
         effectiveness = self._calculate_inhibition_effectiveness(results)
 
-        fig, ax = plt.subplots(1, 1, figsize=self.figure_sizes["effectiveness"])
+        # Single square subplot
+        fig, ax = plt.subplots(1, 1, figsize=compute_subplot_figsize(1, 1))
         self._plot_effectiveness_timeseries(
             ax,
             effectiveness,
@@ -752,7 +750,7 @@ class StabilityVisualizer:
 
         plt.tight_layout()
         filepath = os.path.join(self.summary_dir, "inhibition_effectiveness.pdf")
-        save_figure(fig, filepath, dpi=self.dpi)
+        save_figure(fig, filepath, dpi=DPI)
         print(f"Saved figure: {filepath}")
 
     def create_layer_effectiveness_plot(self, results: dict):
@@ -761,10 +759,8 @@ class StabilityVisualizer:
 
         layer_effectiveness = self._calculate_layer_effectiveness(results)
 
-        # Use standardized layer colors
-        LAYER_COLORS_CLEAN = STANDARD_COLORS["layers"]
-
-        fig, ax = plt.subplots(1, 1, figsize=self.figure_sizes["effectiveness"])
+        # Single square subplot
+        fig, ax = plt.subplots(1, 1, figsize=compute_subplot_figsize(1, 1))
         x_positions = range(len(DEVELOPMENTAL_STAGES))
 
         # Plot each layer with updated colors and markers
@@ -788,18 +784,18 @@ class StabilityVisualizer:
                     ns.append(0)
 
             means, sems = np.array(means), np.array(sems)
-            color = LAYER_COLORS_CLEAN[display_layer]
+            color = LAYER_COLORS[layer]  # Use internal key for color lookup
 
             # Plot line with filled circular markers
             ax.plot(
                 x_positions,
                 means,
                 color=color,
-                linewidth=3,
+                linewidth=LINE_WIDTH,
                 linestyle="-",
                 label=display_layer,
                 marker="o",
-                markersize=8,
+                markersize=MARKER_SIZE,
                 markerfacecolor=color,
                 markeredgecolor=color,
             )
@@ -817,24 +813,24 @@ class StabilityVisualizer:
 
         # Configure axis
         ax.set_title(
-            "Inhibition Effectiveness", fontsize=self.font_sizes["title"], fontweight="bold"
+            "Inhibition Effectiveness", fontsize=FONT_SIZES["title"], fontweight="bold"
         )
-        ax.set_xlabel("Developmental Age", fontsize=self.font_sizes["ylabel"])
+        ax.set_xlabel("Developmental Age", fontsize=FONT_SIZES["ylabel"])
         ax.set_ylabel(
             r"$\lambda_{\mathrm{E\text{-}only}} - \lambda_{\mathrm{full}}$",
-            fontsize=self.font_sizes["ylabel"],
+            fontsize=FONT_SIZES["ylabel"],
         )
         ax.set_xticks(x_positions)
         ax.set_xticklabels(DEVELOPMENTAL_STAGES)
-        ax.legend(fontsize=self.font_sizes["colorbar"], frameon=True)
-        ax.axhline(y=0, color="lightgrey", linestyle="-", alpha=0.8, linewidth=2, zorder=0)
+        ax.legend(fontsize=FONT_SIZES["colorbar"], frameon=True)
+        ax.axhline(y=0, color="lightgrey", linestyle="-", alpha=0.8, linewidth=REFERENCE_LINE_WIDTH, zorder=0)
 
         # Custom y-ticks: only 0 and top value
         self._set_custom_yticks(ax)
 
         plt.tight_layout()
         filepath = os.path.join(self.summary_dir, "layer_specific_inhibition_effectiveness.pdf")
-        save_figure(fig, filepath, dpi=self.dpi)
+        save_figure(fig, filepath, dpi=DPI)
         print(f"Saved figure: {filepath}")
 
     def _calculate_layer_effectiveness(self, results: dict) -> dict:
@@ -974,7 +970,7 @@ class StabilityVisualizer:
             [lim_min, lim_max],
             "k--",
             alpha=REFERENCE_LINE_ALPHA,
-            linewidth=1,
+            linewidth=REFERENCE_LINE_WIDTH,
             zorder=1,
         )
 
@@ -982,9 +978,9 @@ class StabilityVisualizer:
         self, ax, stage: str, lim_min: float, lim_max: float, show_legend: bool = False
     ):
         """Configure individual phase diagram subplot."""
-        ax.set_title(stage, fontsize=self.font_sizes["ylabel"], fontweight="bold")
-        ax.set_xlabel(r"$\lambda_{\mathrm{full}}$", fontsize=self.font_sizes["ylabel"])
-        ax.set_ylabel(r"$\lambda_{\mathrm{E\text{-}only}}$", fontsize=self.font_sizes["ylabel"])
+        ax.set_title(stage, fontsize=FONT_SIZES["ylabel"], fontweight="bold")
+        ax.set_xlabel(r"$\lambda_{\mathrm{full}}$", fontsize=FONT_SIZES["ylabel"])
+        ax.set_ylabel(r"$\lambda_{\mathrm{E\text{-}only}}$", fontsize=FONT_SIZES["ylabel"])
         ax.set_xlim(lim_min, lim_max)
         ax.set_ylim(lim_min, lim_max)
         ax.set_aspect("equal", adjustable="box")
@@ -995,7 +991,7 @@ class StabilityVisualizer:
         self._add_reference_lines(ax, lim_min, lim_max)
 
         if show_legend:
-            ax.legend(fontsize=self.font_sizes["colorbar"], frameon=True, loc="upper left")
+            ax.legend(fontsize=FONT_SIZES["colorbar"], frameon=True, loc="upper left")
 
     def create_stability_phase_diagrams(self, results: dict):
         """Create stability phase diagrams."""
@@ -1004,9 +1000,10 @@ class StabilityVisualizer:
         phase_data = self._collect_phase_diagram_data(results)
         lim_min, lim_max = self._determine_phase_diagram_limits(phase_data)
 
-        fig, axes = plt.subplots(1, 4, figsize=self.figure_sizes["phase_diagram"])
+        # 1 row × 4 columns of square phase plots
+        fig, axes = plt.subplots(1, 4, figsize=compute_subplot_figsize(1, 4))
         fig.suptitle(
-            "Stability Phase Diagrams", fontsize=self.font_sizes["title"], fontweight="bold"
+            "Stability Phase Diagrams", fontsize=FONT_SIZES["title"], fontweight="bold"
         )
 
         for i, stage in enumerate(DEVELOPMENTAL_STAGES):
@@ -1020,28 +1017,28 @@ class StabilityVisualizer:
                             phase_data[stage][condition]["e_only"],
                             c="black",
                             alpha=0.1,
-                            s=5,
+                            s=MARKER_SIZE**2,
                             marker="o" if condition == "driven" else "^",
                             edgecolors="none",
                             label=condition.capitalize(),
                         )
 
             self._configure_phase_subplot(ax, stage, lim_min, lim_max, show_legend=(i == 0))
-            ax.set_xlabel(r"$\lambda_{\mathrm{full}}$", fontsize=self.font_sizes["ylabel"])
+            ax.set_xlabel(r"$\lambda_{\mathrm{full}}$", fontsize=FONT_SIZES["ylabel"])
 
             # Only show y-axis label on leftmost plot
             if i == 0:
                 ax.set_ylabel(
-                    r"$\lambda_{\mathrm{E\text{-}only}}$", fontsize=self.font_sizes["ylabel"]
+                    r"$\lambda_{\mathrm{E\text{-}only}}$", fontsize=FONT_SIZES["ylabel"]
                 )
             else:
                 ax.set_ylabel("")  # Remove y-axis label for non-leftmost plots
 
-            ax.set_title(stage, fontsize=self.font_sizes["ylabel"], fontweight="bold")
+            ax.set_title(stage, fontsize=FONT_SIZES["ylabel"], fontweight="bold")
 
         plt.tight_layout()
         filepath = os.path.join(self.summary_dir, "phase_diagrams.pdf")
-        save_figure(fig, filepath, dpi=self.dpi)
+        save_figure(fig, filepath, dpi=DPI)
         print(f"Saved figure: {filepath}")
 
     def generate_all_figures(self, results: dict):
@@ -1274,12 +1271,9 @@ class StabilityVisualizer:
 
         effectiveness = self._calculate_celltype_effectiveness(results)
 
-        # Create 2x2 subplot layout
-        fig, axes = plt.subplots(2, 2, figsize=self.figure_sizes["effectiveness_2x2"])
+        # 2×2 grid of square trend plots
+        fig, axes = plt.subplots(2, 2, figsize=compute_subplot_figsize(2, 2))
         x_positions = range(len(DEVELOPMENTAL_STAGES))
-
-        # Use standardized colors
-        colors = STANDARD_COLORS["cell_types"]
 
         # Plot 1: SST vs PV Relative Effectiveness (driven condition)
         ax = axes[0, 0]
@@ -1289,30 +1283,30 @@ class StabilityVisualizer:
             ax.plot(
                 x_positions,
                 means,
-                color=colors[cell_type],
+                color=CELL_COLORS[cell_type],
                 linewidth=LINE_WIDTH,
                 linestyle="-",
                 label=cell_type,
                 marker="o",
-                markersize=6,
+                markersize=MARKER_SIZE,
             )
             ax.fill_between(
                 x_positions,
                 means - stds,
                 means + stds,
-                color=colors[cell_type],
+                color=CELL_COLORS[cell_type],
                 alpha=SHADE_ALPHA * 0.5,
             )
 
-        # ax.set_title('Cell-Type Relative Effectiveness (Driven)', fontsize=self.font_sizes['title'], fontweight='bold')  # Title removed
+        # ax.set_title('Cell-Type Relative Effectiveness (Driven)', fontsize=FONT_SIZES['title'], fontweight='bold')  # Title removed
         ax.set_ylabel(
             r"$\lambda_{\mathrm{partial}} - \lambda_{\mathrm{full}}$",
-            fontsize=self.font_sizes["ylabel"],
+            fontsize=FONT_SIZES["ylabel"],
         )
         ax.set_xticks(x_positions)
         ax.set_xticklabels(DEVELOPMENTAL_STAGES)
-        ax.legend(fontsize=self.font_sizes["colorbar"])
-        ax.axhline(y=0, color=LINE_COLOR, linestyle=":", alpha=REFERENCE_LINE_ALPHA, linewidth=1)
+        ax.legend(fontsize=FONT_SIZES["colorbar"])
+        ax.axhline(y=0, color=LINE_COLOR, linestyle=":", alpha=REFERENCE_LINE_ALPHA, linewidth=REFERENCE_LINE_WIDTH)
         # Set custom y-ticks: only 0 and max value
         self._set_custom_yticks(ax)
 
@@ -1324,30 +1318,30 @@ class StabilityVisualizer:
             ax.plot(
                 x_positions,
                 means,
-                color=colors[cell_type],
+                color=CELL_COLORS[cell_type],
                 linewidth=LINE_WIDTH,
                 linestyle="-",
                 label=cell_type,
                 marker="s",
-                markersize=6,
+                markersize=MARKER_SIZE,
             )
             ax.fill_between(
                 x_positions,
                 means - stds,
                 means + stds,
-                color=colors[cell_type],
+                color=CELL_COLORS[cell_type],
                 alpha=SHADE_ALPHA * 0.5,
             )
 
-        # ax.set_title('Cell-Type Absolute Effectiveness (Driven)', fontsize=self.font_sizes['title'], fontweight='bold')  # Title removed
+        # ax.set_title('Cell-Type Absolute Effectiveness (Driven)', fontsize=FONT_SIZES['title'], fontweight='bold')  # Title removed
         ax.set_ylabel(
             r"$\lambda_{\mathrm{E\text{-}only}} - \lambda_{\mathrm{partial}}$",
-            fontsize=self.font_sizes["ylabel"],
+            fontsize=FONT_SIZES["ylabel"],
         )
         ax.set_xticks(x_positions)
         ax.set_xticklabels(DEVELOPMENTAL_STAGES)
-        ax.legend(fontsize=self.font_sizes["colorbar"])
-        ax.axhline(y=0, color=LINE_COLOR, linestyle=":", alpha=REFERENCE_LINE_ALPHA, linewidth=1)
+        ax.legend(fontsize=FONT_SIZES["colorbar"])
+        ax.axhline(y=0, color=LINE_COLOR, linestyle=":", alpha=REFERENCE_LINE_ALPHA, linewidth=REFERENCE_LINE_WIDTH)
         # Set custom y-ticks: only 0 and max value
         self._set_custom_yticks(ax)
 
@@ -1359,31 +1353,31 @@ class StabilityVisualizer:
             ax.plot(
                 x_positions,
                 means,
-                color=colors[cell_type],
+                color=CELL_COLORS[cell_type],
                 linewidth=LINE_WIDTH,
                 linestyle="-",
                 label=cell_type,
                 marker="o",
-                markersize=6,
+                markersize=MARKER_SIZE,
             )
             ax.fill_between(
                 x_positions,
                 means - stds,
                 means + stds,
-                color=colors[cell_type],
+                color=CELL_COLORS[cell_type],
                 alpha=SHADE_ALPHA * 0.5,
             )
 
-        # ax.set_title('Cell-Type Relative Effectiveness (Idle)', fontsize=self.font_sizes['title'], fontweight='bold')  # Title removed
-        ax.set_xlabel("Developmental Age", fontsize=self.font_sizes["ylabel"])
+        # ax.set_title('Cell-Type Relative Effectiveness (Idle)', fontsize=FONT_SIZES['title'], fontweight='bold')  # Title removed
+        ax.set_xlabel("Developmental Age", fontsize=FONT_SIZES["ylabel"])
         ax.set_ylabel(
             r"$\lambda_{\mathrm{partial}} - \lambda_{\mathrm{full}}$",
-            fontsize=self.font_sizes["ylabel"],
+            fontsize=FONT_SIZES["ylabel"],
         )
         ax.set_xticks(x_positions)
         ax.set_xticklabels(DEVELOPMENTAL_STAGES)
-        ax.legend(fontsize=self.font_sizes["colorbar"])
-        ax.axhline(y=0, color=LINE_COLOR, linestyle=":", alpha=REFERENCE_LINE_ALPHA, linewidth=1)
+        ax.legend(fontsize=FONT_SIZES["colorbar"])
+        ax.axhline(y=0, color=LINE_COLOR, linestyle=":", alpha=REFERENCE_LINE_ALPHA, linewidth=REFERENCE_LINE_WIDTH)
         # Set custom y-ticks: only 0 and max value
         self._set_custom_yticks(ax)
 
@@ -1395,38 +1389,38 @@ class StabilityVisualizer:
             ax.plot(
                 x_positions,
                 means,
-                color=colors[cell_type],
+                color=CELL_COLORS[cell_type],
                 linewidth=LINE_WIDTH,
                 linestyle="-",
                 label=cell_type,
                 marker="s",
-                markersize=6,
+                markersize=MARKER_SIZE,
             )
             ax.fill_between(
                 x_positions,
                 means - stds,
                 means + stds,
-                color=colors[cell_type],
+                color=CELL_COLORS[cell_type],
                 alpha=SHADE_ALPHA * 0.5,
             )
 
-        # ax.set_title('Cell-Type Absolute Effectiveness (Idle)', fontsize=self.font_sizes['title'], fontweight='bold')  # Title removed
-        ax.set_xlabel("Developmental Age", fontsize=self.font_sizes["ylabel"])
+        # ax.set_title('Cell-Type Absolute Effectiveness (Idle)', fontsize=FONT_SIZES['title'], fontweight='bold')  # Title removed
+        ax.set_xlabel("Developmental Age", fontsize=FONT_SIZES["ylabel"])
         ax.set_ylabel(
             r"$\lambda_{\mathrm{E\text{-}only}} - \lambda_{\mathrm{partial}}$",
-            fontsize=self.font_sizes["ylabel"],
+            fontsize=FONT_SIZES["ylabel"],
         )
         ax.set_xticks(x_positions)
         ax.set_xticklabels(DEVELOPMENTAL_STAGES)
-        ax.legend(fontsize=self.font_sizes["colorbar"])
-        ax.axhline(y=0, color=LINE_COLOR, linestyle=":", alpha=REFERENCE_LINE_ALPHA, linewidth=1)
+        ax.legend(fontsize=FONT_SIZES["colorbar"])
+        ax.axhline(y=0, color=LINE_COLOR, linestyle=":", alpha=REFERENCE_LINE_ALPHA, linewidth=REFERENCE_LINE_WIDTH)
         # Set custom y-ticks: only 0 and max value
         self._set_custom_yticks(ax)
 
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.3, wspace=0.3)
         filepath = os.path.join(self.summary_dir, "celltype_specific_inhibition_effectiveness.pdf")
-        save_figure(fig, filepath, dpi=self.dpi)
+        save_figure(fig, filepath, dpi=DPI)
         print(f"Saved figure: {filepath}")
 
     def create_layer_specific_heatmaps(self, results: dict):
@@ -1489,14 +1483,18 @@ class StabilityVisualizer:
                                 stage
                             ]["mean"]
 
-        # Create figure with two subplots
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figure_sizes["heatmap_dual"])
+        # 1 row × 2 columns of heatmaps (wider than tall)
+        fig, (ax1, ax2) = plt.subplots(
+            1, 2, figsize=compute_subplot_figsize(1, 2, subplot_aspect=SUBPLOT_ASPECTS["heatmap"])
+        )
+        # Leave room between subplots and for colorbars to avoid overlapping labels
+        plt.subplots_adjust(left=0.18, right=0.92, bottom=0.22, top=0.92, wspace=0.65)
 
         # Make both subplots square
         ax1.set_aspect("equal", adjustable="box")
         ax2.set_aspect("equal", adjustable="box")
 
-        cmap = STANDARD_COLORS["colormaps"]["heatmap"]
+        cmap = COLORMAPS["heatmap"]
 
         # Use separate color scales for each subplot
         # Effectiveness heatmap
@@ -1519,9 +1517,9 @@ class StabilityVisualizer:
         im1 = ax1.imshow(
             effectiveness_matrix, cmap=cmap, aspect="auto", vmin=eff_vmin, vmax=eff_vmax
         )
-        # ax1.set_title('Layer-Specific Relative Effectiveness (Driven)', fontsize=self.font_sizes['title'], fontweight='bold')  # Title removed
-        # ax1.set_xlabel('Developmental Age', fontsize=self.font_sizes['ylabel'])  # X-axis label removed
-        # ax1.set_ylabel('Cell Type & Layer', fontsize=self.font_sizes['ylabel'])  # Y-axis label removed
+        # ax1.set_title('Layer-Specific Relative Effectiveness (Driven)', fontsize=FONT_SIZES['title'], fontweight='bold')  # Title removed
+        # ax1.set_xlabel('Developmental Age', fontsize=FONT_SIZES['ylabel'])  # X-axis label removed
+        # ax1.set_ylabel('Cell Type & Layer', fontsize=FONT_SIZES['ylabel'])  # Y-axis label removed
         ax1.set_xticks(range(len(x_labels)))
         ax1.set_xticklabels(x_labels)
         ax1.set_yticks(range(len(y_labels)))
@@ -1532,7 +1530,7 @@ class StabilityVisualizer:
         cbar1 = plt.colorbar(im1, ax=ax1)
         cbar1.set_label(
             r"$\lambda_{\mathrm{partial}} - \lambda_{\mathrm{full}}$",
-            fontsize=self.font_sizes["colorbar"],
+            fontsize=FONT_SIZES["colorbar"],
         )
         # Set custom ticks: only 0 and vmax
         cbar1.set_ticks([0, eff_vmax])
@@ -1542,9 +1540,9 @@ class StabilityVisualizer:
         im2 = ax2.imshow(
             contribution_matrix, cmap=cmap, aspect="auto", vmin=contrib_vmin, vmax=contrib_vmax
         )
-        # ax2.set_title('Layer-Specific Absolute Effectiveness (Driven)', fontsize=self.font_sizes['title'], fontweight='bold')  # Title removed
-        # ax2.set_xlabel('Developmental Age', fontsize=self.font_sizes['ylabel'])  # X-axis label removed
-        # ax2.set_ylabel('Cell Type & Layer', fontsize=self.font_sizes['ylabel'])  # Y-axis label removed
+        # ax2.set_title('Layer-Specific Absolute Effectiveness (Driven)', fontsize=FONT_SIZES['title'], fontweight='bold')  # Title removed
+        # ax2.set_xlabel('Developmental Age', fontsize=FONT_SIZES['ylabel'])  # X-axis label removed
+        # ax2.set_ylabel('Cell Type & Layer', fontsize=FONT_SIZES['ylabel'])  # Y-axis label removed
         ax2.set_xticks(range(len(x_labels)))
         ax2.set_xticklabels(x_labels)
         ax2.set_yticks(range(len(y_labels)))
@@ -1555,16 +1553,13 @@ class StabilityVisualizer:
         cbar2 = plt.colorbar(im2, ax=ax2)
         cbar2.set_label(
             r"$\lambda_{\mathrm{E\text{-}only}} - \lambda_{\mathrm{partial}}$",
-            fontsize=self.font_sizes["colorbar"],
+            fontsize=FONT_SIZES["colorbar"],
         )
         # Set custom ticks: only 0 and vmax
         cbar2.set_ticks([0, contrib_vmax])
         cbar2.set_ticklabels([f"{0:.2f}", f"{contrib_vmax:.2f}"])
 
-        plt.tight_layout()
-        plt.subplots_adjust(wspace=0.4)
-
         # Save effectiveness heatmap
         filepath_eff = os.path.join(self.summary_dir, "layer_specific_effectiveness_driven.pdf")
-        save_figure(fig, filepath_eff, dpi=self.dpi)
+        save_figure(fig, filepath_eff, dpi=DPI)
         print(f"Saved effectiveness heatmap: {filepath_eff}")

@@ -11,7 +11,12 @@ from typing import Any
 
 from tqdm import tqdm
 
-from src.analysis.common import DEVELOPMENTAL_STAGES, apply_matplotlib_style, save_figure
+from src.analysis.common import (
+    DEVELOPMENTAL_STAGES,
+    apply_matplotlib_style,
+    compute_subplot_figsize,
+    save_figure,
+)
 
 from .config import (
     ANALYSIS_PARAMS,
@@ -19,8 +24,6 @@ from .config import (
     CELL_COLORS,
     DPI,
     ERROR_BAR_ALPHA,
-    FIGSIZE_TIMESERIES,
-    FIGSIZE_TRENDS,
     FONT_SIZES,
     HEATMAP_VMAX,
     HEATMAP_VMIN,
@@ -252,7 +255,7 @@ class ActivityVisualizer:
 
     def create_activity_heatmaps(self, results: dict[str, Any]) -> None:
         """Create 3x4 activity heatmaps showing spatial activity over time."""
-        fig, axes = plt.subplots(3, 4, figsize=FIGSIZE_TIMESERIES)
+        fig, axes = plt.subplots(3, 4, figsize=compute_subplot_figsize(3, 4, subplot_aspect=2.0))
         fig.suptitle("Firing Rates", fontsize=FONT_SIZES["title"], fontweight="bold")
 
         cell_cmaps = self._create_cell_colormaps()
@@ -323,7 +326,7 @@ class ActivityVisualizer:
 
     def create_average_firing_rate_plots(self, results: dict[str, Any]) -> None:
         """Create 3x4 average firing rate timeseries plots."""
-        fig, axes = plt.subplots(3, 4, figsize=FIGSIZE_TIMESERIES)
+        fig, axes = plt.subplots(3, 4, figsize=compute_subplot_figsize(3, 4, subplot_aspect=2.0))
         fig.suptitle("Average Firing Rates", fontsize=FONT_SIZES["title"], fontweight="bold")
 
         # Use configurable ylim if provided, otherwise calculate automatically
@@ -352,7 +355,7 @@ class ActivityVisualizer:
 
     def create_active_cell_fraction_plots(self, results: dict[str, Any]) -> None:
         """Create 3x4 active cell fraction timeseries plots."""
-        fig, axes = plt.subplots(3, 4, figsize=FIGSIZE_TIMESERIES)
+        fig, axes = plt.subplots(3, 4, figsize=compute_subplot_figsize(3, 4, subplot_aspect=2.0))
         fig.suptitle("Fraction of Active Cells", fontsize=FONT_SIZES["title"], fontweight="bold")
 
         ylim = self._calculate_global_ylim(results, "active_fractions")
@@ -395,6 +398,7 @@ class ActivityVisualizer:
             color=color,
             alpha=ERROR_BAR_ALPHA,
             linewidth=0,
+            edgecolor="none",
         )
 
     def _setup_trend_plot_axes(
@@ -443,7 +447,7 @@ class ActivityVisualizer:
 
     def create_pairwise_correlation_trends(self, results: dict[str, Any]) -> None:
         """Create developmental trends in pairwise correlations."""
-        fig, axes = plt.subplots(1, 3, figsize=FIGSIZE_TRENDS)
+        fig, axes = plt.subplots(1, 3, figsize=compute_subplot_figsize(1, 3))
         fig.suptitle("Pairwise Correlation", fontsize=FONT_SIZES["title"], fontweight="bold")
 
         x_pos = list(range(len(DEVELOPMENTAL_STAGES)))
@@ -549,7 +553,7 @@ class ActivityVisualizer:
 
     def create_dimensionality_trends(self, results: dict[str, Any]) -> None:
         """Create developmental trends in network dimensionality (participation ratio)."""
-        fig, axes = plt.subplots(1, 3, figsize=FIGSIZE_TRENDS)
+        fig, axes = plt.subplots(1, 3, figsize=compute_subplot_figsize(1, 3))
         fig.suptitle("Network Dimensionality (Participation Ratio)", fontsize=FONT_SIZES["title"], fontweight="bold")
 
         x_pos = list(range(len(DEVELOPMENTAL_STAGES)))
@@ -655,7 +659,7 @@ class ActivityVisualizer:
 
     def create_synchronous_event_trends(self, results: dict[str, Any]) -> None:
         """Create developmental trends in synchronous events."""
-        fig, axes = plt.subplots(1, 3, figsize=FIGSIZE_TRENDS)
+        fig, axes = plt.subplots(1, 3, figsize=compute_subplot_figsize(1, 3))
         fig.suptitle("Large Synchronous Events", fontsize=FONT_SIZES["title"], fontweight="bold")
 
         x_pos = list(range(len(DEVELOPMENTAL_STAGES)))
@@ -757,7 +761,7 @@ class ActivityVisualizer:
 
         return all_values
 
-    def create_structural_ei_balance_trends(self, results: dict[str, Any]) -> None:
+    def create_ei_balance_structural_trends(self, results: dict[str, Any]) -> None:
         """Create developmental trends in structural E-I balance.
 
         Shows how inhibition to E cells changes across developmental stages,
@@ -766,8 +770,8 @@ class ActivityVisualizer:
         Panel 1: Inhibition by cell type (SST vs PV magnitude)
         Panel 2: Total inhibition (sum of SST + PV)
         """
-        fig, axes = plt.subplots(1, 2, figsize=FIGSIZE_TRENDS)
-        fig.suptitle("Inhibition to E Cells", fontsize=FONT_SIZES["title"], fontweight="bold")
+        fig, axes = plt.subplots(1, 2, figsize=compute_subplot_figsize(1, 2))
+        fig.suptitle("Structural Inhibition to E Cells", fontsize=FONT_SIZES["title"], fontweight="bold")
 
         x_pos = list(range(len(DEVELOPMENTAL_STAGES)))
 
@@ -777,7 +781,7 @@ class ActivityVisualizer:
         
         # Also include total inhibition values
         total_inhib_values = [
-            results[stage]["structural_ei_balance"]["inhibition_total"]
+            results[stage]["ei_balance_structural"]["inhibition_total"]
             for stage in DEVELOPMENTAL_STAGES
         ]
         all_inhib_values = inhib_values + total_inhib_values
@@ -796,7 +800,7 @@ class ActivityVisualizer:
         # --- Panel 1: Inhibition by cell type (SST and PV) ---
         for cell_type in inhibitory_types:
             means = [
-                results[stage]["structural_ei_balance"]["by_inhibitory_celltype"][cell_type]
+                results[stage]["ei_balance_structural"]["by_inhibitory_celltype"][cell_type]
                 for stage in DEVELOPMENTAL_STAGES
             ]
             self._plot_trend_with_errorbars(
@@ -806,7 +810,7 @@ class ActivityVisualizer:
         self._setup_trend_plot_axes(
             axes[0],
             "By Cell Type",
-            "Scaled Strength",
+            "Structural Strength",
             x_pos,
             inhib_ylim,
             inhib_tick_values,
@@ -839,20 +843,20 @@ class ActivityVisualizer:
             title="Cell Types",
         )
         
-        self._save_plot("structural_ei_balance_trends.pdf")
+        self._save_plot("ei_balance_structural_trends.pdf")
 
     def _collect_inhibition_values(self, results: dict[str, Any]) -> list[float]:
         """Collect all inhibition magnitude values for consistent scaling."""
         all_values = []
         for cell_type in ["SST", "PV"]:
             values = [
-                results[stage]["structural_ei_balance"]["by_inhibitory_celltype"][cell_type]
+                results[stage]["ei_balance_structural"]["by_inhibitory_celltype"][cell_type]
                 for stage in DEVELOPMENTAL_STAGES
             ]
             all_values.extend(values)
         return [v for v in all_values if not np.isnan(v) and v != float("inf")]
 
-    def create_functional_ei_balance_trends(self, results: dict[str, Any]) -> None:
+    def create_ei_balance_functional_trends(self, results: dict[str, Any]) -> None:
         """Create developmental trends in functional E-I balance.
 
         Shows how activity-weighted inhibition to E cells changes across
@@ -861,7 +865,7 @@ class ActivityVisualizer:
         Panel 1: Inhibition by cell type (SST vs PV magnitude)
         Panel 2: Total inhibition (sum of SST + PV)
         """
-        fig, axes = plt.subplots(1, 2, figsize=FIGSIZE_TRENDS)
+        fig, axes = plt.subplots(1, 2, figsize=compute_subplot_figsize(1, 2))
         fig.suptitle(
             "Functional Inhibition to E Cells", fontsize=FONT_SIZES["title"], fontweight="bold"
         )
@@ -874,7 +878,7 @@ class ActivityVisualizer:
 
         for cell_type in inhibitory_types:
             values = [
-                results[stage]["functional_ei_balance"]["by_inhibitory_celltype"][cell_type][
+                results[stage]["ei_balance_functional"]["by_inhibitory_celltype"][cell_type][
                     "mean"
                 ]
                 for stage in DEVELOPMENTAL_STAGES
@@ -883,7 +887,7 @@ class ActivityVisualizer:
 
         # Also include total inhibition values
         total_functional_inhib_values = [
-            results[stage]["functional_ei_balance"]["total"]["mean"]
+            results[stage]["ei_balance_functional"]["total"]["mean"]
             for stage in DEVELOPMENTAL_STAGES
         ]
         all_functional_inhib_values = functional_inhib_values + total_functional_inhib_values
@@ -904,7 +908,7 @@ class ActivityVisualizer:
         # --- Panel 1: Inhibition by cell type (SST and PV) ---
         for cell_type in inhibitory_types:
             means = [
-                results[stage]["functional_ei_balance"]["by_inhibitory_celltype"][cell_type][
+                results[stage]["ei_balance_functional"]["by_inhibitory_celltype"][cell_type][
                     "mean"
                 ]
                 for stage in DEVELOPMENTAL_STAGES
@@ -917,7 +921,7 @@ class ActivityVisualizer:
         self._setup_trend_plot_axes(
             axes[0],
             "By Cell Type",
-            "Activity × Strength",
+            "Functional Strength",
             x_pos,
             inhib_ylim,
             inhib_tick_values,
@@ -950,7 +954,7 @@ class ActivityVisualizer:
             title="Cell Types",
         )
 
-        self._save_plot("functional_ei_balance_trends.pdf")
+        self._save_plot("ei_balance_functional_trends.pdf")
 
     def create_spatial_correlation_curves(self, results: dict[str, Any]) -> None:
         """Create C(r) spatial correlation curves for all developmental stages.
@@ -960,8 +964,7 @@ class ActivityVisualizer:
         Uses cell type colors with stage-specific opacity. Distance limited to 1000 μm.
         """
         # 4x4 grid: 3 cell types + total row, 3 layers + total column
-        # Make wider than tall for better aspect ratio
-        fig, axes = plt.subplots(4, 4, figsize=(12, 7))
+        fig, axes = plt.subplots(4, 4, figsize=compute_subplot_figsize(4, 4, subplot_aspect=1.5))
         fig.suptitle(
             "Spatial Correlation C(r)", fontsize=FONT_SIZES["title"], fontweight="bold"
         )
@@ -1177,7 +1180,7 @@ class ActivityVisualizer:
         Shows how the characteristic spatial scale of correlations changes
         across developmental stages, in the same format as other trend plots.
         """
-        fig, axes = plt.subplots(1, 3, figsize=FIGSIZE_TRENDS)
+        fig, axes = plt.subplots(1, 3, figsize=compute_subplot_figsize(1, 3))
         fig.suptitle(
             "Spatial Correlation Length ξ", fontsize=FONT_SIZES["title"], fontweight="bold"
         )
@@ -1311,8 +1314,8 @@ class ActivityVisualizer:
             ("Correlation trends", self.create_pairwise_correlation_trends),
             ("Dimensionality trends", self.create_dimensionality_trends),
             ("Synchronous events", self.create_synchronous_event_trends),
-            ("Structural E-I balance", self.create_structural_ei_balance_trends),
-            ("Functional E-I balance", self.create_functional_ei_balance_trends),
+            ("Structural E-I balance", self.create_ei_balance_structural_trends),
+            ("Functional E-I balance", self.create_ei_balance_functional_trends),
             ("Spatial correlation curves", self.create_spatial_correlation_curves),
             ("Correlation length trends", self.create_correlation_length_trends),
         ]
