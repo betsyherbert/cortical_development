@@ -5,14 +5,14 @@ Wavenumber k is in cycles/μm.
 """
 
 from src.analysis.common import get_output_dir
-from src.model.config import ANATOMICAL_GRID_SIZE, RANDOM_SEED
+from src.model.config import ANATOMICAL_GRID_SIZE, GRID_SIZE, RANDOM_SEED
 
 # Analysis parameters
 ANALYSIS_PARAMS = {
     "n_modes": 10,  # Number of Fourier modes to scan in each direction
     "tolerance": 1e-6,  # Convergence tolerance for steady state finder
     "max_iters": 1000,  # Maximum iterations for steady state finder
-    "grid_size": 50,  # Standard grid size (number of grid points) for Fourier normalization
+    "grid_size": GRID_SIZE,  # Inherit from simulation grid size
     "anatomical_grid_size": ANATOMICAL_GRID_SIZE,  # Anatomical size in μm
 }
 

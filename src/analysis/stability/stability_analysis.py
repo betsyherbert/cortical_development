@@ -36,6 +36,9 @@ class StabilityAnalysis:
         preset = PRESETS[stage]
         self._apply_preset(preset)
 
+        # Get thalamic alpha for this developmental stage
+        alpha = preset["thalamic_alpha"]
+
         print("  Running adaptive snapshot collection...")
 
         n_steps = int(self.params["duration"] * 1000 / DT)
@@ -49,7 +52,7 @@ class StabilityAnalysis:
         idle_threshold = driven_threshold = 0
 
         for step in range(n_steps):
-            activities = self.simulation.update()
+            activities = self.simulation.update(alpha=alpha)
             thalamic_sum = np.sum(activities["thalamus"])
 
             thalamic_buffer.append(thalamic_sum)

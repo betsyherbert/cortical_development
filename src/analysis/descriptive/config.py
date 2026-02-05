@@ -47,7 +47,7 @@ ANALYSIS_PARAMS = {
     "warmup_duration": 2.0,  # Warmup time before data collection (seconds)
     "simulation_duration": 10.0,  # Simulation duration (seconds)
     "activity_threshold": 0.25,  # Firing rate threshold for "active" cells
-    "synchronous_event_threshold": 0.02,  # Fraction of cells for "large synchronous events"
+    "synchronous_event_threshold": 0.03,  # Fraction of cells for "large synchronous events"
     "min_mean_rate": 10e-5,  # Min mean firing rate to include in analysis (correlation and dimensionality calculations)
     "sampling_interval": 20.0,  # Sampling interval (ms)
     "dimensionality_min_variance": 0.001,  # Min eigenvalue to include in dimensionality calculation
