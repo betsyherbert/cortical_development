@@ -27,6 +27,7 @@ from .config import (
     ANALYSIS_PARAMS,
     BIFURCATION_COLORMAP,
     GAIN_CLIP_MAX,
+    GAIN_CLIP_MIN,
     GAIN_COLORMAP,
     GAIN_OPACITY_MAX,
     GAIN_OPACITY_MIN,
@@ -80,6 +81,11 @@ class BifurcationVisualizer:
         self.top_margin = 0.74
         self.bottom_margin = 0.08
 
+        # Label padding (distance between axis label and axis)
+        self.primary_labelpad = 2  # Primary axis labels (x, y)
+        self.secondary_labelpad = 4  # Secondary axis labels (top, right)
+        self.colorbar_labelpad = 8  # Colorbar axis labels
+
     def create_stability_map_figure(
         self,
         results: dict,
@@ -131,7 +137,7 @@ class BifurcationVisualizer:
             wspace=self.wspace,
             left=self.left_margin,
             right=0.83,
-            top=0.80,
+            top=0.92,  # Tighter top margin: grid extends higher, less white space
             bottom=0.08,
         )
 
@@ -302,7 +308,7 @@ class BifurcationVisualizer:
                     ax.set_ylabel(
                         param_y_spec.get_axis_label(absolute=primary_absolute),
                         fontsize=self.label_fontsize,
-                        labelpad=6,
+                        labelpad=self.primary_labelpad,
                         color=primary_label_color,
                     )
                 else:
@@ -313,7 +319,7 @@ class BifurcationVisualizer:
                     ax.set_xlabel(
                         param_x_spec.get_axis_label(absolute=primary_absolute),
                         fontsize=self.label_fontsize,
-                        labelpad=6,
+                        labelpad=self.primary_labelpad,
                         color=primary_label_color,
                     )
                 else:
@@ -333,97 +339,85 @@ class BifurcationVisualizer:
                     # Primary axis is not dominant - use default grey
                     ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.5)
 
-                # Secondary axes - always convert absolute to ratio
-                # Get reference values for ratio conversion
-                if param_y_spec.use_ratio and param_y_spec.reference_param:
-                    ref_spec_y = SCANNABLE_PARAMETERS[param_y_spec.reference_param]
-                    ref_value_y = get_nested_value(preset, ref_spec_y.path)
-                else:
-                    ref_value_y = 1.0
-
-                # Always convert: absolute (primary) → ratio (secondary)
-                # Forward: absolute → ratio (divide), Inverse: ratio → absolute (multiply)
-                def conv_y_fwd(x, rv=ref_value_y):
-                    return x / rv if rv != 0 else x
-
-                def conv_y_inv(x, rv=ref_value_y):
-                    return x * rv
-
-                ax2 = ax.secondary_yaxis("right", functions=(conv_y_fwd, conv_y_inv))
-                # Reduce number of ticks on secondary y-axis to allow 1 d.p. formatting
-                ax2.yaxis.set_major_locator(MaxNLocator(nbins=4))
-                # Make labels grey if not dominant, black if dominant
+                # Secondary axes - convert absolute to ratio (skip for derived ratio params)
                 secondary_label_color = "black" if secondary_width == self.bold_spine_width else "0.5"
-                # Show y-labels on all rightmost axes
-                if stage_idx == n_stages - 1:
-                    ax2.set_ylabel(
-                        param_y_spec.get_axis_label(absolute=secondary_absolute),
-                        fontsize=self.secondary_label_fontsize,
-                        labelpad=10,
-                        color=secondary_label_color,
-                    )
-                    # Make ticks/labels black if secondary axis is dominant
-                    if secondary_width == self.bold_spine_width:
-                        ax2.tick_params(
-                            labelsize=self.secondary_tick_fontsize,
-                            length=2,
-                            width=0.5,
-                            color="black",
-                            labelcolor="black",
-                        )
+
+                if not getattr(param_y_spec, "is_derived_ratio", False):
+                    if param_y_spec.use_ratio and param_y_spec.reference_param:
+                        ref_spec_y = SCANNABLE_PARAMETERS[param_y_spec.reference_param]
+                        ref_value_y = get_nested_value(preset, ref_spec_y.path)
                     else:
-                        ax2.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
-                else:
-                    # Keep secondary axis minimal on interior panels: no tick labels without an axis label
-                    ax2.set_ylabel("")
-                    ax2.tick_params(
-                        labelright=False,
-                        right=False,
-                        length=0,
-                    )
-                ax2.spines["right"].set_linewidth(secondary_width)
-                for spine_name in ["left", "top", "bottom"]:
-                    ax2.spines[spine_name].set_visible(False)
+                        ref_value_y = 1.0
 
-                # Top axis - show on all top row axes
-                if param_x_spec.use_ratio and param_x_spec.reference_param:
-                    ref_spec_x = SCANNABLE_PARAMETERS[param_x_spec.reference_param]
-                    ref_value_x = get_nested_value(preset, ref_spec_x.path)
-                else:
-                    ref_value_x = 1.0
+                    def conv_y_fwd(x, rv=ref_value_y):
+                        return x / rv if rv != 0 else x
 
-                # Always convert: absolute (primary) → ratio (secondary)
-                def conv_x_fwd(x, rv=ref_value_x):
-                    return x / rv if rv != 0 else x
+                    def conv_y_inv(x, rv=ref_value_y):
+                        return x * rv
 
-                def conv_x_inv(x, rv=ref_value_x):
-                    return x * rv
-
-                ax3 = ax.secondary_xaxis("top", functions=(conv_x_fwd, conv_x_inv))
-                if row_idx == 0:
-                    ax3.set_xlabel(
-                        param_x_spec.get_axis_label(absolute=secondary_absolute),
-                        fontsize=self.secondary_label_fontsize,
-                        labelpad=6,
-                        color=secondary_label_color,
-                    )
-                    # Make ticks/labels black if secondary axis is dominant
-                    if secondary_width == self.bold_spine_width:
-                        ax3.tick_params(
-                            labelsize=self.secondary_tick_fontsize,
-                            length=2,
-                            width=0.5,
-                            color="black",
-                            labelcolor="black",
+                    ax2 = ax.secondary_yaxis("right", functions=(conv_y_fwd, conv_y_inv))
+                    ax2.yaxis.set_major_locator(MaxNLocator(nbins=4))
+                    if stage_idx == n_stages - 1:
+                        ax2.set_ylabel(
+                            param_y_spec.get_axis_label(absolute=secondary_absolute),
+                            fontsize=self.secondary_label_fontsize,
+                            labelpad=self.secondary_labelpad,
+                            color=secondary_label_color,
                         )
+                        if secondary_width == self.bold_spine_width:
+                            ax2.tick_params(
+                                labelsize=self.secondary_tick_fontsize,
+                                length=2,
+                                width=0.5,
+                                color="black",
+                                labelcolor="black",
+                            )
+                        else:
+                            ax2.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
                     else:
-                        ax3.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
-                else:
-                    ax3.set_xlabel("")
-                    ax3.tick_params(labeltop=False, length=0)
-                ax3.spines["top"].set_linewidth(secondary_width)
-                for spine_name in ["bottom", "left", "right"]:
-                    ax3.spines[spine_name].set_visible(False)
+                        ax2.set_ylabel("")
+                        ax2.tick_params(labelright=False, right=False, length=0)
+                    ax2.spines["right"].set_linewidth(secondary_width)
+                    for spine_name in ["left", "top", "bottom"]:
+                        ax2.spines[spine_name].set_visible(False)
+
+                if not getattr(param_x_spec, "is_derived_ratio", False):
+                    if param_x_spec.use_ratio and param_x_spec.reference_param:
+                        ref_spec_x = SCANNABLE_PARAMETERS[param_x_spec.reference_param]
+                        ref_value_x = get_nested_value(preset, ref_spec_x.path)
+                    else:
+                        ref_value_x = 1.0
+
+                    def conv_x_fwd(x, rv=ref_value_x):
+                        return x / rv if rv != 0 else x
+
+                    def conv_x_inv(x, rv=ref_value_x):
+                        return x * rv
+
+                    ax3 = ax.secondary_xaxis("top", functions=(conv_x_fwd, conv_x_inv))
+                    if row_idx == 0 or stage_idx == 0:
+                        ax3.set_xlabel(
+                            param_x_spec.get_axis_label(absolute=secondary_absolute),
+                            fontsize=self.secondary_label_fontsize,
+                            labelpad=self.secondary_labelpad,
+                            color=secondary_label_color,
+                        )
+                        if secondary_width == self.bold_spine_width:
+                            ax3.tick_params(
+                                labelsize=self.secondary_tick_fontsize,
+                                length=2,
+                                width=0.5,
+                                color="black",
+                                labelcolor="black",
+                            )
+                        else:
+                            ax3.tick_params(labelsize=self.secondary_tick_fontsize, length=2, width=0.5)
+                    else:
+                        ax3.set_xlabel("")
+                        ax3.tick_params(labeltop=False, length=0)
+                    ax3.spines["top"].set_linewidth(secondary_width)
+                    for spine_name in ["bottom", "left", "right"]:
+                        ax3.spines[spine_name].set_visible(False)
 
                 # Stage label - only on top row
                 if row_idx == 0:
@@ -432,10 +426,9 @@ class BifurcationVisualizer:
                     )
 
         # Add 2D opacity legend (replacing colorbar)
-        # Position to span full height of plots (moved right to avoid overlap)
-        # Start above the grey legend box (which is at 0.09-0.12 + text below)
+        # Position to span full height of plots (align with grid top=0.92)
         cbar_bottom = 0.14
-        cbar_top = 0.80
+        cbar_top = 0.92
         cbar_height = cbar_top - cbar_bottom
         cbar_width = 0.05  # Wider to accommodate 3 columns and rotated labels
         cbar_ax = fig.add_axes([0.95, cbar_bottom, cbar_width, cbar_height])
@@ -491,7 +484,9 @@ class BifurcationVisualizer:
             [f"{w:.0f}" for w in wavelength_tick_values], fontsize=self.tick_fontsize
         )
         cbar_ax.set_ylabel(
-            r"Wavelength w/ max Re($\lambda$) ($\mu$m)", fontsize=self.label_fontsize, labelpad=15
+            r"Wavelength w/ max Re($\lambda$) ($\mu$m)",
+            fontsize=self.label_fontsize,
+            labelpad=self.colorbar_labelpad,
         )
         cbar_ax.yaxis.set_label_position("right")
         cbar_ax.yaxis.tick_right()
@@ -526,9 +521,9 @@ class BifurcationVisualizer:
             ha="center",
         )
 
-        # Overall title (positioned above stage titles)
+        # Overall title (positioned just above top row to match reduced top margin)
         title = f'Stability Landscapes: {mode.replace("_", " ").title()} Values'
-        fig.suptitle(title, fontsize=self.title_fontsize, fontweight="bold", y=1.03)
+        fig.suptitle(title, fontsize=self.title_fontsize, fontweight="bold", y=0.98)
 
         return fig
 
@@ -671,10 +666,10 @@ class BifurcationVisualizer:
 
                 # Compute alpha values based on gain (log-scale)
                 gain_valid = np.where(np.isnan(gain_matrix), 1.0, gain_matrix)
-                gain_clipped = np.clip(gain_valid, 1.0, GAIN_CLIP_MAX)
+                gain_clipped = np.clip(gain_valid, GAIN_CLIP_MIN, GAIN_CLIP_MAX)
                 log_gain = np.log10(gain_clipped)
 
-                log_min = np.log10(1.0)
+                log_min = np.log10(GAIN_CLIP_MIN)
                 log_max = np.log10(GAIN_CLIP_MAX)
                 normalized = (log_gain - log_min) / (log_max - log_min)
                 normalized = np.clip(normalized, 0, 1)
@@ -738,7 +733,7 @@ class BifurcationVisualizer:
                     ax.set_ylabel(
                         param_y_spec.get_axis_label(absolute=primary_absolute),
                         fontsize=self.label_fontsize,
-                        labelpad=6,
+                        labelpad=self.primary_labelpad,
                         color=primary_label_color,
                     )
                 else:
@@ -749,7 +744,7 @@ class BifurcationVisualizer:
                     ax.set_xlabel(
                         param_x_spec.get_axis_label(absolute=primary_absolute),
                         fontsize=self.label_fontsize,
-                        labelpad=6,
+                        labelpad=self.primary_labelpad,
                         color=primary_label_color,
                     )
                 else:
@@ -792,7 +787,7 @@ class BifurcationVisualizer:
                     ax2.set_ylabel(
                         param_y_spec.get_axis_label(absolute=secondary_absolute),
                         fontsize=self.secondary_label_fontsize,
-                        labelpad=10,
+                        labelpad=self.secondary_labelpad,
                         color=secondary_label_color,
                     )
                     # Make ticks/labels black if secondary axis is dominant
@@ -832,7 +827,7 @@ class BifurcationVisualizer:
                     ax3.set_xlabel(
                         param_x_spec.get_axis_label(absolute=secondary_absolute),
                         fontsize=self.secondary_label_fontsize,
-                        labelpad=6,
+                        labelpad=self.secondary_labelpad,
                         color=secondary_label_color,
                     )
                     # Make ticks/labels black if secondary axis is dominant
@@ -859,24 +854,85 @@ class BifurcationVisualizer:
                         stage_name, fontsize=self.subtitle_fontsize, fontweight="bold", pad=10
                     )
 
-        # Add shared colorbar spanning all rows
-        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-        sm.set_array([])
-        # Position colorbar to span full height of plots (moved right to avoid overlap)
-        # Start above the grey legend box (which is at 0.09-0.12 + text below)
+        # Add 2D legend: wavelength (color) x gain (opacity)
         cbar_bottom = 0.14
         cbar_top = 0.80
         cbar_height = cbar_top - cbar_bottom
-        cbar_ax = fig.add_axes([0.93, cbar_bottom, 0.015, cbar_height])
-        cbar = fig.colorbar(sm, cax=cbar_ax, orientation="vertical")
-        cbar.set_label(
-            r"Wavelength w/ max gain ($\mu$m)", fontsize=self.label_fontsize, labelpad=15
+        cbar_width = 0.05
+        cbar_ax = fig.add_axes([0.93, cbar_bottom, cbar_width, cbar_height])
+
+        n_wavelength = 100
+        n_gain_cols = 15
+        opacity_legend = np.zeros((n_wavelength, n_gain_cols, 4))
+
+        wavelength_values_for_legend = np.linspace(wavelength_min, wavelength_max, n_wavelength)
+        gain_values = np.logspace(
+            np.log10(GAIN_CLIP_MIN), np.log10(GAIN_CLIP_MAX), n_gain_cols
         )
-        cbar.ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.6)
+
+        log_min = np.log10(GAIN_CLIP_MIN)
+        log_max = np.log10(GAIN_CLIP_MAX)
+        for i, wavelength_val in enumerate(wavelength_values_for_legend):
+            color_rgb = cmap(norm(wavelength_val))[:3]
+            for j, gain_val in enumerate(gain_values):
+                gain_clipped = np.clip(gain_val, GAIN_CLIP_MIN, GAIN_CLIP_MAX)
+                log_gain = np.log10(gain_clipped)
+                normalized = (log_gain - log_min) / (log_max - log_min)
+                normalized = np.clip(normalized, 0, 1)
+                alpha = GAIN_OPACITY_MIN + normalized * (GAIN_OPACITY_MAX - GAIN_OPACITY_MIN)
+                opacity_legend[i, j, :3] = color_rgb
+                opacity_legend[i, j, 3] = alpha
+
+        cbar_ax.imshow(opacity_legend, origin="lower", aspect="auto", interpolation="nearest")
+        cbar_ax.set_xlim(-0.5, n_gain_cols - 0.5)
+        cbar_ax.set_ylim(0, n_wavelength - 1)
+
+        # Y-axis (right): wavelength (μm)
+        cbar_ax.yaxis.set_label_position("right")
+        cbar_ax.yaxis.tick_right()
+        wavelength_tick_positions = np.linspace(0, n_wavelength - 1, 6)
+        wavelength_tick_values = np.linspace(wavelength_min, wavelength_max, 6)
+        cbar_ax.set_yticks(wavelength_tick_positions)
+        cbar_ax.set_yticklabels(
+            [f"{w:.0f}" for w in wavelength_tick_values], fontsize=self.tick_fontsize
+        )
+        cbar_ax.set_ylabel(
+            r"Wavelength w/ max gain ($\mu$m)",
+            fontsize=self.label_fontsize,
+            labelpad=self.colorbar_labelpad,
+        )
+        cbar_ax.tick_params(axis="y", left=False, right=True, labelsize=self.tick_fontsize)
+
+        # X-axis (top): gain (log scale), three ticks to show log spacing
+        cbar_ax.xaxis.set_label_position("top")
+        cbar_ax.xaxis.tick_top()
+        gain_tick_values = [
+            GAIN_CLIP_MIN,
+            np.round(np.sqrt(GAIN_CLIP_MIN * GAIN_CLIP_MAX)),  # geometric mean
+            GAIN_CLIP_MAX,
+        ]
+        gain_tick_positions = [
+            (n_gain_cols - 1) * (np.log10(g) - log_min) / (log_max - log_min)
+            for g in gain_tick_values
+        ]
+        cbar_ax.set_xticks(gain_tick_positions)
+        cbar_ax.set_xticklabels(
+            [f"{g:.0f}" for g in gain_tick_values],
+            fontsize=self.secondary_tick_fontsize,
+        )
+        cbar_ax.set_xlabel(
+            "Gain", fontsize=self.secondary_label_fontsize, labelpad=self.secondary_labelpad
+        )
+        cbar_ax.tick_params(axis="x", bottom=False, top=True, labelsize=self.secondary_tick_fontsize)
+
+        for spine in cbar_ax.spines.values():
+            spine.set_visible(True)
+            spine.set_edgecolor("black")
+            spine.set_linewidth(1.0)
 
         # Add grey legend at bottom of colorbar
         grey_legend_bottom = 0.08 + 0.01
-        stable_ax = fig.add_axes([0.93, grey_legend_bottom, 0.015, 0.03])
+        stable_ax = fig.add_axes([0.93, grey_legend_bottom, cbar_width, 0.03])
         stable_ax.imshow(
             np.full((10, 1), 0.5), cmap="Greys", vmin=0, vmax=1, origin="lower", aspect="auto"
         )
@@ -1097,280 +1153,6 @@ class BifurcationVisualizer:
 
         return fig
 
-    def create_compressed_stability_map_figure(
-        self,
-        results: dict,
-        stages: list[str],
-    ) -> plt.Figure:
-        """Create compressed stability map figure showing SST-PV ratio analysis.
-
-        Args:
-            results: Results dict organized as {stage: stage_results}
-            stages: List of stage names
-
-        Returns:
-            matplotlib Figure object
-        """
-        n_stages = len(stages)
-
-        # Create figure with single row of n_stages panels
-        fig_height = self.fig_height_per_row * 1.18  # Slightly taller for x-labels
-        fig = plt.figure(figsize=(self.fig_width, fig_height))
-        gs = GridSpec(
-            1,
-            n_stages,
-            figure=fig,
-            hspace=0.45,
-            wspace=self.wspace,
-            left=self.left_margin,
-            right=0.83,
-            top=0.80,
-            bottom=0.08,
-        )
-
-        # Determine global wavelength range for consistent colormap across all stages
-        all_wavelength_values = []
-        for stage in stages:
-            if stage in results:
-                k_matrix = results[stage]["k_matrix"]
-                # Convert k to wavelength, avoiding division by zero
-                wavelength_matrix = np.where(k_matrix > 0, 1.0 / k_matrix, np.inf)
-                all_wavelength_values.append(wavelength_matrix)
-
-        if all_wavelength_values:
-            # Use finite values only
-            finite_wavelengths = [w[np.isfinite(w)] for w in all_wavelength_values]
-            if any(len(w) > 0 for w in finite_wavelengths):
-                wavelength_min = max(
-                    np.min([np.min(w) for w in finite_wavelengths if len(w) > 0]), 50.0
-                )
-                wavelength_max = min(
-                    np.max([np.max(w) for w in finite_wavelengths if len(w) > 0]), 2000.0
-                )
-            else:
-                wavelength_min, wavelength_max = 50.0, 2000.0
-        else:
-            wavelength_min, wavelength_max = 50.0, 2000.0
-
-        norm = colors.Normalize(vmin=wavelength_min, vmax=wavelength_max)
-        cmap = plt.colormaps[BIFURCATION_COLORMAP]
-
-        # Plot each stage
-        for stage_idx, stage_name in enumerate(stages):
-            if stage_name not in results:
-                continue
-
-            stage_result = results[stage_name]
-            tau_ratio_values = stage_result["tau_ratio_values"]
-            sigma_ratio_values = stage_result["sigma_ratio_values"]
-            k_matrix = stage_result["k_matrix"]
-            stability_matrix = stage_result["stability_matrix"]
-            flatness_matrix = stage_result.get("flatness_matrix", None)
-
-            ax = fig.add_subplot(gs[0, stage_idx])
-
-            # Convert k to wavelength: λ = 1/k (μm)
-            wavelength_matrix = np.where(k_matrix > 0, 1.0 / k_matrix, np.inf)
-
-            # Identify NaN values (failed steady-state convergence)
-            nan_mask = np.isnan(k_matrix) | np.isnan(stability_matrix)
-
-            # Compute alpha values based on stability
-            alpha_matrix = np.zeros_like(stability_matrix)
-            alpha_matrix[stability_matrix < STABILITY_THRESHOLD] = OPACITY_STABLE_FAR
-            alpha_matrix[
-                (stability_matrix >= STABILITY_THRESHOLD) & (stability_matrix < 0)
-            ] = OPACITY_STABLE_NEAR
-            alpha_matrix[stability_matrix >= 0] = OPACITY_UNSTABLE
-
-            # Create RGBA image (grey for flat spectra, colormap otherwise, white for NaN)
-            rgba_image = np.zeros((*wavelength_matrix.shape, 4))
-            grey_color = (0.5, 0.5, 0.5)
-            white_color = (1.0, 1.0, 1.0)
-            for i in range(wavelength_matrix.shape[0]):
-                for j in range(wavelength_matrix.shape[1]):
-                    if nan_mask[i, j]:
-                        # NaN values render as white (failed convergence)
-                        rgba_image[i, j] = (*white_color, 1.0)
-                    elif flatness_matrix is not None and flatness_matrix[i, j]:
-                        color_rgb = grey_color
-                        rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
-                    else:
-                        color_rgb = cmap(norm(wavelength_matrix[i, j]))[:3]
-                        rgba_image[i, j] = (*color_rgb, alpha_matrix[i, j])
-
-            # Display image
-            extent = [
-                tau_ratio_values[0],
-                tau_ratio_values[-1],
-                sigma_ratio_values[0],
-                sigma_ratio_values[-1],
-            ]
-            ax.imshow(rgba_image, origin="lower", extent=extent, interpolation="nearest")
-
-            # Add stability boundary contour
-            with contextlib.suppress(ValueError, RuntimeError):
-                ax.contour(
-                    tau_ratio_values,
-                    sigma_ratio_values,
-                    stability_matrix,
-                    levels=[0],
-                    colors="white",
-                    linewidths=1.0,
-                    linestyles="--",
-                    alpha=0.8,
-                )
-
-            # Mark preset point
-            preset_tau_ratio = stage_result["preset_tau_ratio"]
-            preset_sigma_ratio = stage_result["preset_sigma_ratio"]
-            ax.scatter(
-                preset_tau_ratio,
-                preset_sigma_ratio,
-                marker="o",
-                s=30,
-                edgecolor="black",
-                linewidth=1.2,
-                facecolor="white",
-                zorder=10,
-            )
-
-            # Set axis limits
-            ax.set_xlim(tau_ratio_values[0], tau_ratio_values[-1])
-            ax.set_ylim(sigma_ratio_values[0], sigma_ratio_values[-1])
-            
-            # Calculate aspect ratio to make plots visually square
-            # Aspect ratio = (x_range) / (y_range) to maintain square appearance
-            x_range = tau_ratio_values[-1] - tau_ratio_values[0]
-            y_range = sigma_ratio_values[-1] - sigma_ratio_values[0]
-            aspect_ratio = x_range / y_range if y_range > 0 else 1.0
-            ax.set_aspect(aspect_ratio, adjustable="box")
-            
-            ax.locator_params(axis="x", nbins=4)
-            ax.locator_params(axis="y", nbins=5)
-
-            # Axis styling - make all spines visible
-            ax.spines["bottom"].set_linewidth(self.default_spine_width)
-            ax.spines["left"].set_linewidth(self.default_spine_width)
-            ax.spines["top"].set_linewidth(self.default_spine_width)
-            ax.spines["right"].set_linewidth(self.default_spine_width)
-            ax.spines["top"].set_visible(True)
-            ax.spines["right"].set_visible(True)
-
-            # Labels
-            if stage_idx == 0:
-                ax.set_ylabel(
-                    r"$\sigma_{\mathrm{PV}} / \sigma_{\mathrm{SST}}$",
-                    fontsize=self.label_fontsize,
-                    labelpad=6,
-                )
-            else:
-                ax.set_ylabel("")
-
-            ax.set_xlabel(
-                r"$\tau_{\mathrm{PV}} / \tau_{\mathrm{SST}}$",
-                fontsize=self.label_fontsize,
-                labelpad=6,
-            )
-
-            ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.5)
-
-            # Stage label
-            ax.set_title(
-                stage_name, fontsize=self.subtitle_fontsize, fontweight="bold", pad=10
-            )
-
-        # Add 2D opacity legend (same as standard stability maps)
-        cbar_bottom = 0.14
-        cbar_top = 0.80
-        cbar_height = cbar_top - cbar_bottom
-        cbar_width = 0.05
-        cbar_ax = fig.add_axes([0.95, cbar_bottom, cbar_width, cbar_height])
-
-        # Create 2D opacity legend
-        n_ticks = 100
-        opacity_legend = np.zeros((n_ticks, 3, 4))  # RGBA array
-
-        wavelength_values_for_legend = np.linspace(wavelength_min, wavelength_max, n_ticks)
-        for i, wavelength_val in enumerate(wavelength_values_for_legend):
-            color_rgb = cmap(norm(wavelength_val))[:3]
-            opacity_legend[i, 0, :3] = color_rgb
-            opacity_legend[i, 0, 3] = OPACITY_STABLE_FAR
-            opacity_legend[i, 1, :3] = color_rgb
-            opacity_legend[i, 1, 3] = OPACITY_STABLE_NEAR
-            opacity_legend[i, 2, :3] = color_rgb
-            opacity_legend[i, 2, 3] = OPACITY_UNSTABLE
-
-        # Display the 2D legend
-        cbar_ax.imshow(opacity_legend, origin="lower", aspect="auto", interpolation="nearest")
-
-        # Set up axes
-        cbar_ax.set_xlim(-0.5, 2.5)
-        cbar_ax.set_ylim(0, n_ticks - 1)
-
-        # X-axis labels for the three stability ranges
-        cbar_ax.set_xticks([0, 1, 2])
-        cbar_ax.set_xticklabels(
-            ["Stable (far)", "Stable (near)", "Unstable"],
-            fontsize=self.secondary_tick_fontsize,
-            rotation=45,
-            ha="left",
-        )
-        cbar_ax.xaxis.set_label_position("top")
-        cbar_ax.xaxis.tick_top()
-        cbar_ax.tick_params(
-            axis="x", bottom=False, top=True, labelsize=self.secondary_tick_fontsize
-        )
-
-        # Y-axis: wavelength values
-        wavelength_tick_positions = np.linspace(0, n_ticks - 1, 6)
-        wavelength_tick_values = np.linspace(wavelength_min, wavelength_max, 6)
-        cbar_ax.set_yticks(wavelength_tick_positions)
-        cbar_ax.set_yticklabels(
-            [f"{w:.0f}" for w in wavelength_tick_values], fontsize=self.tick_fontsize
-        )
-        cbar_ax.set_ylabel(
-            r"Wavelength w/ max Re($\lambda$) ($\mu$m)", fontsize=self.label_fontsize, labelpad=15
-        )
-        cbar_ax.yaxis.set_label_position("right")
-        cbar_ax.yaxis.tick_right()
-        cbar_ax.tick_params(axis="y", left=False, right=True, labelsize=self.tick_fontsize)
-
-        # Style the axes
-        cbar_ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.6)
-        for spine in cbar_ax.spines.values():
-            spine.set_visible(True)
-            spine.set_edgecolor("black")
-            spine.set_linewidth(1.0)
-
-        # Add grey legend at bottom of colorbar
-        grey_legend_bottom = 0.08 + 0.01
-        stable_ax = fig.add_axes([0.95, grey_legend_bottom, cbar_width, 0.03])
-        stable_ax.imshow(
-            np.full((10, 1), 0.5), cmap="Greys", vmin=0, vmax=1, origin="lower", aspect="auto"
-        )
-        stable_ax.set_xticks([])
-        stable_ax.set_yticks([])
-        for spine in stable_ax.spines.values():
-            spine.set_visible(True)
-            spine.set_edgecolor("black")
-        stable_ax.text(
-            0.5,
-            -0.25,
-            "No dominant\nspatial mode",
-            transform=stable_ax.transAxes,
-            fontsize=self.secondary_label_fontsize,
-            rotation=0,
-            va="top",
-            ha="center",
-        )
-
-        # Overall title
-        title = "Stability Landscape: SST-PV Maturation Ratios"
-        fig.suptitle(title, fontsize=self.title_fontsize, fontweight="bold", y=1.03)
-
-        return fig
-
     def create_maturity_stability_map_figure(
         self,
         results: dict,
@@ -1535,7 +1317,7 @@ class BifurcationVisualizer:
                 ax.set_ylabel(
                     "PV Maturity",
                     fontsize=self.label_fontsize,
-                    labelpad=6,
+                    labelpad=self.primary_labelpad,
                 )
             else:
                 ax.set_ylabel("")
@@ -1543,7 +1325,7 @@ class BifurcationVisualizer:
             ax.set_xlabel(
                 "SST Maturity",
                 fontsize=self.label_fontsize,
-                labelpad=6,
+                labelpad=self.primary_labelpad,
             )
 
             ax.tick_params(labelsize=self.tick_fontsize, length=3, width=0.5)
@@ -1603,7 +1385,9 @@ class BifurcationVisualizer:
             [f"{w:.0f}" for w in wavelength_tick_values], fontsize=self.tick_fontsize
         )
         cbar_ax.set_ylabel(
-            r"Wavelength w/ max Re($\lambda$) ($\mu$m)", fontsize=self.label_fontsize, labelpad=15
+            r"Wavelength w/ max Re($\lambda$) ($\mu$m)",
+            fontsize=self.label_fontsize,
+            labelpad=self.colorbar_labelpad,
         )
         cbar_ax.yaxis.set_label_position("right")
         cbar_ax.yaxis.tick_right()
@@ -1694,20 +1478,6 @@ class BifurcationVisualizer:
                 fig = self.create_gain_spectrum_figure(spectrum_results, param_keys, stages)
 
                 filename = "gain_spectra.pdf"
-                filepath = output_dir / filename
-                save_figure(fig, filepath)
-                print(f"  Saved: {filepath}")
-
-        # Generate compressed stability map figure (SST-PV ratio analysis)
-        if "compressed_stability" in results:
-            print("\nGenerating compressed stability map figure...")
-            compressed_results = results["compressed_stability"]
-            stage_names = list(compressed_results.keys())
-
-            if stage_names:
-                fig = self.create_compressed_stability_map_figure(compressed_results, stage_names)
-
-                filename = "compressed_stability_maps.pdf"
                 filepath = output_dir / filename
                 save_figure(fig, filepath)
                 print(f"  Saved: {filepath}")

@@ -8,6 +8,7 @@ from src.simulation import CorticalSimulation
 from .config import (
     ANALYSIS_PARAMS,
     CELL_TYPES,
+    CONDITIONS,
     DT,
     LAYERS,
     REGIMES,
@@ -155,7 +156,15 @@ class StabilityAnalysis:
         time_constants: np.ndarray,
         gains: np.ndarray,
     ) -> np.ndarray:
-        """Compute voltage Jacobian matrix for a patch."""
+        """Compute voltage Jacobian matrix for a patch.
+
+        For the dynamics τ_i dV_i/dt = -V_i + Σ_j W_ij r_j, where r_j = g_j ReLU(V_j),
+        the Jacobian J_ij = ∂(dV_i/dt)/∂V_j is:
+          - Off-diagonal (i≠j): W_ij g_j H(V_j) / τ_i
+          - Diagonal (i=j): -1/τ_i + W_ii g_i H(V_i) / τ_i
+
+        where H is the Heaviside step function (derivative of ReLU).
+        """
         heaviside = (patch_voltages > 0).astype(float)
 
         gains_heaviside = gains * heaviside
@@ -163,7 +172,8 @@ class StabilityAnalysis:
             patch_connections * gains_heaviside[np.newaxis, :] / time_constants[:, np.newaxis]
         )
 
-        np.fill_diagonal(jacobian, -1.0 / time_constants)
+        # Add the -1/τ term to the diagonal (don't overwrite the W_ii contribution)
+        jacobian[np.diag_indices_from(jacobian)] -= 1.0 / time_constants
 
         return jacobian
 
@@ -304,15 +314,17 @@ class StabilityAnalysis:
                         gains[idx] = snapshot["gains"][cell_type]
                         idx += 1
 
-        # Include a hash of current connection strengths in cache key to ensure
-        # different developmental stages get different cached matrices
-        conn_strengths = tuple(
+        # Include a hash of connection params and strength scaling in cache key
+        # so different developmental stages get different cached matrices
+        connectivity = self.simulation.circuit.connectivity
+        conn_params = tuple(
             sorted(
-                (k, v["amplitude"])
-                for k, v in self.simulation.circuit.connectivity.layer_params.items()
+                (k, v["amplitude"], v["sigma"])
+                for k, v in connectivity.layer_params.items()
             )
         )
-        connectivity_hash = hash(conn_strengths)
+        strength_scaling = tuple(sorted(connectivity.strength_scaling.items()))
+        connectivity_hash = hash((conn_params, strength_scaling))
         cache_key = (tuple(layers), patch_size, condition, connectivity_hash)
         if not hasattr(self, "_connection_cache"):
             self._connection_cache = {}
@@ -329,58 +341,116 @@ class StabilityAnalysis:
     def _build_connection_matrix(
         self, layers: list[str], patch_size: int, condition: str
     ) -> np.ndarray:
-        """Build connection matrix for patch."""
-        n_neurons = len(layers) * patch_size * patch_size * len(CELL_TYPES)
+        """Build connection matrix for patch by extracting from simulation weight matrices.
+
+        This extracts sub-patches from the simulation's pre-computed weight matrices,
+        ensuring the stability analysis uses exactly the same (normalized) weights
+        as the actual simulation dynamics.
+
+        Args:
+            layers: List of layer names to include in the patch
+            patch_size: Size of spatial patch (patch_size x patch_size neurons per cell type)
+            condition: Circuit condition ('full', 'e_only', 'e_pv_only', 'e_sst_only')
+
+        Returns:
+            Connection matrix of shape (n_neurons, n_neurons) where
+            n_neurons = len(layers) * patch_size^2 * len(CELL_TYPES)
+        """
+        n_cell_types = len(CELL_TYPES)
+        n_spatial = patch_size * patch_size
+        n_neurons = len(layers) * n_spatial * n_cell_types
         patch_connections = np.zeros((n_neurons, n_neurons))
         connectivity = self.simulation.circuit.connectivity
+        grid_size = connectivity.grid_size
 
-        def get_neuron_idx(layer_idx, dx, dy, cell_type_idx):
+        # Build neuron index lookup: (layer_idx, dx, dy, cell_idx) -> flat index in patch
+        layer_to_idx = {layer: i for i, layer in enumerate(layers)}
+        cell_to_idx = {cell: i for i, cell in enumerate(CELL_TYPES)}
+
+        def patch_neuron_idx(layer_idx, dx, dy, cell_idx):
+            """Map (layer, spatial_x, spatial_y, cell_type) to flat patch index."""
             return (
-                layer_idx * patch_size * patch_size * len(CELL_TYPES)
-                + dx * patch_size * len(CELL_TYPES)
-                + dy * len(CELL_TYPES)
-                + cell_type_idx
+                layer_idx * n_spatial * n_cell_types
+                + dx * patch_size * n_cell_types
+                + dy * n_cell_types
+                + cell_idx
             )
 
-        inhibitory_mask = {}
-        if condition in ["e_only", "e_pv_only", "e_sst_only"]:
+        # Get patch origin from cache key context (we use center patch for weight extraction)
+        # The weights are translation-invariant, so we extract from center of grid
+        patch_origin_x = (grid_size - patch_size) // 2
+        patch_origin_y = (grid_size - patch_size) // 2
+
+        # Extract weights from simulation's pre-computed matrices
+        for src_layer in layers:
             for src_cell in CELL_TYPES:
-                for tgt_cell in CELL_TYPES:
-                    inhibitory_mask[(src_cell, tgt_cell)] = self._is_inhibitory_connection(
-                        src_cell, tgt_cell, condition
-                    )
+                src_layer_idx = layer_to_idx[src_layer]
+                src_cell_idx = cell_to_idx[src_cell]
 
-        for layer_idx, layer in enumerate(layers):
-            for dx in range(patch_size):
-                for dy in range(patch_size):
-                    for src_cell_idx, src_cell in enumerate(CELL_TYPES):
-                        src_idx = get_neuron_idx(layer_idx, dx, dy, src_cell_idx)
+                for tgt_layer in layers:
+                    for tgt_cell in CELL_TYPES:
+                        # Check if this connection should be zeroed for partial circuits
+                        if self._is_inhibitory_connection(src_cell, tgt_cell, condition):
+                            continue
 
-                        for tgt_layer_idx, tgt_layer in enumerate(layers):
-                            for tgt_dx in range(patch_size):
-                                for tgt_dy in range(patch_size):
-                                    for tgt_cell_idx, tgt_cell in enumerate(CELL_TYPES):
-                                        tgt_idx = get_neuron_idx(
+                        # Get the full weight matrix from simulation
+                        W_key = (src_layer, src_cell, tgt_layer, tgt_cell)
+                        if W_key not in connectivity.W:
+                            continue
+
+                        W_full = connectivity.W[W_key]
+                        tgt_layer_idx = layer_to_idx[tgt_layer]
+                        tgt_cell_idx = cell_to_idx[tgt_cell]
+
+                        # Extract patch weights
+                        # W_full is (grid_size*grid_size, grid_size*grid_size)
+                        # where index i = y*grid_size + x (row-major for target neuron)
+                        for dx in range(patch_size):
+                            for dy in range(patch_size):
+                                # Source neuron position in full grid
+                                src_x = patch_origin_x + dx
+                                src_y = patch_origin_y + dy
+                                src_full_idx = src_y * grid_size + src_x
+
+                                for tgt_dx in range(patch_size):
+                                    for tgt_dy in range(patch_size):
+                                        # Target neuron position in full grid
+                                        tgt_x = patch_origin_x + tgt_dx
+                                        tgt_y = patch_origin_y + tgt_dy
+                                        tgt_full_idx = tgt_y * grid_size + tgt_x
+
+                                        # Get weight from full matrix
+                                        weight = W_full[tgt_full_idx, src_full_idx]
+
+                                        # Map to patch indices
+                                        src_patch_idx = patch_neuron_idx(
+                                            src_layer_idx, dx, dy, src_cell_idx
+                                        )
+                                        tgt_patch_idx = patch_neuron_idx(
                                             tgt_layer_idx, tgt_dx, tgt_dy, tgt_cell_idx
                                         )
 
-                                        conn_key = f"{layer}_{src_cell}_to_{tgt_layer}_{tgt_cell}"
-
-                                        if conn_key in connectivity.layer_params:
-                                            strength = connectivity.layer_params[conn_key][
-                                                "amplitude"
-                                            ]
-
-                                            if condition in [
-                                                "e_only",
-                                                "e_pv_only",
-                                                "e_sst_only",
-                                            ] and inhibitory_mask.get((src_cell, tgt_cell), False):
-                                                strength = 0.0
-
-                                            patch_connections[tgt_idx, src_idx] = strength
+                                        patch_connections[tgt_patch_idx, src_patch_idx] = weight
 
         return patch_connections
+
+    def _build_global_connection_matrix(
+        self, layers: list[str], condition: str
+    ) -> np.ndarray:
+        """Build connection matrix for the full grid (whole network).
+
+        Delegates to _build_connection_matrix with patch_size = grid_size,
+        so the same normalized weights from the simulation are used.
+
+        Args:
+            layers: List of layer names (one for layer-wise, all for column-wise).
+            condition: Circuit condition ('full', 'e_only', 'e_pv_only', 'e_sst_only').
+
+        Returns:
+            Connection matrix of shape (n_neurons, n_neurons) for the full grid.
+        """
+        grid_size = self.simulation.grid_size
+        return self._build_connection_matrix(layers, grid_size, condition)
 
     def _is_inhibitory_connection(
         self, source_cell: str, target_cell: str, condition: str = "e_only"
@@ -460,6 +530,74 @@ class StabilityAnalysis:
 
         self.lambda_max_results = results
         return results
+
+    def run_global_analysis(self) -> dict:
+        """Run whole-network stability analysis (full grid per layer and full column).
+
+        Returns:
+            Dictionary results[stage][regime][snapshot_idx]["global"] with keys
+            "layer_wise" and "column_wise" (same shape as patch analysis but one value per condition/layer).
+        """
+        print("Starting global (whole-network) stability analysis...")
+
+        results = {}
+        grid_size = self.simulation.grid_size
+
+        for stage in DEVELOPMENTAL_STAGES:
+            print(f"\nAnalyzing {stage} (global)...")
+            results[stage] = {}
+
+            snapshots = self.collect_snapshots(stage)
+            self.snapshots[stage] = snapshots
+
+            for regime in REGIMES:
+                if regime not in snapshots:
+                    continue
+
+                results[stage][regime] = {}
+
+                for snap_idx, snapshot in enumerate(snapshots[regime]):
+                    print(f"  Processing {regime} snapshot {snap_idx} (global)...")
+                    results[stage][regime][snap_idx] = {
+                        "global": self._analyze_snapshot_global(snapshot, grid_size),
+                    }
+
+        self.lambda_max_results = results
+        return results
+
+    def _analyze_snapshot_global(self, snapshot: dict, grid_size: int) -> dict:
+        """Analyze one snapshot over the whole network (full grid).
+
+        Args:
+            snapshot: Snapshot state dict (voltages, time_constants, gains).
+            grid_size: Full grid size (same for x and y).
+
+        Returns:
+            Dict with "layer_wise" (per-layer λ_max per condition) and
+            "column_wise" (full-column λ_max per condition).
+        """
+        patch_origin = (0, 0)
+
+        out = {
+            "layer_wise": {
+                cond: {layer: None for layer in LAYERS} for cond in CONDITIONS
+            },
+            "column_wise": {cond: None for cond in CONDITIONS},
+        }
+
+        for condition in CONDITIONS:
+            for layer in LAYERS:
+                patch_data = self._extract_patch_data(
+                    snapshot, [layer], patch_origin, grid_size, condition
+                )
+                out["layer_wise"][condition][layer] = self._compute_lambda_max(patch_data)
+
+            patch_data = self._extract_patch_data(
+                snapshot, LAYERS, patch_origin, grid_size, condition
+            )
+            out["column_wise"][condition] = self._compute_lambda_max(patch_data)
+
+        return out
 
     def _generate_patch_coords(self, patch_size: int) -> list[tuple[int, int]]:
         """Generate valid patch coordinates."""

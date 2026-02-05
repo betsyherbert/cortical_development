@@ -45,6 +45,8 @@ class ParameterSpec:
         use_ratio: bool = False,
         reference_param: str | None = None,
         default_range: tuple[float, float] = (0.1, 10.0),
+        is_derived_ratio: bool = False,
+        base_param: str | None = None,
     ):
         """Initialize parameter specification.
 
@@ -55,6 +57,8 @@ class ParameterSpec:
             use_ratio: If True, display as ratio relative to reference
             reference_param: Key of reference parameter for ratio mode
             default_range: Default (min, max) range for scanning
+            is_derived_ratio: If True, scanned value is a ratio multiplied by base_param
+            base_param: Key of parameter to multiply ratio by (for derived ratio params)
         """
         self.path = path
         self.display_name = display_name
@@ -62,6 +66,8 @@ class ParameterSpec:
         self.use_ratio = use_ratio
         self.reference_param = reference_param
         self.default_range = default_range
+        self.is_derived_ratio = is_derived_ratio
+        self.base_param = base_param
 
     def get_axis_label(self, absolute: bool = True) -> str:
         """Get axis label for plots.
@@ -72,6 +78,9 @@ class ParameterSpec:
         Returns:
             Formatted axis label string
         """
+        if self.is_derived_ratio:
+            return self.display_name
+
         if absolute or not self.use_ratio:
             if self.units:
                 return f"{self.display_name} ({self.units})"
@@ -83,6 +92,10 @@ class ParameterSpec:
                 return f"{self.display_name} / {ref_spec.display_name}"
         return f"{self.display_name} (ratio)"
 
+
+# SST-PV ratio ranges (τ_PV/τ_SST and σ_PV/σ_SST for compressed-style stability maps)
+COMPRESSED_MAP_TAU_RATIO_RANGE = (0.1, 1.0)  # τ_PV/τ_SST ratio
+COMPRESSED_MAP_SIGMA_RATIO_RANGE = (0.5, 1.8)  # σ_PV/σ_SST ratio
 
 SCANNABLE_PARAMETERS = {
     # Time constants
@@ -139,6 +152,23 @@ SCANNABLE_PARAMETERS = {
         # Must include preset values (PV: 100–250 μm across stages)
         default_range=(50.0, 450.0),
     ),
+    # Derived ratio parameters (SST-PV ratios for compressed-style maps)
+    "tau_PV_over_SST": ParameterSpec(
+        path=["time_constants", "PV"],
+        display_name=r"$\tau_{\mathrm{PV}} / \tau_{\mathrm{SST}}$",
+        units="",
+        is_derived_ratio=True,
+        base_param="tau_SST",
+        default_range=COMPRESSED_MAP_TAU_RATIO_RANGE,
+    ),
+    "sigma_PV_over_SST": ParameterSpec(
+        path=["outgoing_widths", "PV"],
+        display_name=r"$\sigma_{\mathrm{PV}} / \sigma_{\mathrm{SST}}$",
+        units="",
+        is_derived_ratio=True,
+        base_param="sigma_SST",
+        default_range=COMPRESSED_MAP_SIGMA_RATIO_RANGE,
+    ),
     # Thalamic widths (for spectrum analysis) - in μm
     "thalamic_width_E": ParameterSpec(
         path=["thalamic_widths", "E"],
@@ -170,6 +200,7 @@ DEFAULT_STABILITY_PAIRS = [
     ("sigma_E", "sigma_SST"),
     ("sigma_SST", "sigma_PV"),
     ("sigma_E", "sigma_PV"),
+    ("tau_PV_over_SST", "sigma_PV_over_SST"),
 ]
 
 DEFAULT_GAIN_PAIRS = [
@@ -225,8 +256,9 @@ STABILITY_THRESHOLD = -0.05  # Threshold for "near boundary" vs "far from bounda
 
 # Gain map visualization parameters
 GAIN_COLORMAP = "viridis"  # Colormap for k values
-GAIN_CLIP_MAX = 50.0  # Maximum gain for opacity (clipping only affects display, not argmax)
-GAIN_OPACITY_MIN = 0.3  # Minimum opacity (low gain)
+GAIN_CLIP_MIN = 5.0  # Minimum gain for opacity scale (gains below this get min opacity)
+GAIN_CLIP_MAX = 500.0  # Maximum gain for opacity (clipping only affects display, not argmax)
+GAIN_OPACITY_MIN = 0.05  # Minimum opacity (low gain) – low value emphasizes gain differences
 GAIN_OPACITY_MAX = 1.0  # Maximum opacity (high gain)
 
 # ============================================================================
@@ -242,15 +274,6 @@ SPECTRUM_LOG_SCALE = True  # Use log10(gain) for colormap
 
 # Visualization parameters
 SPECTRUM_Y_MARGIN = (0.5, 2.0)  # Y-axis range per stage (relative to preset: 0.5x to 2x)
-
-# ============================================================================
-# Compressed Stability Maps Configuration (SST-PV Ratio Analysis)
-# ============================================================================
-
-# Parameter ranges for compressed maps showing SST→PV maturation handoff
-# These maps plot σ_PV/σ_SST vs τ_PV/τ_SST to capture developmental trajectory
-COMPRESSED_MAP_TAU_RATIO_RANGE = (0.1, 1.0)  # τ_PV/τ_SST ratio (PV faster → smaller values)
-COMPRESSED_MAP_SIGMA_RATIO_RANGE = (0.5, 1.8)  # σ_PV/σ_SST ratio
 
 # ============================================================================
 # Maturity Index Stability Maps Configuration

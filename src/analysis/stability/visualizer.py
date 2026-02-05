@@ -753,6 +753,168 @@ class StabilityVisualizer:
         save_figure(fig, filepath, dpi=DPI)
         print(f"Saved figure: {filepath}")
 
+    def _calculate_global_effectiveness(self, results: dict) -> tuple[dict, dict]:
+        """Calculate inhibition effectiveness from global (whole-network) results.
+
+        Args:
+            results: results[stage][regime][snapshot_idx]["global"] with layer_wise and column_wise.
+
+        Returns:
+            Tuple of (layer_effectiveness, column_effectiveness).
+            layer_effectiveness[regime][layer][stage] = {"mean", "std", "n"}.
+            column_effectiveness[regime][stage] = {"mean", "std", "n"}.
+        """
+        layer_effectiveness = {r: {layer: {} for layer in LAYERS} for r in REGIMES}
+        column_effectiveness = {r: {} for r in REGIMES}
+
+        for regime in REGIMES:
+            for stage in DEVELOPMENTAL_STAGES:
+                if stage not in results or regime not in results[stage]:
+                    continue
+
+                # Column-wise: one value per snapshot
+                col_values = []
+                # Layer-wise: per-layer lists
+                layer_values = {layer: [] for layer in LAYERS}
+
+                for snapshot_idx in results[stage][regime]:
+                    snap = results[stage][regime][snapshot_idx]
+                    if "global" not in snap:
+                        continue
+                    g = snap["global"]
+                    full_col = g["column_wise"]["full"]
+                    e_only_col = g["column_wise"]["e_only"]
+                    col_values.append(e_only_col - full_col)
+
+                    for layer in LAYERS:
+                        full_l = g["layer_wise"]["full"][layer]
+                        e_only_l = g["layer_wise"]["e_only"][layer]
+                        layer_values[layer].append(e_only_l - full_l)
+
+                if col_values:
+                    column_effectiveness[regime][stage] = {
+                        "mean": np.mean(col_values),
+                        "std": np.std(col_values),
+                        "n": len(col_values),
+                    }
+                for layer in LAYERS:
+                    if layer_values[layer]:
+                        layer_effectiveness[regime][layer][stage] = {
+                            "mean": np.mean(layer_values[layer]),
+                            "std": np.std(layer_values[layer]),
+                            "n": len(layer_values[layer]),
+                        }
+
+        return layer_effectiveness, column_effectiveness
+
+    def create_global_effectiveness_plot(self, results: dict):
+        """Create 2-panel global inhibition effectiveness plot (per-layer and column-wise)."""
+        print("Creating global inhibition effectiveness plot...")
+
+        layer_eff, column_eff = self._calculate_global_effectiveness(results)
+
+        # 1 row x 2 columns: layers | column
+        fig, (ax_layer, ax_column) = plt.subplots(
+            1, 2, figsize=compute_subplot_figsize(1, 2)
+        )
+        x_positions = range(len(DEVELOPMENTAL_STAGES))
+
+        # Left: per-layer (driven only for clarity; can show both regimes if desired)
+        for layer in LAYERS:
+            display_layer = "L2/3" if layer == "L23" else layer
+            means, sems = [], []
+            for stage in DEVELOPMENTAL_STAGES:
+                if "driven" in layer_eff and stage in layer_eff["driven"][layer]:
+                    d = layer_eff["driven"][layer][stage]
+                    means.append(d["mean"])
+                    sem = d["std"] / np.sqrt(d["n"]) if d["n"] > 0 else 0
+                    sems.append(sem)
+                else:
+                    means.append(np.nan)
+                    sems.append(np.nan)
+            means, sems = np.array(means), np.array(sems)
+            color = LAYER_COLORS[layer]
+            ax_layer.plot(
+                x_positions,
+                means,
+                color=color,
+                linewidth=LINE_WIDTH,
+                linestyle="-",
+                label=display_layer,
+                marker="o",
+                markersize=MARKER_SIZE,
+                markerfacecolor=color,
+                markeredgecolor=color,
+            )
+            ax_layer.fill_between(
+                x_positions,
+                means - sems,
+                means + sems,
+                color=color,
+                alpha=0.3,
+                linewidth=0,
+                edgecolor="none",
+            )
+
+        ax_layer.set_title("Per layer (global)", fontsize=FONT_SIZES["ylabel"], fontweight="bold")
+        ax_layer.set_xlabel("Developmental Age", fontsize=FONT_SIZES["ylabel"])
+        ax_layer.set_ylabel(
+            r"$\lambda_{\mathrm{E\text{-}only}} - \lambda_{\mathrm{full}}$",
+            fontsize=FONT_SIZES["ylabel"],
+        )
+        ax_layer.set_xticks(x_positions)
+        ax_layer.set_xticklabels(DEVELOPMENTAL_STAGES)
+        ax_layer.legend(fontsize=FONT_SIZES["colorbar"], frameon=True)
+        ax_layer.axhline(
+            y=0, color="lightgrey", linestyle="-", alpha=0.8, linewidth=REFERENCE_LINE_WIDTH, zorder=0
+        )
+        self._set_custom_yticks(ax_layer)
+
+        # Right: column-wise (idle vs driven)
+        for regime in REGIMES:
+            if regime not in column_eff:
+                continue
+            means, stds = [], []
+            for stage in DEVELOPMENTAL_STAGES:
+                if stage in column_eff[regime]:
+                    d = column_eff[regime][stage]
+                    means.append(d["mean"])
+                    stds.append(d["std"])
+                else:
+                    means.append(np.nan)
+                    stds.append(np.nan)
+            means, stds = np.array(means), np.array(stds)
+            ax_column.plot(
+                x_positions,
+                means,
+                color=LINE_COLOR,
+                linewidth=LINE_WIDTH,
+                linestyle=LINE_STYLES[regime],
+                label=regime.capitalize(),
+            )
+            ax_column.fill_between(
+                x_positions, means - stds, means + stds, color=SHADE_COLOR, alpha=SHADE_ALPHA
+            )
+
+        ax_column.set_title("Full column (global)", fontsize=FONT_SIZES["ylabel"], fontweight="bold")
+        ax_column.set_xlabel("Developmental Age", fontsize=FONT_SIZES["ylabel"])
+        ax_column.set_ylabel(
+            r"$\lambda_{\mathrm{E\text{-}only}} - \lambda_{\mathrm{full}}$",
+            fontsize=FONT_SIZES["ylabel"],
+        )
+        ax_column.set_xticks(x_positions)
+        ax_column.set_xticklabels(DEVELOPMENTAL_STAGES)
+        ax_column.legend(fontsize=FONT_SIZES["colorbar"], frameon=True)
+        ax_column.axhline(
+            y=0, color=LINE_COLOR, linestyle=":", alpha=REFERENCE_LINE_ALPHA, linewidth=REFERENCE_LINE_WIDTH
+        )
+        self._set_custom_yticks(ax_column)
+
+        plt.tight_layout()
+        filepath = os.path.join(self.summary_dir, "global_inhibition_effectiveness.pdf")
+        save_figure(fig, filepath, dpi=DPI)
+        print(f"Saved figure: {filepath}")
+
     def create_layer_effectiveness_plot(self, results: dict):
         """Create layer-specific inhibition effectiveness plot."""
         print("Creating layer-specific inhibition effectiveness plot...")
@@ -1180,6 +1342,65 @@ class StabilityVisualizer:
 
         return effectiveness
 
+    def _calculate_celltype_effectiveness_global(self, results: dict) -> dict:
+        """Calculate cell-type specific inhibition effectiveness from global (whole-network) results.
+
+        Uses column_wise λ from each snapshot; one scalar per snapshot (no patches).
+        Returns the same structure as _calculate_celltype_effectiveness for reuse of
+        _extract_effectiveness_data and the 2×2 panel drawing.
+        """
+        effectiveness = {
+            "SST_relative": {"driven": {}, "idle": {}},
+            "PV_relative": {"driven": {}, "idle": {}},
+            "SST_absolute": {"driven": {}, "idle": {}},
+            "PV_absolute": {"driven": {}, "idle": {}},
+        }
+
+        for regime in REGIMES:
+            for stage in DEVELOPMENTAL_STAGES:
+                if stage not in results or regime not in results[stage]:
+                    continue
+
+                sst_relative_values = []
+                pv_relative_values = []
+                sst_absolute_values = []
+                pv_absolute_values = []
+
+                for snapshot_idx in results[stage][regime]:
+                    snap = results[stage][regime][snapshot_idx]
+                    if "global" not in snap:
+                        continue
+                    cw = snap["global"]["column_wise"]
+                    full = cw["full"]
+                    e_only = cw["e_only"]
+                    e_pv_only = cw["e_pv_only"]
+                    e_sst_only = cw["e_sst_only"]
+
+                    sst_relative_values.append(e_pv_only - full)
+                    pv_relative_values.append(e_sst_only - full)
+                    sst_absolute_values.append(e_only - e_sst_only)
+                    pv_absolute_values.append(e_only - e_pv_only)
+
+                if sst_relative_values:
+                    effectiveness["SST_relative"][regime][stage] = {
+                        "mean": np.mean(sst_relative_values),
+                        "std": np.std(sst_relative_values),
+                    }
+                    effectiveness["PV_relative"][regime][stage] = {
+                        "mean": np.mean(pv_relative_values),
+                        "std": np.std(pv_relative_values),
+                    }
+                    effectiveness["SST_absolute"][regime][stage] = {
+                        "mean": np.mean(sst_absolute_values),
+                        "std": np.std(sst_absolute_values),
+                    }
+                    effectiveness["PV_absolute"][regime][stage] = {
+                        "mean": np.mean(pv_absolute_values),
+                        "std": np.std(pv_absolute_values),
+                    }
+
+        return effectiveness
+
     def _calculate_layer_specific_effectiveness(self, results: dict) -> dict:
         """Calculate layer-specific cell-type effectiveness for SST and PV across layers."""
         effectiveness = {
@@ -1265,13 +1486,12 @@ class StabilityVisualizer:
 
         return effectiveness
 
-    def create_celltype_effectiveness_plot(self, results: dict):
-        """Create comprehensive cell-type specific inhibition effectiveness plot."""
-        print("Creating cell-type specific inhibition effectiveness plot...")
+    def _draw_celltype_effectiveness_2x2(self, effectiveness: dict, filepath: str) -> None:
+        """Draw the 2×2 cell-type effectiveness panels and save to filepath.
 
-        effectiveness = self._calculate_celltype_effectiveness(results)
-
-        # 2×2 grid of square trend plots
+        effectiveness must have keys SST_relative, PV_relative, SST_absolute, PV_absolute,
+        each mapping regime -> stage -> {mean, std} (same as _calculate_celltype_effectiveness).
+        """
         fig, axes = plt.subplots(2, 2, figsize=compute_subplot_figsize(2, 2))
         x_positions = range(len(DEVELOPMENTAL_STAGES))
 
@@ -1298,7 +1518,6 @@ class StabilityVisualizer:
                 alpha=SHADE_ALPHA * 0.5,
             )
 
-        # ax.set_title('Cell-Type Relative Effectiveness (Driven)', fontsize=FONT_SIZES['title'], fontweight='bold')  # Title removed
         ax.set_ylabel(
             r"$\lambda_{\mathrm{partial}} - \lambda_{\mathrm{full}}$",
             fontsize=FONT_SIZES["ylabel"],
@@ -1307,7 +1526,6 @@ class StabilityVisualizer:
         ax.set_xticklabels(DEVELOPMENTAL_STAGES)
         ax.legend(fontsize=FONT_SIZES["colorbar"])
         ax.axhline(y=0, color=LINE_COLOR, linestyle=":", alpha=REFERENCE_LINE_ALPHA, linewidth=REFERENCE_LINE_WIDTH)
-        # Set custom y-ticks: only 0 and max value
         self._set_custom_yticks(ax)
 
         # Plot 2: SST vs PV Absolute Effectiveness (driven condition)
@@ -1333,7 +1551,6 @@ class StabilityVisualizer:
                 alpha=SHADE_ALPHA * 0.5,
             )
 
-        # ax.set_title('Cell-Type Absolute Effectiveness (Driven)', fontsize=FONT_SIZES['title'], fontweight='bold')  # Title removed
         ax.set_ylabel(
             r"$\lambda_{\mathrm{E\text{-}only}} - \lambda_{\mathrm{partial}}$",
             fontsize=FONT_SIZES["ylabel"],
@@ -1342,7 +1559,6 @@ class StabilityVisualizer:
         ax.set_xticklabels(DEVELOPMENTAL_STAGES)
         ax.legend(fontsize=FONT_SIZES["colorbar"])
         ax.axhline(y=0, color=LINE_COLOR, linestyle=":", alpha=REFERENCE_LINE_ALPHA, linewidth=REFERENCE_LINE_WIDTH)
-        # Set custom y-ticks: only 0 and max value
         self._set_custom_yticks(ax)
 
         # Plot 3: SST vs PV Relative Effectiveness (idle condition)
@@ -1368,7 +1584,6 @@ class StabilityVisualizer:
                 alpha=SHADE_ALPHA * 0.5,
             )
 
-        # ax.set_title('Cell-Type Relative Effectiveness (Idle)', fontsize=FONT_SIZES['title'], fontweight='bold')  # Title removed
         ax.set_xlabel("Developmental Age", fontsize=FONT_SIZES["ylabel"])
         ax.set_ylabel(
             r"$\lambda_{\mathrm{partial}} - \lambda_{\mathrm{full}}$",
@@ -1378,7 +1593,6 @@ class StabilityVisualizer:
         ax.set_xticklabels(DEVELOPMENTAL_STAGES)
         ax.legend(fontsize=FONT_SIZES["colorbar"])
         ax.axhline(y=0, color=LINE_COLOR, linestyle=":", alpha=REFERENCE_LINE_ALPHA, linewidth=REFERENCE_LINE_WIDTH)
-        # Set custom y-ticks: only 0 and max value
         self._set_custom_yticks(ax)
 
         # Plot 4: SST vs PV Absolute Effectiveness (idle condition)
@@ -1404,7 +1618,6 @@ class StabilityVisualizer:
                 alpha=SHADE_ALPHA * 0.5,
             )
 
-        # ax.set_title('Cell-Type Absolute Effectiveness (Idle)', fontsize=FONT_SIZES['title'], fontweight='bold')  # Title removed
         ax.set_xlabel("Developmental Age", fontsize=FONT_SIZES["ylabel"])
         ax.set_ylabel(
             r"$\lambda_{\mathrm{E\text{-}only}} - \lambda_{\mathrm{partial}}$",
@@ -1414,14 +1627,30 @@ class StabilityVisualizer:
         ax.set_xticklabels(DEVELOPMENTAL_STAGES)
         ax.legend(fontsize=FONT_SIZES["colorbar"])
         ax.axhline(y=0, color=LINE_COLOR, linestyle=":", alpha=REFERENCE_LINE_ALPHA, linewidth=REFERENCE_LINE_WIDTH)
-        # Set custom y-ticks: only 0 and max value
         self._set_custom_yticks(ax)
 
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.3, wspace=0.3)
-        filepath = os.path.join(self.summary_dir, "celltype_specific_inhibition_effectiveness.pdf")
         save_figure(fig, filepath, dpi=DPI)
         print(f"Saved figure: {filepath}")
+
+    def create_celltype_effectiveness_plot(self, results: dict):
+        """Create comprehensive cell-type specific inhibition effectiveness plot (patch-based)."""
+        print("Creating cell-type specific inhibition effectiveness plot...")
+        effectiveness = self._calculate_celltype_effectiveness(results)
+        self._draw_celltype_effectiveness_2x2(
+            effectiveness,
+            os.path.join(self.summary_dir, "celltype_specific_inhibition_effectiveness.pdf"),
+        )
+
+    def create_global_celltype_effectiveness_plot(self, results: dict):
+        """Create cell-type specific inhibition effectiveness plot from global (whole-network) results."""
+        print("Creating global cell-type specific inhibition effectiveness plot...")
+        effectiveness = self._calculate_celltype_effectiveness_global(results)
+        self._draw_celltype_effectiveness_2x2(
+            effectiveness,
+            os.path.join(self.summary_dir, "celltype_specific_inhibition_effectiveness_global.pdf"),
+        )
 
     def create_layer_specific_heatmaps(self, results: dict):
         """Create layer-specific SST/PV effectiveness and contribution heatmaps for driven condition."""
@@ -1496,22 +1725,18 @@ class StabilityVisualizer:
 
         cmap = COLORMAPS["heatmap"]
 
-        # Use separate color scales for each subplot
+        # Use separate color scales for each subplot (data-driven min/max)
         # Effectiveness heatmap
         eff_values = effectiveness_matrix.flatten()
         eff_values = eff_values[~np.isnan(eff_values)]  # Remove NaN values
-        eff_vmin = 0.0  # Start at zero
-        eff_vmax = (
-            np.max(eff_values) if len(eff_values) > 0 else 1.0
-        )  # Use max value for effectiveness
+        eff_vmin = np.min(eff_values) if len(eff_values) > 0 else -1.0
+        eff_vmax = np.max(eff_values) if len(eff_values) > 0 else 1.0
 
         # Contribution heatmap
         contrib_values = contribution_matrix.flatten()
         contrib_values = contrib_values[~np.isnan(contrib_values)]  # Remove NaN values
-        contrib_vmin = 0.0  # Start at zero
-        contrib_vmax = (
-            np.max(contrib_values) if len(contrib_values) > 0 else 1.0
-        )  # Use max value for contribution
+        contrib_vmin = np.min(contrib_values) if len(contrib_values) > 0 else -1.0
+        contrib_vmax = np.max(contrib_values) if len(contrib_values) > 0 else 1.0
 
         # Plot relative effectiveness heatmap
         im1 = ax1.imshow(
@@ -1532,9 +1757,9 @@ class StabilityVisualizer:
             r"$\lambda_{\mathrm{partial}} - \lambda_{\mathrm{full}}$",
             fontsize=FONT_SIZES["colorbar"],
         )
-        # Set custom ticks: only 0 and vmax
-        cbar1.set_ticks([0, eff_vmax])
-        cbar1.set_ticklabels([f"{0:.2f}", f"{eff_vmax:.2f}"])
+        # Set custom ticks: min and max
+        cbar1.set_ticks([eff_vmin, eff_vmax])
+        cbar1.set_ticklabels([f"{eff_vmin:.2f}", f"{eff_vmax:.2f}"])
 
         # Plot absolute effectiveness heatmap
         im2 = ax2.imshow(
@@ -1555,9 +1780,9 @@ class StabilityVisualizer:
             r"$\lambda_{\mathrm{E\text{-}only}} - \lambda_{\mathrm{partial}}$",
             fontsize=FONT_SIZES["colorbar"],
         )
-        # Set custom ticks: only 0 and vmax
-        cbar2.set_ticks([0, contrib_vmax])
-        cbar2.set_ticklabels([f"{0:.2f}", f"{contrib_vmax:.2f}"])
+        # Set custom ticks: min and max
+        cbar2.set_ticks([contrib_vmin, contrib_vmax])
+        cbar2.set_ticklabels([f"{contrib_vmin:.2f}", f"{contrib_vmax:.2f}"])
 
         # Save effectiveness heatmap
         filepath_eff = os.path.join(self.summary_dir, "layer_specific_effectiveness_driven.pdf")

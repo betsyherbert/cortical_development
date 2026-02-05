@@ -81,6 +81,51 @@ class StabilityPipeline:
 
         return results
 
+    def run_global(self) -> dict:
+        """Run whole-network (global) stability analysis only.
+
+        Returns:
+            Dictionary with results[stage][regime][snapshot_idx]["global"].
+        """
+        self._seed_used = seed_random()
+
+        print("\n" + "=" * 70)
+        print("GLOBAL STABILITY ANALYSIS PIPELINE")
+        print("=" * 70)
+        print(f"Random seed: {self._seed_used}")
+        print(
+            f"Duration: {self.config['duration']}s | "
+            f"Snapshots: {self.config['n_snapshots']} | "
+            f"Whole network (full grid)"
+        )
+        print(f"Stages: {', '.join(self.config['stages'])}")
+        print(f"Output: {self.config['output_dir']}")
+
+        start_time = time.time()
+
+        print("\nInitializing stability analysis...")
+        analyzer = StabilityAnalysis()
+
+        print("Running global stability analysis...")
+        results = analyzer.run_global_analysis()
+
+        elapsed = time.time() - start_time
+        print(f"\nAnalysis completed in {elapsed:.1f} seconds")
+
+        return results
+
+    def generate_global_visualizations(self, results: dict) -> None:
+        """Generate visualization figures from global analysis results.
+
+        Args:
+            results: Analysis results with global key per snapshot.
+        """
+        print("\nGenerating global visualizations...")
+        visualizer = StabilityVisualizer()
+        visualizer.create_global_effectiveness_plot(results)
+        visualizer.create_global_celltype_effectiveness_plot(results)
+        print("Global visualization complete!")
+
     def save_results(self, results: dict) -> Path:
         """Save analysis results to disk.
 
@@ -93,15 +138,24 @@ class StabilityPipeline:
         output_dir = Path(self.config["output_dir"])
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        results_file = output_dir / "stability_analysis_results.pkl"
+        base_name = (
+            "stability_analysis_global_results.pkl"
+            if self.config.get("global")
+            else "stability_analysis_results.pkl"
+        )
+        results_file = output_dir / base_name
+        params = {
+            "duration": self.config["duration"],
+            "n_snapshots": self.config["n_snapshots"],
+        }
+        if not self.config.get("global"):
+            params["layer_patch_size"] = self.config["layer_patch_size"]
+        else:
+            params["mode"] = "global"
         metadata = make_run_metadata(
             seed=self._seed_used,
             stages=self.config["stages"],
-            params={
-                "duration": self.config["duration"],
-                "n_snapshots": self.config["n_snapshots"],
-                "layer_patch_size": self.config["layer_patch_size"],
-            },
+            params=params,
         )
         save_with_version(results, str(results_file), metadata=metadata)
         print(f"Results saved to: {results_file}")
@@ -159,7 +213,17 @@ Examples:
 
   # Skip visualization generation
   python -m src.analysis.stability --no-viz
+
+  # Whole-network (global) stability analysis only
+  python -m src.analysis.stability --global
         """,
+    )
+
+    parser.add_argument(
+        "--global",
+        dest="global_analysis",
+        action="store_true",
+        help="Run whole-network stability analysis (no patch-based analysis)",
     )
 
     parser.add_argument(
@@ -192,6 +256,7 @@ Examples:
         "n_snapshots": ANALYSIS_PARAMS["n_snapshots"],
         "layer_patch_size": ANALYSIS_PARAMS["layer_patch_size"],
         "output_dir": args.output_dir,
+        "global": getattr(args, "global_analysis", False),
     }
 
     # Initialize pipeline
@@ -201,11 +266,16 @@ Examples:
     try:
         start_time = time.time()
 
-        results = pipeline.run()
-        pipeline.save_results(results)
-
-        if not args.no_viz:
-            pipeline.generate_visualizations(results)
+        if config.get("global"):
+            results = pipeline.run_global()
+            pipeline.save_results(results)
+            if not args.no_viz:
+                pipeline.generate_global_visualizations(results)
+        else:
+            results = pipeline.run()
+            pipeline.save_results(results)
+            if not args.no_viz:
+                pipeline.generate_visualizations(results)
 
         total_time = time.time() - start_time
         print(f"\nTotal execution time: {total_time:.1f} seconds")

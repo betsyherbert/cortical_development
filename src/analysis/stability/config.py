@@ -56,9 +56,9 @@ __all__ = [
 ANALYSIS_PARAMS = {
     "duration": 10.0,  # Simulation duration for snapshot selection (seconds)
     "percentiles": [10, 90],  # [Idle, Driven] thresholds
-    "n_snapshots": 10,  # Number of snapshots per regime
-    "layer_patch_size": 3,  # Patch size for layer-wise analysis
-    "column_patch_size": 3,  # Patch size for column-wise analysis
+    "n_snapshots": 1,  # Number of snapshots per regime
+    "layer_patch_size": 8,  # Patch size for layer-wise analysis
+    "column_patch_size": 8,  # Patch size for column-wise analysis
     "boundary_exclude": 2,  # Pixels to exclude from edges
 }
 

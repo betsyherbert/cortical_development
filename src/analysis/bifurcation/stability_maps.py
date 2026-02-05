@@ -18,8 +18,6 @@ from src.analysis.common import DEVELOPMENTAL_STAGES, PRESETS
 from .config import (
     ALL_LAYERS,
     ANALYSIS_PARAMS,
-    COMPRESSED_MAP_SIGMA_RATIO_RANGE,
-    COMPRESSED_MAP_TAU_RATIO_RANGE,
     FIXED_RATIO_SIGMA_MAX,
     FIXED_RATIO_SIGMA_MIN,
     FIXED_RATIO_TAU_MAX,
@@ -161,14 +159,18 @@ def _stability_worker(args: tuple) -> tuple[float, float, tuple[float, float, bo
     """
     preset, x_val, y_val, param_x_spec, param_y_spec = args
 
-    # Modify preset
     modified_preset = copy.deepcopy(preset)
-    set_nested_value(modified_preset, param_x_spec.path, x_val)
-    set_nested_value(modified_preset, param_y_spec.path, y_val)
 
-    # Compute stability
+    for val, spec in [(x_val, param_x_spec), (y_val, param_y_spec)]:
+        if getattr(spec, "is_derived_ratio", False) and getattr(spec, "base_param", None):
+            base_spec = SCANNABLE_PARAMETERS[spec.base_param]
+            base_value = get_nested_value(preset, base_spec.path)
+            actual_value = val * base_value
+            set_nested_value(modified_preset, spec.path, actual_value)
+        else:
+            set_nested_value(modified_preset, spec.path, val)
+
     result = compute_stability_for_point(modified_preset)
-
     return (x_val, y_val, result)
 
 
@@ -274,39 +276,24 @@ def compute_stability_maps_single_stage(
 
         print(f"\nScanning {param_x_key} vs {param_y_key}...")
 
-        # Determine parameter ranges based on mode
-        if mode == "fixed_absolute":
-            # Use absolute ranges
-            x_min, x_max = param_x_spec.default_range
-            y_min, y_max = param_y_spec.default_range
-        elif mode == "fixed_ratio":
-            # Use ratio ranges if applicable, otherwise absolute
-            if param_x_spec.use_ratio and param_x_spec.reference_param:
-                ref_spec = SCANNABLE_PARAMETERS[param_x_spec.reference_param]
+        # Determine parameter ranges
+        # Derived ratio params and fixed_absolute mode: use default_range
+        # Fixed_ratio mode: compute from reference param
+        def _get_range(spec, param_key):
+            if getattr(spec, "is_derived_ratio", False) or mode == "fixed_absolute":
+                return spec.default_range
+            if mode == "fixed_ratio" and spec.use_ratio and spec.reference_param:
+                ref_spec = SCANNABLE_PARAMETERS[spec.reference_param]
                 ref_value = get_nested_value(preset, ref_spec.path)
-                # Apply fixed ratio ranges
-                if "tau" in param_x_key:
-                    x_min = FIXED_RATIO_TAU_MIN * ref_value
-                    x_max = FIXED_RATIO_TAU_MAX * ref_value
-                else:
-                    x_min = FIXED_RATIO_SIGMA_MIN * ref_value
-                    x_max = FIXED_RATIO_SIGMA_MAX * ref_value
-            else:
-                x_min, x_max = param_x_spec.default_range
-
-            if param_y_spec.use_ratio and param_y_spec.reference_param:
-                ref_spec = SCANNABLE_PARAMETERS[param_y_spec.reference_param]
-                ref_value = get_nested_value(preset, ref_spec.path)
-                if "tau" in param_y_key:
-                    y_min = FIXED_RATIO_TAU_MIN * ref_value
-                    y_max = FIXED_RATIO_TAU_MAX * ref_value
-                else:
-                    y_min = FIXED_RATIO_SIGMA_MIN * ref_value
-                    y_max = FIXED_RATIO_SIGMA_MAX * ref_value
-            else:
-                y_min, y_max = param_y_spec.default_range
-        else:
+                if "tau" in param_key:
+                    return (FIXED_RATIO_TAU_MIN * ref_value, FIXED_RATIO_TAU_MAX * ref_value)
+                return (FIXED_RATIO_SIGMA_MIN * ref_value, FIXED_RATIO_SIGMA_MAX * ref_value)
+            if mode == "fixed_ratio":
+                return spec.default_range
             raise ValueError(f"Unknown mode: {mode}")
+
+        x_min, x_max = _get_range(param_x_spec, param_x_key)
+        y_min, y_max = _get_range(param_y_spec, param_y_key)
 
         # Generate parameter grids
         x_values = np.linspace(x_min, x_max, GRID_RESOLUTION)
@@ -323,8 +310,20 @@ def compute_stability_maps_single_stage(
 
         # Add preset value information
         result["preset"] = preset
-        result["preset_x_value"] = get_nested_value(preset, param_x_spec.path)
-        result["preset_y_value"] = get_nested_value(preset, param_y_spec.path)
+        if getattr(param_x_spec, "is_derived_ratio", False) and param_x_spec.base_param:
+            base_spec = SCANNABLE_PARAMETERS[param_x_spec.base_param]
+            result["preset_x_value"] = get_nested_value(preset, param_x_spec.path) / get_nested_value(
+                preset, base_spec.path
+            )
+        else:
+            result["preset_x_value"] = get_nested_value(preset, param_x_spec.path)
+        if getattr(param_y_spec, "is_derived_ratio", False) and param_y_spec.base_param:
+            base_spec = SCANNABLE_PARAMETERS[param_y_spec.base_param]
+            result["preset_y_value"] = get_nested_value(preset, param_y_spec.path) / get_nested_value(
+                preset, base_spec.path
+            )
+        else:
+            result["preset_y_value"] = get_nested_value(preset, param_y_spec.path)
 
         # Compute stability at exact preset parameters
         k_preset, stability_preset, flat_preset = compute_stability_for_point(preset)
@@ -376,166 +375,6 @@ def compute_stability_maps_all_stages(
         # Distribute results into the organized structure
         for pair, result in stage_results.items():
             all_results[pair][stage_name] = result
-
-    return all_results
-
-
-def _compressed_stability_worker(args: tuple) -> tuple[float, float, tuple[float, float, bool]]:
-    """Worker function for compressed stability map computation.
-
-    Args:
-        args: Tuple of (preset, tau_ratio, sigma_ratio)
-
-    Returns:
-        Tuple of (tau_ratio, sigma_ratio, result) where result is from compute_stability_for_point
-    """
-    preset, tau_ratio, sigma_ratio = args
-
-    # Modify preset with computed absolute values
-    modified_preset = copy.deepcopy(preset)
-    
-    # Get base SST values
-    tau_SST_base = preset["time_constants"]["SST"]
-    sigma_SST_base = preset["outgoing_widths"]["SST"]
-    
-    # Compute absolute PV values from ratios
-    tau_PV = tau_ratio * tau_SST_base
-    sigma_PV = sigma_ratio * sigma_SST_base
-    
-    # Set PV parameters
-    modified_preset["time_constants"]["PV"] = tau_PV
-    modified_preset["outgoing_widths"]["PV"] = sigma_PV
-
-    # Compute stability
-    result = compute_stability_for_point(modified_preset)
-
-    return (tau_ratio, sigma_ratio, result)
-
-
-def compute_compressed_stability_maps_all_stages(
-    stages: list[str] = None,
-    n_processes: int = None,
-) -> dict:
-    """Compute compressed stability maps for SST-PV ratio analysis.
-
-    This function creates a single map per stage showing how stability depends on
-    the ratios τ_PV/τ_SST (x-axis) and σ_PV/σ_SST (y-axis), which capture the
-    SST→PV maturation handoff during development.
-
-    Args:
-        stages: List of developmental stages (default: ['P0', 'P5', 'P10', 'P15'])
-        n_processes: Number of processes for parallelization
-
-    Returns:
-        Dict mapping stage names to results dicts with:
-        - k_matrix: Critical wavenumbers (n_y × n_x)
-        - stability_matrix: Max Re(λ) values (n_y × n_x)
-        - flatness_matrix: Flat spectrum flags (n_y × n_x)
-        - tau_ratio_values: τ_PV/τ_SST ratio values (x-axis)
-        - sigma_ratio_values: σ_PV/σ_SST ratio values (y-axis)
-        - preset: Original preset dict
-        - preset_tau_ratio: Preset τ_PV/τ_SST value
-        - preset_sigma_ratio: Preset σ_PV/σ_SST value
-    """
-    if stages is None:
-        stages = DEVELOPMENTAL_STAGES
-
-    print("\n" + "=" * 70)
-    print("  COMPRESSED STABILITY MAPS - SST-PV Ratio Analysis")
-    print("=" * 70 + "\n")
-
-    # Determine number of processes
-    if n_processes is None:
-        n_processes = max(1, os.cpu_count() - 1)
-
-    # Generate ratio grids
-    tau_ratio_values = np.linspace(
-        COMPRESSED_MAP_TAU_RATIO_RANGE[0],
-        COMPRESSED_MAP_TAU_RATIO_RANGE[1],
-        GRID_RESOLUTION
-    )
-    sigma_ratio_values = np.linspace(
-        COMPRESSED_MAP_SIGMA_RATIO_RANGE[0],
-        COMPRESSED_MAP_SIGMA_RATIO_RANGE[1],
-        GRID_RESOLUTION
-    )
-
-    n_x = len(tau_ratio_values)
-    n_y = len(sigma_ratio_values)
-
-    all_results = {}
-
-    for stage_name in stages:
-        preset = PRESETS[stage_name.upper()]
-        
-        print(f"\n{'='*70}")
-        print(f"Computing compressed stability map for {stage_name}")
-        print(f"{'='*70}")
-        
-        # Get base SST values
-        tau_SST_base = preset["time_constants"]["SST"]
-        sigma_SST_base = preset["outgoing_widths"]["SST"]
-        
-        # Get preset PV values for reference
-        tau_PV_preset = preset["time_constants"]["PV"]
-        sigma_PV_preset = preset["outgoing_widths"]["PV"]
-        
-        # Compute preset ratios
-        preset_tau_ratio = tau_PV_preset / tau_SST_base
-        preset_sigma_ratio = sigma_PV_preset / sigma_SST_base
-        
-        print(f"  Base SST values: τ_SST={tau_SST_base} ms, σ_SST={sigma_SST_base} μm")
-        print(f"  Preset PV values: τ_PV={tau_PV_preset} ms, σ_PV={sigma_PV_preset} μm")
-        print(f"  Preset ratios: τ_PV/τ_SST={preset_tau_ratio:.3f}, σ_PV/σ_SST={preset_sigma_ratio:.3f}")
-        print(f"  Scanning τ_PV/τ_SST ∈ [{COMPRESSED_MAP_TAU_RATIO_RANGE[0]:.2f}, {COMPRESSED_MAP_TAU_RATIO_RANGE[1]:.2f}]")
-        print(f"  Scanning σ_PV/σ_SST ∈ [{COMPRESSED_MAP_SIGMA_RATIO_RANGE[0]:.2f}, {COMPRESSED_MAP_SIGMA_RATIO_RANGE[1]:.2f}]")
-        print(f"  Grid: {GRID_RESOLUTION}×{GRID_RESOLUTION} = {GRID_RESOLUTION**2} points")
-
-        # Prepare tasks for parallel execution
-        tasks = []
-        for sigma_ratio in sigma_ratio_values:
-            for tau_ratio in tau_ratio_values:
-                tasks.append((preset, tau_ratio, sigma_ratio))
-
-        print(f"  Running {len(tasks)} stability computations using {n_processes} processes...")
-
-        # Execute in parallel
-        with mp.Pool(n_processes) as pool:
-            results = pool.map(_compressed_stability_worker, tasks)
-
-        # Unpack results into matrices
-        k_matrix = np.zeros((n_y, n_x))
-        stability_matrix = np.zeros((n_y, n_x))
-        flatness_matrix = np.zeros((n_y, n_x), dtype=bool)
-
-        for tau_ratio, sigma_ratio, (k_crit, max_real, is_flat) in results:
-            # Find indices
-            i = np.argmin(np.abs(sigma_ratio_values - sigma_ratio))
-            j = np.argmin(np.abs(tau_ratio_values - tau_ratio))
-
-            k_matrix[i, j] = k_crit
-            stability_matrix[i, j] = max_real
-            flatness_matrix[i, j] = is_flat
-
-        # Compute stability at exact preset parameters
-        k_preset, stability_preset, flat_preset = compute_stability_for_point(preset)
-        
-        print(f"  Preset stability: k={k_preset:.3f}, Re(λ)_max={stability_preset:.6f}, flat={flat_preset}")
-
-        # Store results
-        all_results[stage_name] = {
-            "k_matrix": k_matrix,
-            "stability_matrix": stability_matrix,
-            "flatness_matrix": flatness_matrix,
-            "tau_ratio_values": tau_ratio_values,
-            "sigma_ratio_values": sigma_ratio_values,
-            "preset": preset,
-            "preset_tau_ratio": preset_tau_ratio,
-            "preset_sigma_ratio": preset_sigma_ratio,
-            "preset_k": k_preset,
-            "preset_stability": stability_preset,
-            "preset_flat": flat_preset,
-        }
 
     return all_results
 

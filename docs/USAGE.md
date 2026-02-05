@@ -30,11 +30,14 @@ python -m src.analysis.bifurcation --analysis gain_maps
 
 # Run only gain spectra
 python -m src.analysis.bifurcation --analysis gain_spectra
+
+# Run maturity analysis
+python -m src.analysis.bifurcation --analysis maturity
 ```
 
 ### Options
 
-- `--analysis`: Type of analysis (`all`, `stability`, `gain`, `gain_maps`, `gain_spectra`)
+- `--analysis`: Type of analysis (`all`, `stability`, `gain`, `gain_maps`, `gain_spectra`, `maturity`)
 - `--stages`: Developmental stages to analyze (`P0`, `P5`, `P10`, `P15`)
 - `--mode`: Parameter range mode (`fixed_absolute`, `fixed_ratio`, `all`). Default: `all` (runs both modes)
 - `--n-processes`: Number of parallel processes (default: cpu_count - 1)
@@ -81,6 +84,7 @@ python -m src.analysis.stability
 ### Options
 
 - `--stages`: Developmental stages to analyze (`P0`, `P5`, `P10`, `P15`)
+- `--global`: Run whole-network (global) stability analysis instead of patch-based
 - `--output-dir`: Custom output directory
 - `--no-viz`: Skip visualization generation
 
@@ -89,6 +93,9 @@ python -m src.analysis.stability
 ```bash
 # Run for specific stages
 python -m src.analysis.stability --stages P0 P5
+
+# Whole-network stability analysis (saves to stability_analysis_global_results.pkl)
+python -m src.analysis.stability --global
 
 # Skip visualization
 python -m src.analysis.stability --no-viz
@@ -100,7 +107,8 @@ python -m src.analysis.stability --output-dir /path/to/outputs
 ### Output
 
 Results are saved to `outputs/stability/`:
-- `stability_analysis_results.pkl` - Complete analysis results
+- `stability_analysis_results.pkl` - Patch-based analysis results (default run)
+- `stability_analysis_global_results.pkl` - Whole-network analysis results (when using `--global`)
 - `snapshots/` - Snapshot data directory
 - `summary/` - Visualization figures
 
